@@ -1,0 +1,226 @@
+@page "/tasks/scheduled"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-calendar me-2"></span>Scheduled
+    </h3>
+    <ExportButton
+        EntityName="scheduled-tasks"
+        OnExportCsv="HandleExportCsv"
+        OnExportJson="HandleExportJson"
+        OnDownloadTemplate="HandleDownloadTemplate"
+        IsDisabled="@(!_tasks.Any())"
+        Size="small" />
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_tasks.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">Nothing scheduled</h5>
+        <p class="text-muted">No tasks are scheduled for specific dates.</p>
+    </div>
+}
+else
+{
+    @foreach (var group in _tasks.GroupBy(t => t.ScheduledDate?.Date ?? DateTime.MaxValue).OrderBy(g => g.Key))
+    {
+        var isToday = group.Key.Date == DateTime.UtcNow.Date;
+        var isPast = group.Key.Date < DateTime.UtcNow.Date;
+
+        <div class="mb-4">
+            <h5 class="@(isToday ? "text-primary" : isPast ? "text-danger" : "")">
+                @if (isToday)
+                {
+                    <span class="badge bg-primary me-2">Today</span>
+                }
+                else if (isPast)
+                {
+                    <span class="badge bg-danger me-2">Overdue</span>
+                }
+                @group.Key.ToString("dddd, MMMM d, yyyy")
+            </h5>
+
+            @foreach (var task in group.OrderBy(t => t.ScheduledStartTime))
+            {
+                <div class="card mb-2">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-sm btn-outline-success me-2" @onclick="() => CompleteTask(task)">
+                                <span class="oi oi-check"></span>
+                            </button>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center">
+                                    @if (task.ScheduledStartTime.HasValue)
+                                    {
+                                        <span class="text-muted me-2">
+                                            @task.ScheduledStartTime.Value.ToString("h:mm tt")
+                                        </span>
+                                    }
+                                    <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
+                                    <a href="/tasks/@task.Id" class="ms-2 text-decoration-none">@task.Title</a>
+                                </div>
+                                <div class="small text-muted">
+                                    @if (task.EstimatedMinutes > 0)
+                                    {
+                                        <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                    }
+                                    @foreach (var ctx in task.Contexts)
+                                    {
+                                        <SelfOrganizer.App.Components.Shared.ContextBadge Context="@ctx" />
+                                    }
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-link text-secondary" @onclick="() => Reschedule(task)" title="Reschedule">
+                                    <span class="oi oi-calendar"></span>
+                                </button>
+                                <button class="btn btn-sm btn-link text-warning" @onclick="() => MoveToNextAction(task)" title="Move to Next Actions">
+                                    <span class="oi oi-action-undo"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@* Reschedule Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Reschedule Task" IsVisible="@_showRescheduleModal" OnClose="() => _showRescheduleModal = false">
+    <ChildContent>
+        @if (_reschedulingTask != null)
+        {
+            <p><strong>@_reschedulingTask.Title</strong></p>
+            <div class="mb-3">
+                <label class="form-label">New Date</label>
+                <input type="date" class="form-control" @bind="_newScheduledDate" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Time (optional)</label>
+                <input type="time" class="form-control" @bind="_newScheduledTime" />
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showRescheduleModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="ConfirmReschedule">Reschedule</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@code {
+    private List<TodoTask> _tasks = new();
+    private bool _isLoading = true;
+    private bool _showRescheduleModal = false;
+    private TodoTask? _reschedulingTask;
+    private DateTime _newScheduledDate = DateTime.Today;
+    private TimeOnly? _newScheduledTime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        _isLoading = true;
+        try
+        {
+            _tasks = (await TaskService.GetScheduledAsync()).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CompleteTask(TodoTask task)
+    {
+        await TaskService.CompleteAsync(task.Id);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private async Task MoveToNextAction(TodoTask task)
+    {
+        task.Status = TodoTaskStatus.NextAction;
+        task.ScheduledDate = null;
+        task.ScheduledStartTime = null;
+        await TaskService.UpdateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private void Reschedule(TodoTask task)
+    {
+        _reschedulingTask = task;
+        _newScheduledDate = task.ScheduledDate?.Date ?? DateTime.Today;
+        _newScheduledTime = task.ScheduledStartTime.HasValue
+            ? TimeOnly.FromDateTime(task.ScheduledStartTime.Value)
+            : null;
+        _showRescheduleModal = true;
+    }
+
+    private async Task ConfirmReschedule()
+    {
+        if (_reschedulingTask != null)
+        {
+            DateTime? startTime = _newScheduledTime.HasValue
+                ? _newScheduledDate.Date.Add(_newScheduledTime.Value.ToTimeSpan())
+                : null;
+
+            await TaskService.ScheduleAsync(_reschedulingTask.Id, _newScheduledDate, startTime);
+            _showRescheduleModal = false;
+            _reschedulingTask = null;
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "ScheduledDate", "ScheduledStartTime", "Priority", "EstimatedMinutes", "Contexts"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_tasks, "scheduled-tasks", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} tasks");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_tasks, "scheduled-tasks");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} tasks");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<TodoTask>("scheduled-tasks", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+}

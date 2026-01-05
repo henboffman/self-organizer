@@ -1,0 +1,21 @@
+@if (_isVisible)
+{
+    <div class="celebration-overlay" @onclick="Hide">
+        <div class="celebration-content animate-scale-in">
+            <div class="celebration-icon">
+                <span class="oi oi-check"></span>
+            </div>
+            <div class="celebration-message">@Message</div>
+            <div class="confetti-container">
+                @for (int i = 0; i < 50; i++)
+                {
+                    var left = Random.Shared.Next(0, 100);
+                    var delay = Random.Shared.NextDouble() * 2;
+                    var duration = 2 + Random.Shared.NextDouble() * 2;
+                    var color = _colors[Random.Shared.Next(_colors.Length)];
+                    <div class="confetti" style="left: @(left)%; animation-delay: @(delay)s; animation-duration: @(duration)s; background-color: @color;"></div>
+                }
+            </div>
+        </div>
+    </div>
+}

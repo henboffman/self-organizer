@@ -1,0 +1,139 @@
+@page "/review/weekly"
+
+<h3 class="mb-4">
+    <span class="oi oi-list-rich me-2"></span>Weekly Review
+</h3>
+
+<div class="alert alert-info">
+    <strong>Weekly Review</strong> - Follow the GTD weekly review process to get clear, current, and creative.
+</div>
+
+<div class="accordion" id="weeklyReviewAccordion">
+    @* Get Clear *@
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#getClear">
+                <span class="oi oi-inbox me-2"></span>Get Clear
+            </button>
+        </h2>
+        <div id="getClear" class="accordion-collapse collapse show" data-bs-parent="#weeklyReviewAccordion">
+            <div class="accordion-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="clear1" />
+                    <label class="form-check-label" for="clear1">Process inbox to zero</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="clear2" />
+                    <label class="form-check-label" for="clear2">Process all notes and captures</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="clear3" />
+                    <label class="form-check-label" for="clear3">Review previous week's calendar</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="clear4" />
+                    <label class="form-check-label" for="clear4">Review upcoming week's calendar</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Get Current *@
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#getCurrent">
+                <span class="oi oi-reload me-2"></span>Get Current
+            </button>
+        </h2>
+        <div id="getCurrent" class="accordion-collapse collapse" data-bs-parent="#weeklyReviewAccordion">
+            <div class="accordion-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="current1" />
+                    <label class="form-check-label" for="current1">
+                        <a href="/tasks/next">Review Next Actions list</a>
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="current2" />
+                    <label class="form-check-label" for="current2">
+                        <a href="/projects">Review Projects list</a> (ensure each has a next action)
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="current3" />
+                    <label class="form-check-label" for="current3">
+                        <a href="/tasks/waiting">Review Waiting For list</a>
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="current4" />
+                    <label class="form-check-label" for="current4">
+                        <a href="/tasks/someday">Review Someday/Maybe list</a>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Get Creative *@
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#getCreative">
+                <span class="oi oi-lightbulb me-2"></span>Get Creative
+            </button>
+        </h2>
+        <div id="getCreative" class="accordion-collapse collapse" data-bs-parent="#weeklyReviewAccordion">
+            <div class="accordion-body">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="creative1" />
+                    <label class="form-check-label" for="creative1">Any new projects to add?</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="creative2" />
+                    <label class="form-check-label" for="creative2">Any Someday/Maybe items to activate?</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="creative3" />
+                    <label class="form-check-label" for="creative3">Anything else on your mind?</label>
+                </div>
+
+                <hr />
+
+                <h6>Trigger List</h6>
+                <p class="text-muted small">Review these areas to capture anything you might have missed:</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <ul class="small">
+                            <li>Projects started, not completed</li>
+                            <li>Projects needing to be started</li>
+                            <li>Commitments to others</li>
+                            <li>Communications to respond to</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <ul class="small">
+                            <li>Upcoming events</li>
+                            <li>Travel plans</li>
+                            <li>Financial items</li>
+                            <li>Administration</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <ul class="small">
+                            <li>Health & wellness</li>
+                            <li>Personal development</li>
+                            <li>Family & friends</li>
+                            <li>Creative projects</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="/capture" class="btn btn-primary btn-lg">
+        <span class="oi oi-bolt me-1"></span> Capture New Items
+    </a>
+</div>

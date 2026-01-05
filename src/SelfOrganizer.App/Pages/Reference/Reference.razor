@@ -1,0 +1,250 @@
+@page "/reference"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.IRepository<ReferenceItem> ReferenceRepository
+@inject IExportService ExportService
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-book me-2"></span>Reference
+    </h3>
+    <div class="d-flex gap-2">
+        <ExportButton
+            EntityName="reference"
+            OnExportCsv="HandleExportCsv"
+            OnExportJson="HandleExportJson"
+            OnDownloadTemplate="HandleDownloadTemplate"
+            IsDisabled="@(!_items.Any())"
+            Size="small" />
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <span class="oi oi-plus me-1"></span> Add Reference
+        </button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_items.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">No reference items</h5>
+        <p class="text-muted">Store non-actionable information here for future reference.</p>
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var item in _items.OrderByDescending(i => i.ModifiedAt))
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>@item.Title</span>
+                        @if (!string.IsNullOrEmpty(item.Category))
+                        {
+                            <span class="badge bg-secondary">@item.Category</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(item.Content))
+                        {
+                            <p class="card-text small" style="max-height: 100px; overflow: hidden;">@item.Content</p>
+                        }
+                        @if (!string.IsNullOrEmpty(item.Url))
+                        {
+                            <a href="@item.Url" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <span class="oi oi-external-link"></span> Open Link
+                            </a>
+                        }
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <small class="text-muted">Updated @item.ModifiedAt.ToString("MMM d, yyyy")</small>
+                        <div class="float-end">
+                            <button class="btn btn-sm btn-link text-primary" @onclick="() => EditItem(item)">
+                                <span class="oi oi-pencil"></span>
+                            </button>
+                            <button class="btn btn-sm btn-link text-danger" @onclick="() => DeleteItem(item)">
+                                <span class="oi oi-trash"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingItem == null ? "Add Reference" : "Edit Reference")" IsVisible="@_showModal" OnClose="CloseModal">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_itemTitle" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Content</label>
+            <textarea class="form-control" @bind="_itemContent" rows="4"></textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">URL (optional)</label>
+            <input type="url" class="form-control" @bind="_itemUrl" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Category</label>
+            <input type="text" class="form-control" @bind="_itemCategory" />
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveItem" disabled="@string.IsNullOrWhiteSpace(_itemTitle)">Save</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Reference"
+    Message="Are you sure you want to delete this reference item?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+@code {
+    private List<ReferenceItem> _items = new();
+    private bool _isLoading = true;
+    private bool _showModal = false;
+    private bool _showDeleteConfirm = false;
+    private ReferenceItem? _editingItem;
+    private ReferenceItem? _deletingItem;
+
+    private string _itemTitle = string.Empty;
+    private string _itemContent = string.Empty;
+    private string _itemUrl = string.Empty;
+    private string _itemCategory = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+    }
+
+    private async Task LoadItems()
+    {
+        _isLoading = true;
+        try
+        {
+            _items = (await ReferenceRepository.GetAllAsync()).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowAddModal()
+    {
+        _editingItem = null;
+        _itemTitle = string.Empty;
+        _itemContent = string.Empty;
+        _itemUrl = string.Empty;
+        _itemCategory = string.Empty;
+        _showModal = true;
+    }
+
+    private void EditItem(ReferenceItem item)
+    {
+        _editingItem = item;
+        _itemTitle = item.Title;
+        _itemContent = item.Content ?? string.Empty;
+        _itemUrl = item.Url ?? string.Empty;
+        _itemCategory = item.Category ?? string.Empty;
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingItem = null;
+    }
+
+    private async Task SaveItem()
+    {
+        if (string.IsNullOrWhiteSpace(_itemTitle)) return;
+
+        if (_editingItem == null)
+        {
+            var item = new ReferenceItem
+            {
+                Title = _itemTitle,
+                Content = _itemContent,
+                Url = _itemUrl,
+                Category = _itemCategory
+            };
+            await ReferenceRepository.AddAsync(item);
+        }
+        else
+        {
+            _editingItem.Title = _itemTitle;
+            _editingItem.Content = _itemContent;
+            _editingItem.Url = _itemUrl;
+            _editingItem.Category = _itemCategory;
+            await ReferenceRepository.UpdateAsync(_editingItem);
+        }
+
+        CloseModal();
+        await LoadItems();
+    }
+
+    private void DeleteItem(ReferenceItem item)
+    {
+        _deletingItem = item;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingItem != null)
+        {
+            await ReferenceRepository.DeleteAsync(_deletingItem.Id);
+            _deletingItem = null;
+        }
+        _showDeleteConfirm = false;
+        await LoadItems();
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "Content", "Category", "Url", "Tags"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_items, "reference", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_items, "reference");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<ReferenceItem>("reference", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+}

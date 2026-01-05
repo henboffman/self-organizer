@@ -1,0 +1,639 @@
+@page "/"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ICaptureService CaptureService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject IDataChangeNotificationService DataChangeNotification
+@inject IJSRuntime JS
+@implements IDisposable
+
+<h3 class="mb-4">Dashboard</h3>
+
+<div class="row">
+    @* Quick Stats *@
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Inbox</h6>
+                        <h2 class="card-title mb-0">@_inboxCount</h2>
+                    </div>
+                    <span class="oi oi-inbox fs-1 opacity-50"></span>
+                </div>
+            </div>
+            <a href="/inbox" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
+                Process Inbox <span class="oi oi-arrow-right"></span>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Completed Today</h6>
+                        <h2 class="card-title mb-0">@_completedToday</h2>
+                    </div>
+                    <span class="oi oi-check fs-1 opacity-50"></span>
+                </div>
+            </div>
+            <div class="card-footer text-white-50">
+                Keep up the great work!
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 text-dark opacity-75">Next Actions</h6>
+                        <h2 class="card-title mb-0 text-dark">@_nextActionsCount</h2>
+                    </div>
+                    <span class="oi oi-task fs-1 opacity-50 text-dark"></span>
+                </div>
+            </div>
+            <a href="/tasks/next" class="card-footer text-dark text-decoration-none d-flex justify-content-between align-items-center">
+                View Tasks <span class="oi oi-arrow-right"></span>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Overdue</h6>
+                        <h2 class="card-title mb-0">@_overdueCount</h2>
+                    </div>
+                    <span class="oi oi-warning fs-1 opacity-50"></span>
+                </div>
+            </div>
+            <a href="/tasks/scheduled" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
+                Review <span class="oi oi-arrow-right"></span>
+            </a>
+        </div>
+    </div>
+</div>
+
+@* Today's Focus - Pick 3 *@
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span><span class="oi oi-target me-2"></span>Today's Focus</span>
+        @if (_todaysPicks.Any())
+        {
+            <span class="badge bg-light text-primary">@_todaysPicks.Count(p => p.IsCompleted)/@_todaysPicks.Count done</span>
+        }
+    </div>
+    <div class="card-body">
+        @if (!_pick3Loaded)
+        {
+            <div class="text-center py-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            </div>
+        }
+        else if (!_todaysPicks.Any())
+        {
+            @* No picks yet - show selection UI *@
+            @if (!_showPickSelector)
+            {
+                <div class="text-center py-3">
+                    <p class="text-muted mb-3">
+                        <strong>What 3 things will make today a success?</strong><br />
+                        <small>Selecting just 3 tasks reduces decision fatigue and increases focus.</small>
+                    </p>
+                    <button class="btn btn-primary btn-lg" @onclick="() => _showPickSelector = true">
+                        <span class="oi oi-target me-1"></span> Pick My 3 for Today
+                    </button>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted small mb-3">Select up to 3 tasks for today:</p>
+                <div class="list-group mb-3" style="max-height: 300px; overflow-y: auto;">
+                    @foreach (var task in _topNextActions.Take(10))
+                    {
+                        var isSelected = _tempPicks.Contains(task.Id);
+                        <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(isSelected ? "active" : "")"
+                                @onclick="() => ToggleTempPick(task.Id)"
+                                disabled="@(!isSelected && _tempPicks.Count >= 3)">
+                            <span>
+                                @if (isSelected)
+                                {
+                                    <span class="oi oi-check me-2"></span>
+                                }
+                                @task.Title
+                            </span>
+                            @if (task.EstimatedMinutes > 0)
+                            {
+                                <span class="badge @(isSelected ? "bg-light text-primary" : "bg-secondary")">@task.EstimatedMinutes min</span>
+                            }
+                        </button>
+                    }
+                </div>
+                <div class="d-flex justify-content-between">
+                    <button class="btn btn-outline-secondary" @onclick="CancelPicking">Cancel</button>
+                    <button class="btn btn-primary" @onclick="ConfirmPicks" disabled="@(!_tempPicks.Any())">
+                        <span class="oi oi-check me-1"></span> Set These @(_tempPicks.Count) as Today's Focus
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            @* Show today's picks *@
+            <div class="list-group mb-3">
+                @foreach (var pick in _todaysPicks)
+                {
+                    var task = _allNextActions.FirstOrDefault(t => t.Id == pick.TaskId);
+                    <div class="list-group-item d-flex align-items-center @(pick.IsCompleted ? "list-group-item-success" : "")">
+                        <button class="btn btn-sm @(pick.IsCompleted ? "btn-success" : "btn-outline-success") me-3"
+                                @onclick="() => TogglePickComplete(pick)"
+                                title="@(pick.IsCompleted ? "Mark incomplete" : "Mark complete")">
+                            <span class="oi @(pick.IsCompleted ? "oi-check" : "oi-circle-check")"></span>
+                        </button>
+                        <span class="flex-grow-1 @(pick.IsCompleted ? "text-decoration-line-through text-muted" : "")">
+                            @(task?.Title ?? "Task not found")
+                        </span>
+                        @if (task?.EstimatedMinutes > 0 && !pick.IsCompleted)
+                        {
+                            <span class="badge bg-secondary me-2">@task.EstimatedMinutes min</span>
+                        }
+                        @if (!pick.IsCompleted)
+                        {
+                            <a href="/focus" class="btn btn-sm btn-outline-primary" title="Start focus session">
+                                <span class="oi oi-clock"></span>
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+            @if (_todaysPicks.All(p => p.IsCompleted))
+            {
+                <div class="alert alert-success mb-0">
+                    <span class="oi oi-star me-2"></span>
+                    <strong>You did it!</strong> All 3 tasks completed. Great work today!
+                </div>
+            }
+            else
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        @{
+                            var remaining = _todaysPicks.Where(p => !p.IsCompleted)
+                                .Sum(p => _allNextActions.FirstOrDefault(t => t.Id == p.TaskId)?.EstimatedMinutes ?? 0);
+                        }
+                        @if (remaining > 0)
+                        {
+                            <span>~@remaining min remaining</span>
+                        }
+                    </small>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearPicks">
+                        <span class="oi oi-reload me-1"></span> Reset Picks
+                    </button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div class="row">
+    @* Quick Capture *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <span class="oi oi-bolt me-2"></span>Quick Capture
+            </div>
+            <div class="card-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="What's on your mind?" @bind="_quickCaptureText" @onkeydown="HandleCaptureKeyDown" />
+                    <button class="btn btn-primary" @onclick="QuickCapture" disabled="@(string.IsNullOrWhiteSpace(_quickCaptureText) || _isCapturing)">
+                        @if (_isCapturing)
+                        {
+                            <span class="spinner-border spinner-border-sm"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-plus"></span>
+                        }
+                    </button>
+                </div>
+                @if (_captureSuccess)
+                {
+                    <div class="text-success small mt-2">
+                        <span class="oi oi-check"></span> Captured!
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Stalled Projects *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 @(_stalledProjects.Any() ? "border-warning" : "")">
+            <div class="card-header @(_stalledProjects.Any() ? "bg-warning text-dark" : "")">
+                <span class="oi oi-folder me-2"></span>Project Status
+            </div>
+            <div class="card-body">
+                @if (_stalledProjects.Any())
+                {
+                    <div class="alert alert-warning py-2">
+                        <strong>@_stalledProjects.Count project(s)</strong> need a next action!
+                    </div>
+                    @foreach (var project in _stalledProjects.Take(3))
+                    {
+                        <div class="d-flex justify-content-between align-items-center py-1">
+                            <a href="/projects/@project.Id">@project.Name</a>
+                            <a href="/projects/@project.Id" class="btn btn-sm btn-warning">Add Action</a>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-3">
+                        <span class="oi oi-check text-success fs-3"></span>
+                        <p class="text-muted mb-0 mt-2">All projects have next actions!</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    @* Next Actions *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-task me-2"></span>Top Next Actions</span>
+                <a href="/tasks/next" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                @if (_topNextActions.Any())
+                {
+                    @foreach (var task in _topNextActions)
+                    {
+                        <div class="d-flex align-items-center py-2 border-bottom">
+                            <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
+                            <a href="/tasks/@task.Id" class="ms-2 text-decoration-none flex-grow-1">@task.Title</a>
+                            @if (task.EstimatedMinutes > 0)
+                            {
+                                <small class="text-muted">
+                                    <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                </small>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted text-center py-3">No next actions. Process your inbox!</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Today's Events *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-calendar me-2"></span>Today's Schedule</span>
+                <a href="/calendar" class="btn btn-sm btn-outline-primary">View Calendar</a>
+            </div>
+            <div class="card-body">
+                @if (_todayEvents.Any())
+                {
+                    @foreach (var evt in _todayEvents.OrderBy(e => e.StartTime))
+                    {
+                        <div class="d-flex align-items-center py-2 border-bottom">
+                            <span class="text-muted me-2" style="min-width: 70px;">
+                                @evt.StartTime.ToString("h:mm tt")
+                            </span>
+                            <a href="/events/@evt.Id" class="text-decoration-none flex-grow-1">@evt.Title</a>
+                            <small class="text-muted">
+                                @((evt.EndTime - evt.StartTime).TotalMinutes)min
+                            </small>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted text-center py-3">No events scheduled for today.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    @* Waiting For *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-clock me-2"></span>Waiting For</span>
+                <a href="/tasks/waiting" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                @if (_waitingFor.Any())
+                {
+                    @foreach (var task in _waitingFor.Take(5))
+                    {
+                        var days = task.WaitingForSince.HasValue
+                            ? (int)(DateTime.UtcNow - task.WaitingForSince.Value).TotalDays
+                            : 0;
+
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                            <div>
+                                <a href="/tasks/@task.Id" class="text-decoration-none">@task.Title</a>
+                                <small class="d-block text-muted">@(task.WaitingForNote ?? "Someone")</small>
+                            </div>
+                            <span class="badge @(days > 7 ? "bg-warning text-dark" : "bg-secondary")">
+                                @days days
+                            </span>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted text-center py-3">Nothing waiting.</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* Review Reminder *@
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <span class="oi oi-list-rich me-2"></span>Reviews
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-3">
+                    <a href="/review/daily" class="btn btn-lg btn-outline-primary">
+                        <span class="oi oi-check me-2"></span>Daily Review
+                    </a>
+                    <a href="/review/weekly" class="btn btn-lg btn-outline-secondary">
+                        <span class="oi oi-list-rich me-2"></span>Weekly Review
+                    </a>
+                </div>
+                <p class="text-muted text-center mt-3 mb-0 small">
+                    Regular reviews keep your system trusted!
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int _inboxCount = 0;
+    private int _completedToday = 0;
+    private int _nextActionsCount = 0;
+    private int _overdueCount = 0;
+    private List<TodoTask> _topNextActions = new();
+    private List<TodoTask> _allNextActions = new();
+    private List<TodoTask> _waitingFor = new();
+    private List<CalendarEvent> _todayEvents = new();
+    private List<Project> _stalledProjects = new();
+
+    private string _quickCaptureText = string.Empty;
+    private bool _isCapturing = false;
+    private bool _captureSuccess = false;
+
+    // Pick 3 state
+    private bool _pick3Loaded = false;
+    private bool _showPickSelector = false;
+    private List<Guid> _tempPicks = new();
+    private List<DailyPick> _todaysPicks = new();
+    private bool _enableCelebrations = true;
+
+    private record DailyPick(Guid TaskId, bool IsCompleted);
+
+    private const string Pick3StorageKey = "selforg_pick3";
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataChangeNotification.OnDataChanged += HandleDataChanged;
+        await LoadDashboardData();
+
+        // Load preferences
+        var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (prefs != null)
+        {
+            _enableCelebrations = prefs.EnableCelebrationEffects;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadPick3FromStorage();
+            _pick3Loaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async void HandleDataChanged()
+    {
+        try
+        {
+            await LoadDashboardData();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            // Log error - async void methods swallow exceptions so we need to handle them here
+            Console.Error.WriteLine($"Error refreshing dashboard: {ex.Message}");
+        }
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Inbox count = unprocessed captures + tasks with Inbox status
+            var capturesCountTask = CaptureService.GetUnprocessedCountAsync();
+            var inboxTasksTask = TaskService.GetByStatusAsync(TodoTaskStatus.Inbox);
+
+            await Task.WhenAll(capturesCountTask, inboxTasksTask);
+
+            var capturesCount = await capturesCountTask;
+            var inboxTasksCount = (await inboxTasksTask).Count();
+            _inboxCount = capturesCount + inboxTasksCount;
+
+            _completedToday = await TaskService.GetCompletedTodayCountAsync();
+
+            var nextActions = (await TaskService.GetNextActionsAsync()).ToList();
+            _allNextActions = nextActions;
+            _nextActionsCount = nextActions.Count;
+            _topNextActions = nextActions.OrderBy(t => t.Priority).ThenBy(t => t.DueDate).Take(10).ToList();
+
+            var overdue = await TaskService.GetOverdueAsync();
+            _overdueCount = overdue.Count();
+
+            _waitingFor = (await TaskService.GetWaitingForAsync()).ToList();
+
+            _todayEvents = (await CalendarService.GetEventsForDateAsync(DateOnly.FromDateTime(DateTime.Today))).ToList();
+
+            _stalledProjects = (await ProjectService.GetStalledProjectsAsync()).ToList();
+        }
+        catch
+        {
+            // Silently handle errors on initial load
+        }
+    }
+
+    private async Task HandleCaptureKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_quickCaptureText))
+        {
+            await QuickCapture();
+        }
+    }
+
+    private async Task QuickCapture()
+    {
+        if (string.IsNullOrWhiteSpace(_quickCaptureText) || _isCapturing) return;
+
+        _isCapturing = true;
+        _captureSuccess = false;
+
+        try
+        {
+            await CaptureService.CaptureAsync(_quickCaptureText.Trim());
+            _quickCaptureText = string.Empty;
+            _captureSuccess = true;
+            DataChangeNotification.NotifyDataChanged();
+
+            _ = Task.Delay(2000).ContinueWith(_ =>
+            {
+                _captureSuccess = false;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+        finally
+        {
+            _isCapturing = false;
+        }
+    }
+
+    // Pick 3 Methods
+    private async Task LoadPick3FromStorage()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("localStorage.getItem", Pick3StorageKey);
+            if (!string.IsNullOrEmpty(json))
+            {
+                var stored = System.Text.Json.JsonSerializer.Deserialize<StoredPick3>(json);
+                if (stored != null && stored.Date == DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd"))
+                {
+                    _todaysPicks = stored.Picks.Select(p => new DailyPick(p.TaskId, p.IsCompleted)).ToList();
+                }
+            }
+        }
+        catch
+        {
+            // Ignore storage errors
+        }
+    }
+
+    private async Task SavePick3ToStorage()
+    {
+        try
+        {
+            var stored = new StoredPick3
+            {
+                Date = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd"),
+                Picks = _todaysPicks.Select(p => new StoredPickItem { TaskId = p.TaskId, IsCompleted = p.IsCompleted }).ToList()
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(stored);
+            await JS.InvokeVoidAsync("localStorage.setItem", Pick3StorageKey, json);
+        }
+        catch
+        {
+            // Ignore storage errors
+        }
+    }
+
+    private void ToggleTempPick(Guid taskId)
+    {
+        if (_tempPicks.Contains(taskId))
+            _tempPicks.Remove(taskId);
+        else if (_tempPicks.Count < 3)
+            _tempPicks.Add(taskId);
+    }
+
+    private void CancelPicking()
+    {
+        _showPickSelector = false;
+        _tempPicks.Clear();
+    }
+
+    private async Task ConfirmPicks()
+    {
+        _todaysPicks = _tempPicks.Select(id => new DailyPick(id, false)).ToList();
+        _tempPicks.Clear();
+        _showPickSelector = false;
+        await SavePick3ToStorage();
+    }
+
+    private async Task TogglePickComplete(DailyPick pick)
+    {
+        var index = _todaysPicks.FindIndex(p => p.TaskId == pick.TaskId);
+        if (index >= 0)
+        {
+            var newCompleted = !pick.IsCompleted;
+            _todaysPicks[index] = pick with { IsCompleted = newCompleted };
+
+            // Also complete the actual task if marking complete
+            if (newCompleted)
+            {
+                var task = _allNextActions.FirstOrDefault(t => t.Id == pick.TaskId);
+                if (task != null)
+                {
+                    if (task.IsRecurring)
+                        await TaskService.CompleteRecurringTaskAsync(task.Id);
+                    else
+                        await TaskService.CompleteAsync(task.Id);
+
+                    DataChangeNotification.NotifyDataChanged();
+                }
+            }
+
+            await SavePick3ToStorage();
+        }
+    }
+
+    private async Task ClearPicks()
+    {
+        _todaysPicks.Clear();
+        await SavePick3ToStorage();
+    }
+
+    // Storage model for Pick 3
+    private class StoredPick3
+    {
+        public string Date { get; set; } = "";
+        public List<StoredPickItem> Picks { get; set; } = new();
+    }
+
+    private class StoredPickItem
+    {
+        public Guid TaskId { get; set; }
+        public bool IsCompleted { get; set; }
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotification.OnDataChanged -= HandleDataChanged;
+    }
+}

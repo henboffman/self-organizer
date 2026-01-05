@@ -1,0 +1,33 @@
+/* Modal Component Styles */
+
+.modal-overlay {
+    background-color: var(--bg-overlay);
+}
+
+.modal-content {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-default);
+    padding: var(--space-md) var(--space-lg);
+}
+
+.modal-title {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: var(--space-lg);
+    color: var(--text-secondary);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-default);
+    padding: var(--space-md) var(--space-lg);
+    gap: var(--space-sm);
+}

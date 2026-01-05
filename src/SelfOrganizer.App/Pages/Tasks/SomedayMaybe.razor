@@ -1,0 +1,204 @@
+@page "/tasks/someday"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-star me-2"></span>Someday/Maybe
+    </h3>
+    <ExportButton
+        EntityName="someday-maybe"
+        OnExportCsv="HandleExportCsv"
+        OnExportJson="HandleExportJson"
+        OnDownloadTemplate="HandleDownloadTemplate"
+        IsDisabled="@(!_tasks.Any())"
+        Size="small" />
+</div>
+
+<div class="alert alert-info mb-4">
+    <span class="oi oi-info me-2"></span>
+    These are ideas and tasks you might want to do someday, but aren't committed to yet.
+    Review this list during your weekly review.
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_tasks.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">Nothing here yet</h5>
+        <p class="text-muted">Add tasks you might want to do someday during inbox processing.</p>
+    </div>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var task in _tasks.OrderByDescending(t => t.CreatedAt))
+        {
+            <div class="list-group-item">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <a href="/tasks/@task.Id" class="text-decoration-none">@task.Title</a>
+                        @if (!string.IsNullOrEmpty(task.Description))
+                        {
+                            <p class="mb-0 small text-muted">@task.Description</p>
+                        }
+                        <small class="text-muted">Added @task.CreatedAt.ToString("MMM d, yyyy")</small>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-success" @onclick="() => Activate(task)" title="Move to Next Actions">
+                            <span class="oi oi-arrow-right"></span> Activate
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Schedule(task)" title="Schedule">
+                            <span class="oi oi-calendar"></span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTask(task)" title="Delete">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@* Schedule Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Schedule Task" IsVisible="@_showScheduleModal" OnClose="() => _showScheduleModal = false">
+    <ChildContent>
+        @if (_schedulingTask != null)
+        {
+            <p><strong>@_schedulingTask.Title</strong></p>
+            <div class="mb-3">
+                <label class="form-label">Schedule Date</label>
+                <input type="date" class="form-control" @bind="_scheduleDate" />
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showScheduleModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="ConfirmSchedule">Schedule</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Task"
+    Message="Are you sure you want to delete this task?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+@code {
+    private List<TodoTask> _tasks = new();
+    private bool _isLoading = true;
+    private bool _showScheduleModal = false;
+    private bool _showDeleteConfirm = false;
+    private TodoTask? _schedulingTask;
+    private TodoTask? _deletingTask;
+    private DateTime _scheduleDate = DateTime.Today.AddDays(7);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        _isLoading = true;
+        try
+        {
+            _tasks = (await TaskService.GetSomedayMaybeAsync()).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task Activate(TodoTask task)
+    {
+        task.Status = TodoTaskStatus.NextAction;
+        await TaskService.UpdateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private void Schedule(TodoTask task)
+    {
+        _schedulingTask = task;
+        _scheduleDate = DateTime.Today.AddDays(7);
+        _showScheduleModal = true;
+    }
+
+    private async Task ConfirmSchedule()
+    {
+        if (_schedulingTask != null)
+        {
+            await TaskService.ScheduleAsync(_schedulingTask.Id, _scheduleDate);
+            _showScheduleModal = false;
+            _schedulingTask = null;
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+    }
+
+    private void DeleteTask(TodoTask task)
+    {
+        _deletingTask = task;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingTask != null)
+        {
+            await TaskService.DeleteAsync(_deletingTask.Id);
+            _deletingTask = null;
+        }
+        _showDeleteConfirm = false;
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "Description", "Category"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_tasks, "someday-maybe", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_tasks, "someday-maybe");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<TodoTask>("someday-maybe", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+}

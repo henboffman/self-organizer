@@ -1,0 +1,102 @@
+/* ===========================================
+   Main Layout Styles
+   Uses CSS variables from theme.css
+   =========================================== */
+
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+    background-color: var(--bg-primary);
+}
+
+.sidebar {
+    background: var(--sidebar-bg-gradient);
+}
+
+.top-row {
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-default);
+    justify-content: flex-end;
+    height: 3.5rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.top-row ::deep a,
+.top-row ::deep .btn-link {
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.top-row ::deep a:hover,
+.top-row ::deep .btn-link:hover {
+    text-decoration: underline;
+}
+
+.top-row ::deep a:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.settings-link {
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+}
+
+.settings-link:hover {
+    color: var(--color-primary);
+}
+
+.content {
+    padding-top: var(--space-lg);
+}
+
+article {
+    animation: fadeIn var(--transition-normal) ease-out;
+}
+
+@media (max-width: 640.98px) {
+    .top-row {
+        justify-content: space-between;
+        padding: 0 var(--space-md);
+    }
+}
+
+@media (min-width: 641px) {
+    .page {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: 260px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        flex-shrink: 0;
+    }
+
+    .top-row {
+        position: sticky;
+        top: 0;
+        z-index: var(--z-sticky);
+    }
+
+    .top-row.auth ::deep a:first-child {
+        flex: 1;
+        text-align: right;
+        width: 0;
+    }
+
+    .top-row,
+    article {
+        padding-left: var(--space-xl) !important;
+        padding-right: var(--space-lg) !important;
+    }
+}

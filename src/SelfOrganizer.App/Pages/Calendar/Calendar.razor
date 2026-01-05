@@ -1,0 +1,1671 @@
+@page "/calendar"
+@page "/calendar/day/{DateParam?}"
+@page "/calendar/week/{DateParam?}"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Services.Intelligence
+@using SelfOrganizer.App.Components.Shared
+@using Microsoft.JSInterop
+@inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.ISchedulingService SchedulingService
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject ITaskOptimizerService TaskOptimizer
+@inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@implements IAsyncDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-calendar me-2"></span>Calendar
+    </h3>
+    <div class="d-flex gap-2">
+        <ExportButton
+            EntityName="events"
+            OnExportCsv="HandleExportCsv"
+            OnExportJson="HandleExportJson"
+            OnDownloadTemplate="HandleDownloadTemplate"
+            IsDisabled="@(!_events.Any())"
+            Size="small" />
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <span class="oi oi-plus me-1"></span> New Event
+        </button>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary" @onclick="Previous">
+            <span class="oi oi-chevron-left"></span>
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="Today">Today</button>
+        <button class="btn btn-outline-secondary" @onclick="Next">
+            <span class="oi oi-chevron-right"></span>
+        </button>
+    </div>
+    <h4 class="mb-0">@GetDateRangeDisplay()</h4>
+    <div class="d-flex gap-2 align-items-center">
+        @* Task Scheduler Toggle *@
+        <div class="form-check form-switch me-2" title="Show task scheduler">
+            <input class="form-check-input" type="checkbox" role="switch" id="schedulerToggle"
+                   checked="@_showScheduler"
+                   @onchange="OnShowSchedulerChanged" />
+            <label class="form-check-label small" for="schedulerToggle">
+                <span class="oi oi-spreadsheet @(_showScheduler ? "text-primary" : "text-muted")"></span>
+                Tasks
+            </label>
+        </div>
+        @* Smart Features Toggle *@
+        <div class="form-check form-switch me-2" title="Show prep & decompress time blocks">
+            <input class="form-check-input" type="checkbox" role="switch" id="smartFeaturesToggle"
+                   checked="@_showSmartBlocks"
+                   @onchange="OnShowSmartBlocksChanged" />
+            <label class="form-check-label small" for="smartFeaturesToggle">
+                <span class="oi oi-lightbulb @(_showSmartBlocks ? "text-warning" : "text-muted")"></span>
+                Smart
+            </label>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-sm @(_displayStyle == DisplayStyle.Timeline ? "btn-secondary" : "btn-outline-secondary")"
+                    @onclick="() => SetDisplayStyle(DisplayStyle.Timeline)" title="Timeline View">
+                <span class="oi oi-spreadsheet"></span>
+            </button>
+            <button class="btn btn-sm @(_displayStyle == DisplayStyle.List ? "btn-secondary" : "btn-outline-secondary")"
+                    @onclick="() => SetDisplayStyle(DisplayStyle.List)" title="List View">
+                <span class="oi oi-list"></span>
+            </button>
+        </div>
+        <div class="btn-group">
+            <button class="btn @(_viewMode == ViewMode.Day ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewMode(ViewMode.Day)">Day</button>
+            <button class="btn @(_viewMode == ViewMode.ThreeDay ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewMode(ViewMode.ThreeDay)">3-Day</button>
+            <button class="btn @(_viewMode == ViewMode.FiveDay ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewMode(ViewMode.FiveDay)">5-Day</button>
+        </div>
+    </div>
+</div>
+
+@* Smart Features Legend (shown when enabled) *@
+@if (_showSmartBlocks && _displayStyle == DisplayStyle.Timeline)
+{
+    <div class="alert alert-info py-2 mb-3 d-flex align-items-center gap-3 small flex-wrap">
+        <span><span class="oi oi-lightbulb me-1"></span><strong>Smart View:</strong></span>
+        <span class="d-flex align-items-center gap-1">
+            <span class="legend-block prep-block"></span> Prep
+        </span>
+        <span class="d-flex align-items-center gap-1">
+            <span class="legend-block decompress-block"></span> Wind-down
+        </span>
+        <span class="d-flex align-items-center gap-1">
+            <span class="legend-block followup-block"></span> Follow-up (click to create task)
+        </span>
+        <span class="d-flex align-items-center gap-1">
+            <span class="legend-block task-block"></span> Scheduled Tasks
+        </span>
+    </div>
+}
+
+@* Task Scheduling Section *@
+@if (_showScheduler)
+{
+    <div class="card mb-4 @(_isScheduling ? "opacity-75" : "")">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <span class="oi oi-dashboard me-2"></span>Task Scheduling
+            </span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showAdvancedSettings = !_showAdvancedSettings">
+                    @(_showAdvancedSettings ? "Hide Settings" : "Show Settings")
+                </button>
+                <button class="btn btn-sm btn-primary" @onclick="AutoScheduleTasks" disabled="@(_isScheduling || !_availableTasks.Any())">
+                    @if (_isScheduling)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-loop-circular me-1"></span>
+                    }
+                    Auto-Schedule
+                </button>
+            </div>
+        </div>
+        @if (_showAdvancedSettings)
+        {
+            <div class="card-body">
+                <p class="text-muted small mb-3">Adjust weights to change how tasks are prioritized and scheduled</p>
+
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label small">
+                            <span class="oi oi-target me-1"></span>
+                            Due Date Urgency: <strong>@_dueDateUrgencyWeight%</strong>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100"
+                               value="@_dueDateUrgencyWeight"
+                               @oninput="OnDueDateInput"
+                               disabled="@_isScheduling" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">
+                            <span class="oi oi-bolt me-1"></span>
+                            Energy Matching: <strong>@_energyMatchingWeight%</strong>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100"
+                               value="@_energyMatchingWeight"
+                               @oninput="OnEnergyMatchingInput"
+                               disabled="@_isScheduling" />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label class="form-label small">
+                            <span class="oi oi-map-marker me-1"></span>
+                            Context Grouping: <strong>@_contextGroupingWeight%</strong>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100"
+                               value="@_contextGroupingWeight"
+                               @oninput="OnContextGroupingInput"
+                               disabled="@_isScheduling" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">
+                            <span class="oi oi-layers me-1"></span>
+                            Similar Work Grouping: <strong>@_similarWorkGroupingWeight%</strong>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100"
+                               value="@_similarWorkGroupingWeight"
+                               @oninput="OnSimilarWorkInput"
+                               disabled="@_isScheduling" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        @if (_availableTasks.Any())
+                        {
+                            <span class="badge bg-success">@_availableTasks.Count tasks available</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">No tasks in Next Actions</span>
+                        }
+                        @if (_scheduledTasks.Any())
+                        {
+                            <span class="badge bg-info ms-2">@_scheduledTasks.Count scheduled</span>
+                        }
+                    </div>
+                    <div>
+                        @if (_scheduledTasks.Any())
+                        {
+                            <button class="btn btn-sm btn-outline-danger me-2" @onclick="ClearScheduledTasks">
+                                <span class="oi oi-trash me-1"></span>Clear
+                            </button>
+                        }
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ResetToDefaults">
+                            <span class="oi oi-reload me-1"></span>Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (!_availableTasks.Any())
+        {
+            <div class="card-body py-2">
+                <small class="text-muted">
+                    <span class="oi oi-info me-1"></span>
+                    No tasks available. <a href="/inbox">Process your inbox</a> to create tasks.
+                </small>
+            </div>
+        }
+    </div>
+}
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    @if (_displayStyle == DisplayStyle.List)
+    {
+        @* List View *@
+        @if (_viewMode == ViewMode.Day)
+        {
+            <div class="card">
+                <div class="card-body">
+                    @if (!_events.Any())
+                    {
+                        <p class="text-muted text-center py-5">No events scheduled for this day.</p>
+                    }
+                    else
+                    {
+                        @foreach (var evt in _events.OrderBy(e => e.StartTime))
+                        {
+                            @RenderEventCard(evt, showDate: false)
+                        }
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                @foreach (var date in GetDisplayDates())
+                {
+                    var dayEvents = _events.Where(e => DateOnly.FromDateTime(e.StartTime) == date).OrderBy(e => e.StartTime).ToList();
+                    var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                    <div class="col" style="min-width: 200px;">
+                        <div class="card h-100">
+                            <div class="card-header @(isToday ? "bg-primary text-white" : "")">
+                                <div class="fw-bold">@date.ToString("ddd")</div>
+                                <div class="small @(isToday ? "" : "text-muted")">@date.ToString("MMM d")</div>
+                            </div>
+                            <div class="card-body p-2">
+                                @if (!dayEvents.Any())
+                                {
+                                    <p class="text-muted text-center small py-3">No events</p>
+                                }
+                                else
+                                {
+                                    @foreach (var evt in dayEvents)
+                                    {
+                                        @RenderEventCardCompact(evt)
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        @* Timeline View *@
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="timeline-container">
+                    @* Header row for multi-day view *@
+                    @if (_viewMode != ViewMode.Day)
+                    {
+                        <div class="timeline-header">
+                            <div class="timeline-gutter"></div>
+                            @foreach (var date in GetDisplayDates())
+                            {
+                                var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                                <div class="timeline-day-header @(isToday ? "today" : "")">
+                                    <div class="fw-bold">@date.ToString("ddd")</div>
+                                    <div class="small">@date.ToString("MMM d")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Hour rows *@
+                    <div class="timeline-body"
+                         @ondragover="OnDragOver"
+                         @ondragover:preventDefault="true"
+                         @ondrop="OnDrop"
+                         @ondrop:preventDefault="true">
+                        <div class="timeline-hours">
+                            @for (int hour = _startHour; hour <= _endHour; hour++)
+                            {
+                                <div class="timeline-hour-row">
+                                    <div class="timeline-gutter">
+                                        <span class="hour-label">@(new TimeOnly(hour, 0).ToString("h tt"))</span>
+                                    </div>
+                                    @if (_viewMode == ViewMode.Day)
+                                    {
+                                        <div class="timeline-hour-cell">
+                                            <div class="half-hour-line"></div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var date in GetDisplayDates())
+                                        {
+                                            var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                                            <div class="timeline-hour-cell @(isToday ? "today-column" : "")">
+                                                <div class="half-hour-line"></div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @* Events overlay *@
+                        <div class="timeline-events-layer">
+                            @if (_viewMode == ViewMode.Day)
+                            {
+                                @RenderTimelineEvents(_events.ToList(), 0)
+                            }
+                            else
+                            {
+                                var dayIndex = 0;
+                                foreach (var date in GetDisplayDates())
+                                {
+                                    var dayEvents = _events.Where(e => DateOnly.FromDateTime(e.StartTime) == date).ToList();
+                                    @RenderTimelineEvents(dayEvents, dayIndex)
+                                    dayIndex++;
+                                }
+                            }
+                        </div>
+
+                        @* Drop preview indicator is handled by JavaScript for real-time tracking *@
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@* Add/Edit Event Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingEvent == null ? "New Event" : "Edit Event")" IsVisible="@_showModal" OnClose="CloseModal" Size="modal-lg">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_eventTitle" />
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Start Date & Time</label>
+                <input type="datetime-local" class="form-control"
+                       value="@_eventStart.ToString("yyyy-MM-ddTHH:mm")"
+                       @onchange="OnEventStartChanged" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">End Date & Time</label>
+                <input type="datetime-local" class="form-control"
+                       value="@_eventEnd.ToString("yyyy-MM-ddTHH:mm")"
+                       @onchange="OnEventEndChanged" />
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Location</label>
+            <input type="text" class="form-control" @bind="_eventLocation" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="_eventDescription" rows="2"></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Category</label>
+                <select class="form-select" @bind="_eventCategory">
+                    @foreach (var cat in Enum.GetValues<MeetingCategory>())
+                    {
+                        <option value="@cat">@cat</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Prep Time (min)</label>
+                <input type="number" class="form-control" @bind="_eventPrepTime" min="0" />
+                <small class="text-muted">Block before event</small>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Wind-down (min)</label>
+                <input type="number" class="form-control" @bind="_eventDecompressTime" min="0" />
+                <small class="text-muted">Block after event</small>
+            </div>
+        </div>
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" @bind="_eventRequiresFollowUp" id="requiresFollowUp" />
+            <label class="form-check-label" for="requiresFollowUp">
+                <strong>Requires Follow-up</strong>
+                <small class="text-muted d-block">Shows a reminder on calendar. Click it to create a follow-up task.</small>
+            </label>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveEvent" disabled="@string.IsNullOrWhiteSpace(_eventTitle)">
+            @(_editingEvent == null ? "Create" : "Save")
+        </button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Event"
+    Message="Are you sure you want to delete this event?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+@* Task Details Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Task Details" IsVisible="@_showTaskModal" OnClose="CloseTaskModal" Size="modal-md">
+    <ChildContent>
+        @if (_viewingTask != null)
+        {
+            <div class="mb-3">
+                <h5>@_viewingTask.Title</h5>
+                @if (_viewingTask.Priority == 1)
+                {
+                    <span class="badge bg-danger">High Priority</span>
+                }
+                else if (_viewingTask.Priority == 2)
+                {
+                    <span class="badge bg-warning text-dark">Normal Priority</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary">Low Priority</span>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(_viewingTask.Description))
+            {
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Description</label>
+                    <p class="mb-0">@_viewingTask.Description</p>
+                </div>
+            }
+
+            <div class="row mb-3">
+                @if (_viewingTask.EstimatedMinutes > 0)
+                {
+                    <div class="col-6">
+                        <label class="form-label text-muted small">Estimated Time</label>
+                        <p class="mb-0">@_viewingTask.EstimatedMinutes minutes</p>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(_viewingTask.Category))
+                {
+                    <div class="col-6">
+                        <label class="form-label text-muted small">Category</label>
+                        <p class="mb-0">@_viewingTask.Category</p>
+                    </div>
+                }
+            </div>
+
+            @if (_viewingTask.Contexts.Any())
+            {
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Contexts</label>
+                    <div>
+                        @foreach (var context in _viewingTask.Contexts)
+                        {
+                            <span class="badge bg-info me-1">@context</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_viewingTask.DueDate.HasValue)
+            {
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Due Date</label>
+                    <p class="mb-0">@_viewingTask.DueDate.Value.ToString("dddd, MMMM d, yyyy")</p>
+                </div>
+            }
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseTaskModal">Close</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@code {
+    [Parameter] public string? DateParam { get; set; }
+
+    private enum ViewMode { Day, ThreeDay, FiveDay }
+    private enum DisplayStyle { Timeline, List }
+
+    private DateOnly _currentDate = DateOnly.FromDateTime(DateTime.Today);
+    private ViewMode _viewMode = ViewMode.Day;
+    private DisplayStyle _displayStyle = DisplayStyle.Timeline;
+    private bool _showSmartBlocks = true;
+    private bool _showScheduler = false;
+    private bool _settingsLoaded = false;
+    private List<CalendarEvent> _events = new();
+    private bool _isLoading = true;
+    private bool _showModal = false;
+    private bool _showDeleteConfirm = false;
+    private CalendarEvent? _editingEvent;
+    private CalendarEvent? _deletingEvent;
+
+    // Timeline view settings
+    private int _startHour = 7;
+    private int _endHour = 20;
+    private const int HourHeightPx = 60;
+    private const int GutterWidthPx = 60;
+
+    // Drag and drop state
+    private bool _isDragging = false;
+    private string? _dragItemType;
+    private string? _dragItemId;
+
+    // Event form fields
+    private string _eventTitle = string.Empty;
+    private DateTime _eventStart = DateTime.Today.AddHours(9);
+    private DateTime _eventEnd = DateTime.Today.AddHours(10);
+    private TimeSpan _eventDuration = TimeSpan.FromHours(1); // Track duration for auto-update
+    private string _eventLocation = string.Empty;
+    private string _eventDescription = string.Empty;
+    private MeetingCategory _eventCategory = MeetingCategory.Other;
+    private int _eventPrepTime = 5;
+    private int _eventDecompressTime = 5;
+    private bool _eventRequiresFollowUp = false;
+
+    // Task scheduling state
+    private bool _showAdvancedSettings = false;
+    private bool _isScheduling = false;
+    private List<TodoTask> _availableTasks = new();
+    private List<ScheduledTaskItem> _scheduledTasks = new();
+    private UserPreferences? _preferences;
+
+    // Optimizer weights
+    private int _dueDateUrgencyWeight = 70;
+    private int _energyMatchingWeight = 50;
+    private int _contextGroupingWeight = 50;
+    private int _similarWorkGroupingWeight = 50;
+
+    // Debounce timer for slider changes
+    private System.Threading.Timer? _debounceTimer;
+    private const int DebounceDelayMs = 500;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(DateParam) && DateOnly.TryParse(DateParam, out var date))
+        {
+            _currentDate = date;
+        }
+        await LoadPreferences();
+        await LoadEvents();
+        await LoadAvailableTasks();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCalendarSettings();
+            _settingsLoaded = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCalendarSettings()
+    {
+        try
+        {
+            var showScheduler = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.showScheduler");
+            var showSmartBlocks = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.showSmartBlocks");
+            var viewMode = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.viewMode");
+            var displayStyle = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.displayStyle");
+
+            if (showScheduler != null) _showScheduler = showScheduler == "true";
+            if (showSmartBlocks != null) _showSmartBlocks = showSmartBlocks == "true";
+            if (viewMode != null && Enum.TryParse<ViewMode>(viewMode, out var vm)) _viewMode = vm;
+            if (displayStyle != null && Enum.TryParse<DisplayStyle>(displayStyle, out var ds)) _displayStyle = ds;
+
+            // Reload events if view mode changed
+            await LoadEvents();
+            if (_showScheduler) await LoadScheduledTasks();
+        }
+        catch
+        {
+            // Ignore errors loading settings - use defaults
+        }
+    }
+
+    private async Task SaveCalendarSetting(string key, string value)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", $"calendar.{key}", value);
+        }
+        catch
+        {
+            // Ignore errors saving settings
+        }
+    }
+
+    // Drag event handlers - Uses "hold to drag" pattern so clicks still work
+    // User must hold for 200ms before drag activates
+    private bool _dragAllowed = false;
+
+    private async Task OnMouseDownItem(MouseEventArgs e, string itemType, string itemId)
+    {
+        // Start the hold-to-drag timer in JS
+        // After 200ms, drag will be allowed
+        _dragAllowed = false;
+        await JSRuntime.InvokeVoidAsync("dragDropInterop.initHoldToDrag",
+            null, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+    }
+
+    private async Task OnMouseUpItem(MouseEventArgs e)
+    {
+        // Cancel hold-to-drag if mouse released before drag started
+        if (!_isDragging)
+        {
+            await JSRuntime.InvokeVoidAsync("dragDropInterop.cancelHoldToDrag");
+        }
+        _dragAllowed = false;
+    }
+
+    private async Task OnDragStartTask(DragEventArgs e, string taskId)
+    {
+        // Check if hold time has elapsed (drag is allowed)
+        var isDragReady = await JSRuntime.InvokeAsync<bool>("dragDropInterop.isDragReady");
+        if (!isDragReady)
+        {
+            // Cancel the drag - user just clicked, didn't hold
+            e.DataTransfer.DropEffect = "none";
+            return;
+        }
+
+        _isDragging = true;
+        _dragItemType = "task";
+        _dragItemId = taskId;
+        e.DataTransfer.EffectAllowed = "move";
+
+        // Initialize JS-based drag tracking for real-time preview
+        await JSRuntime.InvokeVoidAsync("dragDropInterop.startDrag",
+            _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+    }
+
+    private async Task OnDragStartEvent(DragEventArgs e, string eventId)
+    {
+        // Check if hold time has elapsed (drag is allowed)
+        var isDragReady = await JSRuntime.InvokeAsync<bool>("dragDropInterop.isDragReady");
+        if (!isDragReady)
+        {
+            // Cancel the drag - user just clicked, didn't hold
+            e.DataTransfer.DropEffect = "none";
+            return;
+        }
+
+        _isDragging = true;
+        _dragItemType = "event";
+        _dragItemId = eventId;
+        e.DataTransfer.EffectAllowed = "move";
+
+        // Initialize JS-based drag tracking for real-time preview
+        await JSRuntime.InvokeVoidAsync("dragDropInterop.startDrag",
+            _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+    }
+
+    private async Task OnDragEnd(DragEventArgs e)
+    {
+        _isDragging = false;
+        _dragItemType = null;
+        _dragItemId = null;
+        _dragAllowed = false;
+
+        // Clean up JS drag tracking
+        await JSRuntime.InvokeVoidAsync("dragDropInterop.endDrag");
+    }
+
+    private void OnDragOver(DragEventArgs e)
+    {
+        // Just allow drop - JS handles the preview display in real-time
+        if (_isDragging)
+        {
+            e.DataTransfer.DropEffect = "move";
+        }
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_dragItemId) || string.IsNullOrEmpty(_dragItemType))
+            return;
+
+        // Get the final position from JS (which has been tracking in real-time)
+        var result = await JSRuntime.InvokeAsync<DropPositionResult?>("dragDropInterop.getLastPosition");
+
+        // Fallback to calculating from event if JS tracking failed
+        if (result == null)
+        {
+            result = await JSRuntime.InvokeAsync<DropPositionResult?>("dragDropInterop.calculateDropFromEvent",
+                e.ClientX, e.ClientY, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+        }
+
+        if (result == null) return;
+
+        var newDate = _currentDate.AddDays(result.DayIndex);
+        var newStartTime = newDate.ToDateTime(new TimeOnly(result.Hour, result.Minute));
+
+        if (_dragItemType == "task")
+        {
+            await MoveScheduledTask(Guid.Parse(_dragItemId), newStartTime);
+        }
+        else if (_dragItemType == "event")
+        {
+            await MoveEvent(Guid.Parse(_dragItemId), newStartTime);
+        }
+
+        // Clean up JS drag tracking and reset state
+        await JSRuntime.InvokeVoidAsync("dragDropInterop.endDrag");
+        _isDragging = false;
+        _dragItemType = null;
+        _dragItemId = null;
+
+        StateHasChanged();
+    }
+
+    private class DropPositionResult
+    {
+        public int Hour { get; set; }
+        public int Minute { get; set; }
+        public int DayIndex { get; set; }
+    }
+
+    private async Task MoveScheduledTask(Guid taskId, DateTime newStartTime)
+    {
+        // Find the current scheduled task to get its duration
+        var scheduledTask = _scheduledTasks.FirstOrDefault(t => t.Task.Id == taskId);
+        if (scheduledTask == null) return;
+
+        var duration = scheduledTask.EndTime - scheduledTask.StartTime;
+        var newEndTime = newStartTime.Add(duration);
+        var newDate = DateOnly.FromDateTime(newStartTime);
+
+        // Delete the old time block
+        var oldDate = DateOnly.FromDateTime(scheduledTask.StartTime);
+        var blocks = await SchedulingService.GetTimeBlocksForDateAsync(oldDate);
+        var oldBlock = blocks.FirstOrDefault(b => b.AssignedTaskIds.Contains(taskId));
+        if (oldBlock != null)
+        {
+            await SchedulingService.DeleteTimeBlockAsync(oldBlock.Id);
+        }
+
+        // Create a new time block at the new position
+        var newBlock = new TimeBlock
+        {
+            StartTime = newStartTime,
+            EndTime = newEndTime,
+            Type = duration.TotalMinutes >= (_preferences?.DeepWorkMinimumMinutes ?? 90)
+                ? TimeBlockType.DeepWork
+                : TimeBlockType.ShallowWork,
+            IsAutoGenerated = true,
+            AssignedTaskIds = new List<Guid> { taskId }
+        };
+        await SchedulingService.CreateTimeBlockAsync(newBlock);
+
+        // Reload scheduled tasks
+        await LoadScheduledTasks();
+    }
+
+    private async Task MoveEvent(Guid eventId, DateTime newStartTime)
+    {
+        var evt = _events.FirstOrDefault(e => e.Id == eventId);
+        if (evt == null) return;
+
+        var duration = evt.EndTime - evt.StartTime;
+        evt.StartTime = newStartTime;
+        evt.EndTime = newStartTime.Add(duration);
+
+        await CalendarService.UpdateAsync(evt);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadEvents();
+    }
+
+    private async Task LoadPreferences()
+    {
+        var prefs = await PreferencesRepository.GetAllAsync();
+        _preferences = prefs.FirstOrDefault();
+        if (_preferences != null)
+        {
+            _dueDateUrgencyWeight = _preferences.DueDateUrgencyWeight;
+            _energyMatchingWeight = _preferences.EnergyMatchingWeight;
+            _contextGroupingWeight = _preferences.ContextGroupingWeight;
+            _similarWorkGroupingWeight = _preferences.SimilarWorkGroupingWeight;
+        }
+    }
+
+    private async Task LoadAvailableTasks()
+    {
+        _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
+        await LoadScheduledTasks();
+    }
+
+    private async Task LoadScheduledTasks()
+    {
+        _scheduledTasks.Clear();
+        foreach (var date in GetDisplayDates())
+        {
+            var blocks = await SchedulingService.GetTimeBlocksForDateAsync(date);
+            foreach (var block in blocks.Where(b => b.AssignedTaskIds.Any()))
+            {
+                // Each block now contains exactly one task with proper start/end times
+                var taskId = block.AssignedTaskIds.FirstOrDefault();
+                var task = _availableTasks.FirstOrDefault(t => t.Id == taskId);
+                if (task != null)
+                {
+                    _scheduledTasks.Add(new ScheduledTaskItem
+                    {
+                        Task = task,
+                        StartTime = block.StartTime,
+                        EndTime = block.EndTime, // Use block's actual end time
+                        BlockType = block.Type
+                    });
+                }
+            }
+        }
+    }
+
+    private int GetDaysInView() => _viewMode switch
+    {
+        ViewMode.ThreeDay => 3,
+        ViewMode.FiveDay => 5,
+        _ => 1
+    };
+
+    private IEnumerable<DateOnly> GetDisplayDates()
+    {
+        var days = GetDaysInView();
+        for (int i = 0; i < days; i++)
+        {
+            yield return _currentDate.AddDays(i);
+        }
+    }
+
+    private string GetDateRangeDisplay()
+    {
+        if (_viewMode == ViewMode.Day)
+        {
+            return _currentDate.ToString("dddd, MMMM d, yyyy");
+        }
+
+        var endDate = _currentDate.AddDays(GetDaysInView() - 1);
+        if (_currentDate.Month == endDate.Month)
+        {
+            return $"{_currentDate.ToString("MMM d")} - {endDate.ToString("d, yyyy")}";
+        }
+        return $"{_currentDate.ToString("MMM d")} - {endDate.ToString("MMM d, yyyy")}";
+    }
+
+    private async Task LoadEvents()
+    {
+        _isLoading = true;
+        try
+        {
+            if (_viewMode == ViewMode.Day)
+            {
+                _events = (await CalendarService.GetEventsForDateAsync(_currentDate)).ToList();
+            }
+            else
+            {
+                var startDateTime = _currentDate.ToDateTime(TimeOnly.MinValue);
+                var endDateTime = _currentDate.AddDays(GetDaysInView()).ToDateTime(TimeOnly.MinValue);
+                _events = (await CalendarService.GetEventsForRangeAsync(startDateTime, endDateTime)).ToList();
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SetViewMode(ViewMode mode)
+    {
+        if (_viewMode != mode)
+        {
+            _viewMode = mode;
+            await LoadEvents();
+            await SaveCalendarSetting("viewMode", mode.ToString());
+        }
+    }
+
+    private async Task SetDisplayStyle(DisplayStyle style)
+    {
+        _displayStyle = style;
+        await SaveCalendarSetting("displayStyle", style.ToString());
+    }
+
+    private async Task OnShowSchedulerChanged(ChangeEventArgs e)
+    {
+        _showScheduler = (bool)(e.Value ?? false);
+        await SaveCalendarSetting("showScheduler", _showScheduler.ToString().ToLower());
+        if (_showScheduler)
+        {
+            await LoadScheduledTasks();
+        }
+    }
+
+    private async Task OnShowSmartBlocksChanged(ChangeEventArgs e)
+    {
+        _showSmartBlocks = (bool)(e.Value ?? false);
+        await SaveCalendarSetting("showSmartBlocks", _showSmartBlocks.ToString().ToLower());
+    }
+
+    private async Task Previous()
+    {
+        _currentDate = _currentDate.AddDays(-GetDaysInView());
+        await LoadEvents();
+    }
+
+    private async Task Next()
+    {
+        _currentDate = _currentDate.AddDays(GetDaysInView());
+        await LoadEvents();
+    }
+
+    private async Task Today()
+    {
+        _currentDate = DateOnly.FromDateTime(DateTime.Today);
+        await LoadEvents();
+    }
+
+    private void ShowAddModal()
+    {
+        _editingEvent = null;
+        _eventTitle = string.Empty;
+        _eventStart = _currentDate.ToDateTime(new TimeOnly(9, 0));
+        _eventEnd = _currentDate.ToDateTime(new TimeOnly(10, 0));
+        _eventDuration = _eventEnd - _eventStart;
+        _eventLocation = string.Empty;
+        _eventDescription = string.Empty;
+        _eventCategory = MeetingCategory.Other;
+        _eventPrepTime = 5;
+        _eventDecompressTime = 5;
+        _eventRequiresFollowUp = false;
+        _showModal = true;
+    }
+
+    private void EditEvent(CalendarEvent evt)
+    {
+        _editingEvent = evt;
+        _eventTitle = evt.Title;
+        _eventStart = evt.StartTime;
+        _eventEnd = evt.EndTime;
+        _eventDuration = _eventEnd - _eventStart;
+        _eventLocation = evt.Location ?? string.Empty;
+        _eventDescription = evt.Description ?? string.Empty;
+        _eventCategory = evt.OverrideCategory ?? evt.AutoCategory ?? MeetingCategory.Other;
+        _eventPrepTime = evt.PrepTimeMinutes ?? 5;
+        _eventDecompressTime = evt.DecompressTimeMinutes ?? 5;
+        _eventRequiresFollowUp = evt.RequiresFollowUp;
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingEvent = null;
+        _viewingTask = null;
+        _showTaskModal = false;
+    }
+
+    // Task details modal
+    private bool _showTaskModal = false;
+    private TodoTask? _viewingTask = null;
+
+    private void ShowTaskDetails(TodoTask task)
+    {
+        // Don't show if we're in the middle of dragging
+        if (_isDragging) return;
+
+        _viewingTask = task;
+        _showTaskModal = true;
+    }
+
+    private void CloseTaskModal()
+    {
+        _showTaskModal = false;
+        _viewingTask = null;
+    }
+
+    private void OnEventStartChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var newStart))
+        {
+            _eventStart = newStart;
+            // Preserve duration - update end time to match
+            _eventEnd = _eventStart + _eventDuration;
+        }
+    }
+
+    private void OnEventEndChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var newEnd))
+        {
+            _eventEnd = newEnd;
+            // Update duration when user explicitly changes end time
+            if (_eventEnd > _eventStart)
+            {
+                _eventDuration = _eventEnd - _eventStart;
+            }
+        }
+    }
+
+    private async Task SaveEvent()
+    {
+        if (string.IsNullOrWhiteSpace(_eventTitle)) return;
+
+        if (_editingEvent == null)
+        {
+            var evt = new CalendarEvent
+            {
+                Title = _eventTitle,
+                StartTime = _eventStart,
+                EndTime = _eventEnd,
+                Location = _eventLocation,
+                Description = _eventDescription,
+                OverrideCategory = _eventCategory,
+                PrepTimeMinutes = _eventPrepTime,
+                DecompressTimeMinutes = _eventDecompressTime,
+                RequiresPrep = _eventPrepTime > 0,
+                RequiresFollowUp = _eventRequiresFollowUp
+            };
+            await CalendarService.CreateAsync(evt);
+        }
+        else
+        {
+            _editingEvent.Title = _eventTitle;
+            _editingEvent.StartTime = _eventStart;
+            _editingEvent.EndTime = _eventEnd;
+            _editingEvent.Location = _eventLocation;
+            _editingEvent.Description = _eventDescription;
+            _editingEvent.OverrideCategory = _eventCategory;
+            _editingEvent.PrepTimeMinutes = _eventPrepTime;
+            _editingEvent.DecompressTimeMinutes = _eventDecompressTime;
+            _editingEvent.RequiresPrep = _eventPrepTime > 0;
+            _editingEvent.RequiresFollowUp = _eventRequiresFollowUp;
+            await CalendarService.UpdateAsync(_editingEvent);
+        }
+
+        CloseModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadEvents();
+    }
+
+    private void DeleteEvent(CalendarEvent evt)
+    {
+        _deletingEvent = evt;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingEvent != null)
+        {
+            await CalendarService.DeleteAsync(_deletingEvent.Id);
+            _deletingEvent = null;
+        }
+        _showDeleteConfirm = false;
+        DataChangeNotification.NotifyDataChanged();
+        await LoadEvents();
+    }
+
+    private async Task CreateFollowUpTask(CalendarEvent evt)
+    {
+        var task = new TodoTask
+        {
+            Title = $"Follow up: {evt.Title}",
+            Description = $"Follow-up task for meeting on {evt.StartTime:MMM d, yyyy} at {evt.StartTime:h:mm tt}",
+            Status = TodoTaskStatus.Inbox,
+            Priority = 2,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await TaskService.CreateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+
+        // Clear the follow-up flag since task was created
+        evt.RequiresFollowUp = false;
+        await CalendarService.UpdateAsync(evt);
+        await LoadEvents();
+    }
+
+    // Render helpers for event cards
+    private RenderFragment RenderEventCard(CalendarEvent evt, bool showDate) => __builder =>
+    {
+        <div class="d-flex align-items-start p-3 border-bottom">
+            <div class="me-3 text-muted" style="min-width: 100px;">
+                @if (showDate)
+                {
+                    <div class="small fw-bold">@evt.StartTime.ToString("ddd, MMM d")</div>
+                }
+                <div>@evt.StartTime.ToString("h:mm tt")</div>
+                <div class="small">@evt.EndTime.ToString("h:mm tt")</div>
+            </div>
+            <div class="flex-grow-1">
+                <h5 class="mb-1">@evt.Title</h5>
+                @if (!string.IsNullOrEmpty(evt.Location))
+                {
+                    <small class="text-muted d-block">
+                        <span class="oi oi-map-marker me-1"></span>@evt.Location
+                    </small>
+                }
+                @if (!string.IsNullOrEmpty(evt.Description))
+                {
+                    <p class="mb-1 small">@evt.Description</p>
+                }
+                <div class="mt-2">
+                    <span class="badge bg-secondary">@evt.EffectiveCategory</span>
+                    @if (evt.RequiresPrep)
+                    {
+                        <span class="badge bg-info">Needs Prep</span>
+                    }
+                    @if (evt.RequiresFollowUp)
+                    {
+                        <span class="badge bg-warning text-dark">Needs Follow-up</span>
+                    }
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditEvent(evt)">
+                    <span class="oi oi-pencil"></span>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEvent(evt)">
+                    <span class="oi oi-trash"></span>
+                </button>
+            </div>
+        </div>
+    };
+
+    private RenderFragment RenderEventCardCompact(CalendarEvent evt) => __builder =>
+    {
+        <div class="event-card-compact p-2 mb-2 border rounded" style="cursor: pointer;" @onclick="() => EditEvent(evt)">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="small fw-bold text-truncate" style="max-width: 140px;">@evt.Title</div>
+                <button class="btn btn-sm btn-link p-0 text-danger" @onclick="() => DeleteEvent(evt)" @onclick:stopPropagation="true">
+                    <span class="oi oi-x small"></span>
+                </button>
+            </div>
+            <div class="text-muted small">
+                @evt.StartTime.ToString("h:mm tt") - @evt.EndTime.ToString("h:mm tt")
+            </div>
+            @if (!string.IsNullOrEmpty(evt.Location))
+            {
+                <div class="text-muted small text-truncate">
+                    <span class="oi oi-map-marker me-1"></span>@evt.Location
+                </div>
+            }
+            <div class="mt-1">
+                <span class="badge bg-secondary small">@evt.EffectiveCategory</span>
+            </div>
+        </div>
+    };
+
+    // Timeline event rendering with overlap detection
+    private RenderFragment RenderTimelineEvents(List<CalendarEvent> events, int dayIndex) => __builder =>
+    {
+        var daysCount = GetDaysInView();
+        var currentDate = GetDisplayDates().Skip(dayIndex).First();
+
+        // Calculate event positions first to determine occupied time slots
+        var positioned = events.Any() ? CalculateEventPositions(events) : new List<EventPosition>();
+
+        // Render scheduled tasks for this day (rendered first so events appear on top)
+        if (_showScheduler && _scheduledTasks.Any())
+        {
+            var dayTasks = _scheduledTasks.Where(t => DateOnly.FromDateTime(t.StartTime) == currentDate).ToList();
+
+            // Calculate task positions accounting for events and their smart blocks
+            var taskPositions = CalculateTaskPositions(dayTasks, events);
+
+            foreach (var taskPos in taskPositions)
+            {
+                var scheduledTask = taskPos.Task;
+                var taskTopPx = GetEventTopPosition(scheduledTask.StartTime);
+                var taskHeightPx = GetEventHeight(scheduledTask.StartTime, scheduledTask.EndTime);
+                var taskLeftCalc = GetEventLeftPosition(dayIndex, daysCount, taskPos.Column, taskPos.TotalColumns);
+                var taskWidthCalc = GetEventWidth(daysCount, taskPos.TotalColumns);
+
+                var taskClass = scheduledTask.BlockType == TimeBlockType.DeepWork ? "event-task-deep" : "event-task";
+
+                var taskIdStr = scheduledTask.Task.Id.ToString();
+                var taskTooltip = $"{scheduledTask.Task.Title}\n{scheduledTask.StartTime:h:mm tt} - {scheduledTask.EndTime:h:mm tt}\nHold to drag, click to view";
+                <div class="timeline-event @taskClass draggable-item"
+                     style="top: @(taskTopPx)px; height: @(taskHeightPx)px; left: @taskLeftCalc; width: calc(@taskWidthCalc - 4px); z-index: 1;"
+                     title="@taskTooltip"
+                     draggable="true"
+                     data-item-type="task"
+                     data-item-id="@taskIdStr"
+                     @onmousedown="async (e) => await OnMouseDownItem(e, \"task\", taskIdStr)"
+                     @onmouseup="async (e) => await OnMouseUpItem(e)"
+                     @onclick="() => ShowTaskDetails(scheduledTask.Task)"
+                     @onclick:stopPropagation="true"
+                     @ondragstart="async (e) => await OnDragStartTask(e, taskIdStr)"
+                     @ondragend="async (e) => await OnDragEnd(e)">
+                    <div class="event-time">@scheduledTask.StartTime.ToString("h:mm")</div>
+                    <div class="event-title">@scheduledTask.Task.Title</div>
+                    @if (scheduledTask.Task.Priority == 1)
+                    {
+                        <span class="badge bg-danger" style="font-size: 0.6rem;">High</span>
+                    }
+                    @if (!string.IsNullOrEmpty(scheduledTask.Task.Category) && taskHeightPx > 40)
+                    {
+                        <div class="event-location">@scheduledTask.Task.Category</div>
+                    }
+                </div>
+            }
+        }
+
+        if (!events.Any()) return;
+
+        foreach (var pos in positioned)
+        {
+            var evt = pos.Event;
+            var topPx = GetEventTopPosition(evt.StartTime);
+            var heightPx = GetEventHeight(evt.StartTime, evt.EndTime);
+            var leftCalc = GetEventLeftPosition(dayIndex, daysCount, pos.Column, pos.TotalColumns);
+            var widthCalc = GetEventWidth(daysCount, pos.TotalColumns);
+
+            var categoryClass = evt.EffectiveCategory switch
+            {
+                MeetingCategory.OneOnOne => "event-1on1",
+                MeetingCategory.TeamMeeting => "event-team",
+                MeetingCategory.ClientMeeting => "event-external",
+                MeetingCategory.Focus => "event-focus",
+                MeetingCategory.Interview => "event-interview",
+                _ => "event-default"
+            };
+
+            // Render Prep Time block (before the event)
+            if (_showSmartBlocks && evt.PrepTimeMinutes.HasValue && evt.PrepTimeMinutes.Value > 0)
+            {
+                var prepStart = evt.StartTime.AddMinutes(-evt.PrepTimeMinutes.Value);
+                var prepTopPx = GetEventTopPosition(prepStart);
+                var prepHeightPx = evt.PrepTimeMinutes.Value * (HourHeightPx / 60.0);
+
+                <div class="timeline-event event-prep"
+                     style="top: @(prepTopPx)px; height: @(prepHeightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
+                     title="Prep for @evt.Title&#10;@prepStart.ToString("h:mm tt") - @evt.StartTime.ToString("h:mm tt")">
+                    <div class="smart-block-label">
+                        <span class="oi oi-clipboard me-1"></span>
+                        <strong>Prep</strong> for @evt.Title
+                        <span class="smart-block-time">@prepStart.ToString("h:mm") (@(evt.PrepTimeMinutes)m)</span>
+                    </div>
+                </div>
+            }
+
+            // Render main event - locally created events are draggable
+            var isDraggableEvent = string.IsNullOrEmpty(evt.ExternalId);
+            var eventTooltip = $"{evt.Title}\n{evt.StartTime:h:mm tt} - {evt.EndTime:h:mm tt}" + (isDraggableEvent ? "\nHold to drag, click to edit" : "");
+            var eventIdStr = evt.Id.ToString();
+            <div class="timeline-event @categoryClass @(isDraggableEvent ? "draggable-item" : "")"
+                 style="top: @(topPx)px; height: @(heightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
+                 @onmousedown="async (e) => { if (isDraggableEvent) await OnMouseDownItem(e, \"event\", eventIdStr); }"
+                 @onmouseup="async (e) => await OnMouseUpItem(e)"
+                 @onclick="() => EditEvent(evt)"
+                 @onclick:stopPropagation="true"
+                 title="@eventTooltip"
+                 draggable="@isDraggableEvent"
+                 data-item-type="event"
+                 data-item-id="@eventIdStr"
+                 @ondragstart="async (e) => { if (isDraggableEvent) await OnDragStartEvent(e, eventIdStr); }"
+                 @ondragend="async (e) => await OnDragEnd(e)">
+                <div class="event-time">@evt.StartTime.ToString("h:mm")</div>
+                <div class="event-title">@evt.Title</div>
+                @if (!string.IsNullOrEmpty(evt.Location) && heightPx > 50)
+                {
+                    <div class="event-location">@evt.Location</div>
+                }
+                @if (_showSmartBlocks && (evt.PrepTimeMinutes > 0 || evt.DecompressTimeMinutes > 0))
+                {
+                    <div class="event-smart-indicator">
+                        @if (evt.PrepTimeMinutes > 0)
+                        {
+                            <span class="badge bg-warning text-dark me-1" style="font-size: 0.6rem;">@(evt.PrepTimeMinutes)m prep</span>
+                        }
+                        @if (evt.DecompressTimeMinutes > 0)
+                        {
+                            <span class="badge bg-info" style="font-size: 0.6rem;">@(evt.DecompressTimeMinutes)m wind-down</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            // Render Decompress Time block (after the event)
+            if (_showSmartBlocks && evt.DecompressTimeMinutes.HasValue && evt.DecompressTimeMinutes.Value > 0)
+            {
+                var decompressTopPx = GetEventTopPosition(evt.EndTime);
+                var decompressHeightPx = evt.DecompressTimeMinutes.Value * (HourHeightPx / 60.0);
+
+                <div class="timeline-event event-decompress"
+                     style="top: @(decompressTopPx)px; height: @(decompressHeightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
+                     title="Wind-down after @evt.Title&#10;@evt.EndTime.ToString("h:mm tt") - @evt.EndTime.AddMinutes(evt.DecompressTimeMinutes.Value).ToString("h:mm tt")">
+                    <div class="smart-block-label">
+                        <span class="oi oi-pulse me-1"></span>
+                        <strong>Wind-down</strong> after @evt.Title
+                        <span class="smart-block-time">@evt.EndTime.ToString("h:mm") (@(evt.DecompressTimeMinutes)m)</span>
+                    </div>
+                </div>
+            }
+
+            // Render Follow-up reminder block (after event + decompress)
+            if (_showSmartBlocks && evt.RequiresFollowUp)
+            {
+                var followUpStart = evt.EndTime.AddMinutes(evt.DecompressTimeMinutes ?? 0);
+                var followUpTopPx = GetEventTopPosition(followUpStart);
+                var followUpHeightPx = Math.Max(25, 15 * (HourHeightPx / 60.0)); // At least 25px, default 15min visual
+
+                <div class="timeline-event event-followup"
+                     style="top: @(followUpTopPx)px; height: @(followUpHeightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
+                     title="Follow-up needed for @evt.Title&#10;Click to create a follow-up task"
+                     @onclick="() => CreateFollowUpTask(evt)"
+                     @onclick:stopPropagation="true">
+                    <div class="smart-block-label">
+                        <span class="oi oi-action-redo me-1"></span>
+                        <strong>Follow-up:</strong> @evt.Title
+                        <span class="smart-block-action">+ Create Task</span>
+                    </div>
+                </div>
+            }
+        }
+    };
+
+    private record EventPosition(CalendarEvent Event, int Column, int TotalColumns);
+    private record TaskPosition(ScheduledTaskItem Task, int Column, int TotalColumns);
+
+    /// <summary>
+    /// Calculate task positions, accounting for calendar events and their smart blocks (prep/decompress).
+    /// Tasks should not visually overlap with events or their associated time blocks.
+    /// </summary>
+    private List<TaskPosition> CalculateTaskPositions(List<ScheduledTaskItem> tasks, List<CalendarEvent> events)
+    {
+        if (!tasks.Any()) return new();
+
+        var positions = new List<TaskPosition>();
+
+        // Build list of all blocked time ranges (events + prep + decompress)
+        var blockedRanges = new List<(DateTime Start, DateTime End)>();
+        foreach (var evt in events)
+        {
+            // Add prep time
+            var prepMinutes = evt.PrepTimeMinutes ?? 0;
+            if (prepMinutes > 0)
+            {
+                blockedRanges.Add((evt.StartTime.AddMinutes(-prepMinutes), evt.StartTime));
+            }
+
+            // Add event itself
+            blockedRanges.Add((evt.StartTime, evt.EndTime));
+
+            // Add decompress time
+            var decompressMinutes = evt.DecompressTimeMinutes ?? 0;
+            if (decompressMinutes > 0)
+            {
+                blockedRanges.Add((evt.EndTime, evt.EndTime.AddMinutes(decompressMinutes)));
+            }
+
+            // Add follow-up indicator time (if shown)
+            if (evt.RequiresFollowUp)
+            {
+                var followUpStart = evt.EndTime.AddMinutes(decompressMinutes);
+                blockedRanges.Add((followUpStart, followUpStart.AddMinutes(15)));
+            }
+        }
+
+        foreach (var task in tasks.OrderBy(t => t.StartTime))
+        {
+            // Check if task overlaps with any blocked range
+            var overlapsEvent = blockedRanges.Any(r =>
+                task.StartTime < r.End && task.EndTime > r.Start);
+
+            if (overlapsEvent)
+            {
+                // Task overlaps with an event - put it in a separate column
+                positions.Add(new TaskPosition(task, 1, 2));
+            }
+            else
+            {
+                // Task doesn't overlap - full width
+                positions.Add(new TaskPosition(task, 0, 1));
+            }
+        }
+
+        return positions;
+    }
+
+    private List<EventPosition> CalculateEventPositions(List<CalendarEvent> events)
+    {
+        if (!events.Any()) return new();
+
+        var sorted = events.OrderBy(e => e.StartTime).ThenByDescending(e => e.EndTime - e.StartTime).ToList();
+        var positions = new List<EventPosition>();
+        var columns = new List<List<CalendarEvent>>(); // Each column tracks events in that column
+
+        foreach (var evt in sorted)
+        {
+            // Find the first column where this event doesn't overlap
+            int col = 0;
+            bool placed = false;
+
+            for (col = 0; col < columns.Count; col++)
+            {
+                var lastInColumn = columns[col].LastOrDefault();
+                if (lastInColumn == null || lastInColumn.EndTime <= evt.StartTime)
+                {
+                    columns[col].Add(evt);
+                    placed = true;
+                    break;
+                }
+            }
+
+            if (!placed)
+            {
+                // Need a new column
+                columns.Add(new List<CalendarEvent> { evt });
+                col = columns.Count - 1;
+            }
+
+            positions.Add(new EventPosition(evt, col, 0)); // TotalColumns updated later
+        }
+
+        // Update total columns for each event based on overlapping events
+        var result = new List<EventPosition>();
+        foreach (var pos in positions)
+        {
+            // Find how many events overlap with this one
+            var overlapping = events.Where(e =>
+                e.StartTime < pos.Event.EndTime && e.EndTime > pos.Event.StartTime).ToList();
+
+            // Calculate max columns needed for this time slot
+            int maxCols = 1;
+            foreach (var other in overlapping)
+            {
+                var otherPos = positions.FirstOrDefault(p => p.Event == other);
+                if (otherPos != null && otherPos.Column + 1 > maxCols)
+                {
+                    maxCols = otherPos.Column + 1;
+                }
+            }
+
+            result.Add(new EventPosition(pos.Event, pos.Column, maxCols));
+        }
+
+        return result;
+    }
+
+    private double GetEventTopPosition(DateTime startTime)
+    {
+        var minutesFromStart = (startTime.Hour - _startHour) * 60 + startTime.Minute;
+        return minutesFromStart * (HourHeightPx / 60.0);
+    }
+
+    private double GetEventHeight(DateTime startTime, DateTime endTime)
+    {
+        var durationMinutes = (endTime - startTime).TotalMinutes;
+        return Math.Max(20, durationMinutes * (HourHeightPx / 60.0)); // Minimum 20px height
+    }
+
+    private string GetEventLeftPosition(int dayIndex, int totalDays, int column, int totalColumns)
+    {
+        // Calculate position relative to container
+        // Gutter is 60px, remaining space is split evenly among days
+        var dayFraction = (dayIndex + (column / (double)Math.Max(1, totalColumns))) / totalDays;
+        // left = gutter + (fraction * available width)
+        return $"calc({GutterWidthPx}px + {dayFraction * 100:F2}% - {GutterWidthPx * dayFraction:F2}px)";
+    }
+
+    private string GetEventWidth(int totalDays, int totalColumns)
+    {
+        // Width is (1/totalDays) * (1/totalColumns) of available space
+        var fraction = 1.0 / (totalDays * Math.Max(1, totalColumns));
+        return $"calc({fraction * 100:F2}% - {GutterWidthPx * fraction:F2}px)";
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "StartTime", "EndTime", "Location", "Description", "IsAllDay"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_events, $"events-{_currentDate:yyyy-MM-dd}", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} events");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_events, $"events-{_currentDate:yyyy-MM-dd}");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} events");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<CalendarEvent>("events", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+
+    // Task scheduling methods
+    private async Task AutoScheduleTasks()
+    {
+        _isScheduling = true;
+        StateHasChanged();
+
+        try
+        {
+            // Save current preferences
+            if (_preferences != null)
+            {
+                _preferences.DueDateUrgencyWeight = _dueDateUrgencyWeight;
+                _preferences.EnergyMatchingWeight = _energyMatchingWeight;
+                _preferences.ContextGroupingWeight = _contextGroupingWeight;
+                _preferences.SimilarWorkGroupingWeight = _similarWorkGroupingWeight;
+                await PreferencesRepository.UpdateAsync(_preferences);
+            }
+
+            // Clear and regenerate for each displayed day
+            foreach (var date in GetDisplayDates())
+            {
+                await SchedulingService.ClearAutoGeneratedBlocksAsync(date);
+                await SchedulingService.AutoScheduleTasksAsync(date, _availableTasks);
+            }
+
+            await LoadScheduledTasks();
+        }
+        finally
+        {
+            _isScheduling = false;
+        }
+    }
+
+    private async Task ClearScheduledTasks()
+    {
+        foreach (var date in GetDisplayDates())
+        {
+            await SchedulingService.ClearAutoGeneratedBlocksAsync(date);
+        }
+        _scheduledTasks.Clear();
+    }
+
+    // Slider handlers
+    private void OnDueDateInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _dueDateUrgencyWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnEnergyMatchingInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _energyMatchingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnContextGroupingInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _contextGroupingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnSimilarWorkInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _similarWorkGroupingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void ScheduleDebounceRegenerate()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(
+            async _ => await InvokeAsync(async () =>
+            {
+                if (_scheduledTasks.Any())
+                {
+                    await AutoScheduleTasks();
+                    StateHasChanged();
+                }
+            }),
+            null,
+            DebounceDelayMs,
+            Timeout.Infinite
+        );
+    }
+
+    private async Task ResetToDefaults()
+    {
+        _dueDateUrgencyWeight = 70;
+        _energyMatchingWeight = 50;
+        _contextGroupingWeight = 50;
+        _similarWorkGroupingWeight = 50;
+        if (_scheduledTasks.Any())
+        {
+            await AutoScheduleTasks();
+        }
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _debounceTimer?.Dispose();
+        await Task.CompletedTask; // Satisfy async requirement
+    }
+
+    // Helper class for scheduled task display
+    private class ScheduledTaskItem
+    {
+        public TodoTask Task { get; set; } = null!;
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public TimeBlockType BlockType { get; set; }
+    }
+}

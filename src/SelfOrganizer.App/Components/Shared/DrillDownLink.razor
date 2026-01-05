@@ -1,0 +1,44 @@
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter] public string Type { get; set; } = string.Empty; // Task, Project, Event, Reference
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string GetUrl()
+    {
+        if (!Id.HasValue) return "#";
+
+        return Type.ToLower() switch
+        {
+            "task" => $"/tasks/{Id}",
+            "project" => $"/projects/{Id}",
+            "event" => $"/events/{Id}",
+            "reference" => $"/reference/{Id}",
+            _ => "#"
+        };
+    }
+
+    private string GetIcon()
+    {
+        return Type.ToLower() switch
+        {
+            "task" => "oi-task",
+            "project" => "oi-folder",
+            "event" => "oi-calendar",
+            "reference" => "oi-book",
+            _ => "oi-link-intact"
+        };
+    }
+}
+
+@if (Id.HasValue)
+{
+    <a href="@GetUrl()" class="drill-down-link">
+        <span class="oi @GetIcon() me-1"></span>@ChildContent
+    </a>
+}
+else
+{
+    <span class="text-muted">@ChildContent</span>
+}

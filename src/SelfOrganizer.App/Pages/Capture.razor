@@ -1,0 +1,67 @@
+@page "/capture"
+
+<div class="capture-page">
+    <div class="capture-container animate-fade-in-up">
+        <div class="capture-header">
+            <span class="oi oi-check capture-icon" aria-hidden="true"></span>
+            <h2 class="capture-title">What's on your mind?</h2>
+        </div>
+
+        <div class="capture-input-wrapper">
+            <textarea
+                @ref="_textareaRef"
+                @bind="_captureText"
+                @bind:event="oninput"
+                @onkeydown="HandleKeyDown"
+                class="capture-input"
+                rows="3"
+                placeholder="Type anything... ideas, tasks, notes"
+                autofocus>
+            </textarea>
+            <div class="capture-underline"></div>
+        </div>
+
+        <div class="capture-actions">
+            <button class="capture-button" @onclick="CaptureItem" disabled="@(string.IsNullOrWhiteSpace(_captureText) || _isCapturing)">
+                @if (_isCapturing)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                }
+                <span>Capture</span>
+            </button>
+            <span class="capture-hint">Press <kbd>@_modifierKey</kbd>+<kbd>Enter</kbd> to capture</span>
+        </div>
+
+        @if (_showSuccess)
+        {
+            <div class="capture-success animate-slide-in-down">
+                <span class="oi oi-check"></span> Captured successfully!
+            </div>
+        }
+
+        <div class="capture-stats">
+            <span class="oi oi-inbox"></span>
+            <span>@_todayCaptureCount item(s) captured today</span>
+        </div>
+
+        @if (_recentCaptures.Any())
+        {
+            <div class="recent-captures">
+                <h6 class="recent-title">Recently Captured</h6>
+                @foreach (var capture in _recentCaptures)
+                {
+                    <div class="recent-item animate-slide-in-down">
+                        <span class="recent-text">@capture.RawText</span>
+                        <span class="recent-time">@GetRelativeTime(capture.CreatedAt)</span>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="capture-footer">
+            <a href="/" class="back-link">
+                <span class="oi oi-arrow-left"></span> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,212 @@
+.import-section {
+    min-height: 200px;
+}
+
+/* File Upload Area */
+.file-upload-area {
+    border: 2px dashed var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    background-color: var(--bg-surface);
+}
+
+.file-upload-area:hover {
+    border-color: var(--interactive-primary);
+    background-color: var(--surface-hover);
+}
+
+.file-upload-area.drag-over {
+    border-color: var(--interactive-primary);
+    background-color: rgba(var(--interactive-primary-rgb), 0.1);
+}
+
+.upload-icon {
+    font-size: 2.5rem;
+    color: var(--text-tertiary);
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.upload-text {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.upload-hint {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+    margin: 0;
+}
+
+.file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.template-hint {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* File Info */
+.file-info {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+/* Validation Summary */
+.validation-summary {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.validation-summary.valid {
+    background-color: rgba(var(--success-rgb), 0.1);
+    color: var(--success);
+}
+
+.validation-summary.invalid {
+    background-color: rgba(var(--warning-rgb), 0.1);
+    color: var(--warning);
+}
+
+.validation-messages {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+.validation-messages li {
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.validation-messages li::before {
+    content: "\2022";
+    color: var(--warning);
+    margin-right: 0.5rem;
+}
+
+/* Preview Section */
+.preview-section {
+    margin-top: 1rem;
+}
+
+.preview-section h6 {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.preview-table {
+    font-size: 0.8125rem;
+}
+
+.preview-table th {
+    background-color: var(--bg-surface);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.preview-table td {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Result Summary */
+.result-summary {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.result-summary.success {
+    background-color: rgba(var(--success-rgb), 0.1);
+    color: var(--success);
+}
+
+.result-summary.partial {
+    background-color: rgba(var(--warning-rgb), 0.1);
+    color: var(--warning);
+}
+
+.result-summary.error {
+    background-color: rgba(var(--danger-rgb), 0.1);
+    color: var(--danger);
+}
+
+/* Error List */
+.error-list-section {
+    margin-top: 1rem;
+}
+
+.error-list-section h6 {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.error-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+}
+
+.error-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: flex-start;
+}
+
+.error-item:last-child {
+    border-bottom: none;
+}
+
+.error-item.error {
+    color: var(--danger);
+}
+
+.error-item.warning {
+    color: var(--warning);
+}
+
+.error-item.more {
+    color: var(--text-tertiary);
+    font-style: italic;
+    justify-content: center;
+}
+
+/* Dark mode adjustments */
+:root[data-theme="dark"] .file-upload-area {
+    border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .file-upload-area:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}

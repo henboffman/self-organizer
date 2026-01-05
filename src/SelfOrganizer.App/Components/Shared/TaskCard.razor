@@ -1,0 +1,65 @@
+@using SelfOrganizer.Core.Models
+
+@code {
+    [Parameter] public TodoTask Task { get; set; } = default!;
+    [Parameter] public EventCallback<TodoTask> OnComplete { get; set; }
+    [Parameter] public EventCallback<TodoTask> OnEdit { get; set; }
+    [Parameter] public EventCallback<TodoTask> OnDelete { get; set; }
+    [Parameter] public EventCallback<TodoTask> OnDeactivate { get; set; }
+    [Parameter] public bool ShowProject { get; set; } = true;
+    [Parameter] public bool ShowDeactivate { get; set; } = false;
+}
+
+<div class="card task-card mb-2">
+    <div class="card-body py-2 px-3">
+        <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-success me-2" @onclick="() => OnComplete.InvokeAsync(Task)" title="Complete">
+                <span class="oi oi-check"></span>
+            </button>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center">
+                    <PriorityIndicator Priority="@Task.Priority" />
+                    <a href="/tasks/@Task.Id" class="task-title ms-2 text-decoration-none">@Task.Title</a>
+                </div>
+                <div class="task-meta small text-muted">
+                    @if (Task.EstimatedMinutes > 0)
+                    {
+                        <TimeDisplay Minutes="@Task.EstimatedMinutes" />
+                        <span class="mx-1">|</span>
+                    }
+                    @if (Task.Contexts.Any())
+                    {
+                        @foreach (var context in Task.Contexts)
+                        {
+                            <ContextBadge Context="@context" />
+                        }
+                    }
+                    @if (!string.IsNullOrEmpty(Task.Category))
+                    {
+                        <CategoryBadge Category="@Task.Category" />
+                    }
+                    @if (Task.DueDate.HasValue)
+                    {
+                        <span class="ms-2 @(Task.DueDate.Value < DateTime.UtcNow ? "text-danger" : "")">
+                            <span class="oi oi-calendar"></span> @Task.DueDate.Value.ToString("MMM d")
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="task-actions">
+                @if (ShowDeactivate)
+                {
+                    <button class="btn btn-sm btn-link text-warning" @onclick="() => OnDeactivate.InvokeAsync(Task)" title="Move back to Inbox">
+                        <span class="oi oi-action-undo"></span>
+                    </button>
+                }
+                <button class="btn btn-sm btn-link text-secondary" @onclick="() => OnEdit.InvokeAsync(Task)" title="Edit">
+                    <span class="oi oi-pencil"></span>
+                </button>
+                <button class="btn btn-sm btn-link text-danger" @onclick="() => OnDelete.InvokeAsync(Task)" title="Delete">
+                    <span class="oi oi-trash"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,574 @@
+@page "/inbox"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ICaptureService CaptureService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h3 class="mb-1">
+            <span class="oi oi-inbox me-2"></span>Process Your Inbox
+            @if (_totalCount > 0)
+            {
+                <span class="badge bg-danger ms-2">@_totalCount</span>
+            }
+        </h3>
+        <p class="text-muted mb-0 small">
+            Review each captured item and decide what to do with it. The goal is to reach <strong>Inbox Zero</strong>.
+        </p>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_totalCount == 0)
+{
+    <div class="text-center py-5">
+        <div class="display-1 text-success mb-3">
+            <span class="oi oi-check"></span>
+        </div>
+        <h4 class="text-muted">Inbox Zero!</h4>
+        <p class="text-muted">All captured items have been processed.</p>
+        <a href="/capture" class="btn btn-primary mt-3">
+            <span class="oi oi-plus me-1"></span> Capture Something
+        </a>
+    </div>
+}
+else
+{
+    <div class="alert alert-info mb-4">
+        <h6 class="alert-heading mb-2">
+            <span class="oi oi-question-mark me-2"></span>How to Process Items
+        </h6>
+        <p class="mb-2 small">For each item, ask yourself:</p>
+        <ol class="small mb-0">
+            <li><strong>Is it actionable?</strong> If not, delete it, save it as reference, or add to Someday/Maybe.</li>
+            <li><strong>Can you do it in under 2 minutes?</strong> If yes, do it now and mark complete!</li>
+            <li><strong>Does it need more time?</strong> Create a task with an estimate and add it to your Next Actions.</li>
+        </ol>
+    </div>
+
+    @if (_inboxTasks.Any())
+    {
+        <h5 class="mb-3">
+            <span class="oi oi-action-undo me-2"></span>Tasks Returned to Inbox
+            <span class="badge bg-warning text-dark ms-2">@_inboxTasks.Count</span>
+        </h5>
+        <div class="list-group mb-4">
+            @foreach (var task in _inboxTasks.OrderByDescending(t => t.ModifiedAt))
+            {
+                <div class="list-group-item list-group-item-warning">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-grow-1">
+                            <p class="mb-1"><strong>@task.Title</strong></p>
+                            @if (!string.IsNullOrEmpty(task.Description))
+                            {
+                                <p class="mb-1 small text-muted">@task.Description</p>
+                            }
+                            <small class="text-muted">
+                                Returned to inbox @task.ModifiedAt.ToString("MMM d, yyyy h:mm tt")
+                            </small>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-success" @onclick="() => ReactivateTask(task)" title="Move to Next Actions">
+                                <span class="oi oi-arrow-right me-1"></span> Activate
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" @onclick="() => MoveTaskToSomeday(task)" title="Move to Someday">
+                                <span class="oi oi-star"></span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTask(task)" title="Delete">
+                                <span class="oi oi-trash"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (_items.Any())
+    {
+        <h5 class="mb-3">
+            <span class="oi oi-bolt me-2"></span>New Captures
+            <span class="badge bg-danger ms-2">@_items.Count</span>
+        </h5>
+        <div class="list-group">
+            @foreach (var item in _items.OrderBy(i => i.CreatedAt))
+            {
+                <div class="list-group-item">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-grow-1">
+                            <p class="mb-1">@item.RawText</p>
+                            <small class="text-muted">
+                                Captured @item.CreatedAt.ToString("MMM d, yyyy h:mm tt")
+                            </small>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenProcessModal(item)">
+                                <span class="oi oi-cog"></span> Process
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteItem(item)">
+                                <span class="oi oi-trash"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@* Process Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Process Capture" IsVisible="@_showProcessModal" OnClose="CloseProcessModal" Size="modal-lg">
+    <ChildContent>
+        @if (_selectedItem != null)
+        {
+            <div class="mb-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p class="mb-1"><strong>Original:</strong> @_selectedItem.RawText</p>
+                        <small class="text-muted">Captured @_selectedItem.CreatedAt.ToString("MMM d, yyyy h:mm tt")</small>
+                    </div>
+                </div>
+            </div>
+
+            @if (_processStep == 1)
+            {
+                <h5>Is this actionable?</h5>
+                <div class="d-grid gap-2 d-md-flex">
+                    <button class="btn btn-success btn-lg flex-fill" @onclick="() => SetActionable(true)">
+                        <span class="oi oi-check me-2"></span>Yes, it's actionable
+                    </button>
+                    <button class="btn btn-secondary btn-lg flex-fill" @onclick="() => SetActionable(false)">
+                        <span class="oi oi-x me-2"></span>No, not actionable
+                    </button>
+                </div>
+            }
+            else if (_processStep == 2 && !_isActionable)
+            {
+                <h5>What would you like to do with it?</h5>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" @onclick="MoveToReference">
+                        <span class="oi oi-book me-2"></span>Move to Reference
+                    </button>
+                    <button class="btn btn-outline-warning" @onclick="MoveToSomeday">
+                        <span class="oi oi-star me-2"></span>Move to Someday/Maybe
+                    </button>
+                    <button class="btn btn-outline-danger" @onclick="() => DeleteItem(_selectedItem!)">
+                        <span class="oi oi-trash me-2"></span>Delete
+                    </button>
+                </div>
+            }
+            else if (_processStep == 2 && _isActionable)
+            {
+                <h5>Can you do this in under 2 minutes?</h5>
+                <div class="d-grid gap-2 d-md-flex">
+                    <button class="btn btn-success btn-lg flex-fill" @onclick="DoItNow">
+                        <span class="oi oi-check me-2"></span>Yes - Do it now!
+                    </button>
+                    <button class="btn btn-primary btn-lg flex-fill" @onclick="() => _processStep = 3">
+                        <span class="oi oi-clock me-2"></span>No - needs more time
+                    </button>
+                </div>
+            }
+            else if (_processStep == 3)
+            {
+                <h5>Create Task</h5>
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" class="form-control" @bind="_newTaskTitle" />
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Estimated Time (minutes)</label>
+                        <input type="number" class="form-control" @bind="_newTaskEstimatedMinutes" min="1" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" @bind="_newTaskPriority">
+                            <option value="1">High</option>
+                            <option value="2">Normal</option>
+                            <option value="3">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Context</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var ctx in _availableContexts)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm @(_selectedContexts.Contains(ctx) ? "btn-info" : "btn-outline-info")"
+                                    @onclick="() => ToggleContext(ctx)">
+                                @ctx
+                            </button>
+                        }
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Due Date (optional)</label>
+                        <input type="date" class="form-control" @bind="_newTaskDueDate" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Schedule For (optional)</label>
+                        <input type="date" class="form-control" @bind="_newTaskScheduledDate" />
+                    </div>
+                </div>
+
+                @* Advanced Options - Collapsible *@
+                <div class="mb-3">
+                    <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="() => _showAdvancedOptions = !_showAdvancedOptions">
+                        <span class="oi @(_showAdvancedOptions ? "oi-chevron-bottom" : "oi-chevron-right") me-1"></span>
+                        Advanced Options
+                    </button>
+                </div>
+
+                @if (_showAdvancedOptions)
+                {
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Energy Level (1-5)</label>
+                                <select class="form-select" @bind="_newTaskEnergyLevel">
+                                    <option value="">Not set</option>
+                                    <option value="1">1 - Very Low</option>
+                                    <option value="2">2 - Low</option>
+                                    <option value="3">3 - Medium</option>
+                                    <option value="4">4 - High</option>
+                                    <option value="5">5 - Very High</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Who is this for?</label>
+                                <input type="text" class="form-control" @bind="_newTaskWhoFor" placeholder="e.g., Client name, Team" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Tags (comma-separated)</label>
+                            <input type="text" class="form-control" @bind="_newTaskTagsInput" placeholder="e.g., urgent, follow-up, research" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Links (one per line)</label>
+                            <textarea class="form-control" @bind="_newTaskLinksInput" rows="2" placeholder="https://example.com"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_newTaskRequiresDeepWork" id="inboxRequiresDeepWork" />
+                                <label class="form-check-label" for="inboxRequiresDeepWork">Requires Deep Work (focused time)</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_newTaskIsRecurring" id="inboxIsRecurring" />
+                                <label class="form-check-label" for="inboxIsRecurring">Recurring Task</label>
+                            </div>
+                        </div>
+
+                        @if (_newTaskIsRecurring)
+                        {
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Recurrence Pattern</label>
+                                    <select class="form-select" @bind="_newTaskRecurrencePattern">
+                                        <option value="@RecurrencePattern.Daily">Daily</option>
+                                        <option value="@RecurrencePattern.Weekdays">Weekdays (Mon-Fri)</option>
+                                        <option value="@RecurrencePattern.Weekly">Weekly</option>
+                                        <option value="@RecurrencePattern.Biweekly">Biweekly</option>
+                                        <option value="@RecurrencePattern.Monthly">Monthly</option>
+                                        <option value="@RecurrencePattern.Quarterly">Quarterly</option>
+                                        <option value="@RecurrencePattern.Yearly">Yearly</option>
+                                        <option value="@RecurrencePattern.Custom">Custom</option>
+                                    </select>
+                                </div>
+                                @if (_newTaskRecurrencePattern == RecurrencePattern.Custom)
+                                {
+                                    <div class="col-md-6">
+                                        <label class="form-label">Every X Days</label>
+                                        <input type="number" class="form-control" @bind="_newTaskRecurrenceIntervalDays" min="1" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="d-grid">
+                    <button class="btn btn-primary btn-lg" @onclick="CreateTask" disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)">
+                        <span class="oi oi-plus me-2"></span>Create Task
+                    </button>
+                </div>
+            }
+        }
+    </ChildContent>
+    <Footer>
+        @if (_processStep > 1)
+        {
+            <button class="btn btn-secondary" @onclick="() => _processStep--">
+                <span class="oi oi-arrow-left me-1"></span> Back
+            </button>
+        }
+        <button class="btn btn-outline-secondary" @onclick="CloseProcessModal">Cancel</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<CelebrationEffect @ref="_celebrationEffect" />
+
+@code {
+    private List<CaptureItem> _items = new();
+    private List<TodoTask> _inboxTasks = new();
+    private bool _isLoading = true;
+    private bool _showProcessModal = false;
+    private CaptureItem? _selectedItem;
+    private int _processStep = 1;
+    private bool _isActionable = false;
+    private CelebrationEffect? _celebrationEffect;
+    private bool _enableCelebrations = true;
+
+    private int _totalCount => _items.Count + _inboxTasks.Count;
+
+    // New task fields
+    private string _newTaskTitle = string.Empty;
+    private int _newTaskEstimatedMinutes = 30;
+    private int _newTaskPriority = 2;
+    private DateTime? _newTaskDueDate;
+    private DateTime? _newTaskScheduledDate;
+    private List<string> _selectedContexts = new();
+    private readonly List<string> _availableContexts = new() { "@home", "@work", "@phone", "@computer", "@errands", "@anywhere" };
+
+    // Advanced options fields
+    private bool _showAdvancedOptions = false;
+    private int? _newTaskEnergyLevel;
+    private string _newTaskWhoFor = string.Empty;
+    private string _newTaskTagsInput = string.Empty;
+    private string _newTaskLinksInput = string.Empty;
+    private bool _newTaskRequiresDeepWork = false;
+    private bool _newTaskIsRecurring = false;
+    private RecurrencePattern _newTaskRecurrencePattern = RecurrencePattern.Daily;
+    private int _newTaskRecurrenceIntervalDays = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var prefsTask = PreferencesRepository.GetAllAsync();
+        await LoadItems();
+
+        var prefs = (await prefsTask).FirstOrDefault();
+        if (prefs != null)
+        {
+            _enableCelebrations = prefs.EnableCelebrationEffects;
+        }
+    }
+
+    private async Task LoadItems()
+    {
+        _isLoading = true;
+        try
+        {
+            var capturesTask = CaptureService.GetUnprocessedAsync();
+            var inboxTasksTask = TaskService.GetByStatusAsync(TodoTaskStatus.Inbox);
+
+            await Task.WhenAll(capturesTask, inboxTasksTask);
+
+            _items = (await capturesTask).ToList();
+            _inboxTasks = (await inboxTasksTask).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ReactivateTask(TodoTask task)
+    {
+        task.Status = TodoTaskStatus.NextAction;
+        await TaskService.UpdateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task MoveTaskToSomeday(TodoTask task)
+    {
+        await TaskService.MoveToSomedayAsync(task.Id);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task DeleteTask(TodoTask task)
+    {
+        await TaskService.DeleteAsync(task.Id);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private void OpenProcessModal(CaptureItem item)
+    {
+        _selectedItem = item;
+        _newTaskTitle = item.RawText;
+        _processStep = 1;
+        _isActionable = false;
+        _newTaskEstimatedMinutes = 30;
+        _newTaskPriority = 2;
+        _newTaskDueDate = null;
+        _newTaskScheduledDate = null;
+        _selectedContexts.Clear();
+
+        // Reset advanced options
+        _showAdvancedOptions = false;
+        _newTaskEnergyLevel = null;
+        _newTaskWhoFor = string.Empty;
+        _newTaskTagsInput = string.Empty;
+        _newTaskLinksInput = string.Empty;
+        _newTaskRequiresDeepWork = false;
+        _newTaskIsRecurring = false;
+        _newTaskRecurrencePattern = RecurrencePattern.Daily;
+        _newTaskRecurrenceIntervalDays = 1;
+
+        _showProcessModal = true;
+    }
+
+    private void CloseProcessModal()
+    {
+        _showProcessModal = false;
+        _selectedItem = null;
+    }
+
+    private void SetActionable(bool actionable)
+    {
+        _isActionable = actionable;
+        _processStep = 2;
+    }
+
+    private void ToggleContext(string context)
+    {
+        if (_selectedContexts.Contains(context))
+            _selectedContexts.Remove(context);
+        else
+            _selectedContexts.Add(context);
+    }
+
+    private async Task DoItNow()
+    {
+        if (_selectedItem == null) return;
+
+        // Create task and immediately complete it
+        var task = new TodoTask
+        {
+            Title = _newTaskTitle,
+            Status = TodoTaskStatus.Completed,
+            CompletedAt = DateTime.UtcNow,
+            EstimatedMinutes = 2
+        };
+        var createdTask = await TaskService.CreateAsync(task);
+        await CaptureService.MarkAsProcessedAsync(_selectedItem.Id, createdTask.Id, ProcessedItemType.Task);
+
+        CloseProcessModal();
+
+        // Show celebration effect if enabled
+        if (_enableCelebrations && _celebrationEffect != null)
+        {
+            _ = _celebrationEffect.ShowAsync($"Done! {_newTaskTitle}");
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task MoveToReference()
+    {
+        if (_selectedItem == null) return;
+
+        var task = new TodoTask
+        {
+            Title = _selectedItem.RawText,
+            Status = TodoTaskStatus.Reference
+        };
+        var createdTask = await TaskService.CreateAsync(task);
+        await CaptureService.MarkAsProcessedAsync(_selectedItem.Id, createdTask.Id, ProcessedItemType.Reference);
+
+        CloseProcessModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task MoveToSomeday()
+    {
+        if (_selectedItem == null) return;
+
+        var task = new TodoTask
+        {
+            Title = _selectedItem.RawText,
+            Status = TodoTaskStatus.SomedayMaybe
+        };
+        var createdTask = await TaskService.CreateAsync(task);
+        await CaptureService.MarkAsProcessedAsync(_selectedItem.Id, createdTask.Id, ProcessedItemType.SomedayMaybe);
+
+        CloseProcessModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task CreateTask()
+    {
+        if (_selectedItem == null || string.IsNullOrWhiteSpace(_newTaskTitle)) return;
+
+        var status = _newTaskScheduledDate.HasValue ? TodoTaskStatus.Scheduled : TodoTaskStatus.NextAction;
+
+        // Parse tags and links from input strings
+        var tags = string.IsNullOrWhiteSpace(_newTaskTagsInput)
+            ? new List<string>()
+            : _newTaskTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var links = string.IsNullOrWhiteSpace(_newTaskLinksInput)
+            ? new List<string>()
+            : _newTaskLinksInput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var task = new TodoTask
+        {
+            Title = _newTaskTitle,
+            Status = status,
+            EstimatedMinutes = _newTaskEstimatedMinutes,
+            Priority = _newTaskPriority,
+            Contexts = _selectedContexts.ToList(),
+            DueDate = _newTaskDueDate,
+            ScheduledDate = _newTaskScheduledDate,
+            // Advanced options
+            EnergyLevel = _newTaskEnergyLevel,
+            WhoFor = string.IsNullOrWhiteSpace(_newTaskWhoFor) ? null : _newTaskWhoFor,
+            Tags = tags,
+            Links = links,
+            RequiresDeepWork = _newTaskRequiresDeepWork,
+            IsRecurring = _newTaskIsRecurring,
+            RecurrencePattern = _newTaskIsRecurring ? _newTaskRecurrencePattern : null,
+            RecurrenceIntervalDays = _newTaskIsRecurring && _newTaskRecurrencePattern == RecurrencePattern.Custom ? _newTaskRecurrenceIntervalDays : null
+        };
+
+        var createdTask = await TaskService.CreateAsync(task);
+        await CaptureService.MarkAsProcessedAsync(_selectedItem.Id, createdTask.Id, ProcessedItemType.Task);
+
+        CloseProcessModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+
+    private async Task DeleteItem(CaptureItem item)
+    {
+        await CaptureService.DeleteAsync(item.Id);
+        CloseProcessModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadItems();
+    }
+}

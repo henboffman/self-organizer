@@ -1,0 +1,587 @@
+@page "/tasks/next"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-task me-2"></span>Next Actions
+    </h3>
+    <div class="d-flex gap-2">
+        <ExportButton
+            EntityName="next-actions"
+            OnExportCsv="HandleExportCsv"
+            OnExportJson="HandleExportJson"
+            OnDownloadTemplate="HandleDownloadTemplate"
+            IsDisabled="@(!_tasks.Any())"
+            Size="small" />
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <span class="oi oi-plus me-1"></span> New Task
+        </button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_tasks.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">No next actions defined</h5>
+        <p class="text-muted">Process your inbox or add new tasks to get started.</p>
+        <a href="/inbox" class="btn btn-outline-primary">
+            <span class="oi oi-inbox me-1"></span> Go to Inbox
+        </a>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-3 mb-3 align-items-center">
+        <div class="btn-group" role="group">
+            <button class="btn @(_groupBy == "none" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => _groupBy = "none")">All</button>
+            <button class="btn @(_groupBy == "context" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => _groupBy = "context")">By Context</button>
+            <button class="btn @(_groupBy == "priority" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => _groupBy = "priority")">By Priority</button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">Energy:</span>
+            <div class="btn-group btn-group-sm" role="group">
+                <button class="btn @(_energyFilter == null ? "btn-secondary" : "btn-outline-secondary")" @onclick="@(() => _energyFilter = null)" title="Show all tasks">
+                    All
+                </button>
+                <button class="btn @(_energyFilter == 1 ? "btn-success" : "btn-outline-success")" @onclick="@(() => _energyFilter = 1)" title="Low energy tasks - for when you're tired">
+                    <span class="oi oi-battery-empty"></span> Low
+                </button>
+                <button class="btn @(_energyFilter == 3 ? "btn-warning" : "btn-outline-warning")" @onclick="@(() => _energyFilter = 3)" title="Medium energy tasks">
+                    <span class="oi oi-battery-full"></span> Med
+                </button>
+                <button class="btn @(_energyFilter == 5 ? "btn-danger" : "btn-outline-danger")" @onclick="@(() => _energyFilter = 5)" title="High energy tasks - for when you're feeling sharp">
+                    <span class="oi oi-fire"></span> High
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (_energyFilter.HasValue)
+    {
+        <div class="alert alert-info py-2 mb-3">
+            <small>
+                <span class="oi oi-info me-1"></span>
+                Showing tasks for <strong>@GetEnergyLabel(_energyFilter.Value)</strong> energy.
+                Tasks without an energy level are included.
+            </small>
+        </div>
+    }
+
+    @if (_groupBy == "none")
+    {
+        @foreach (var task in FilteredTasks.OrderBy(t => t.Priority).ThenBy(t => t.DueDate))
+        {
+            <SelfOrganizer.App.Components.Shared.TaskCard
+                Task="@task"
+                OnComplete="CompleteTask"
+                OnEdit="EditTask"
+                OnDelete="DeleteTask"
+                OnDeactivate="DeactivateTask"
+                ShowDeactivate="true" />
+        }
+    }
+    else if (_groupBy == "context")
+    {
+        var filteredList = FilteredTasks.ToList();
+        var contextsUsed = filteredList.SelectMany(t => t.Contexts).Distinct().OrderBy(c => c).ToList();
+        if (!contextsUsed.Any() && filteredList.Any(t => !t.Contexts.Any())) contextsUsed.Add("No Context");
+
+        @foreach (var context in contextsUsed)
+        {
+            var contextTasks = context == "No Context"
+                ? filteredList.Where(t => !t.Contexts.Any()).ToList()
+                : filteredList.Where(t => t.Contexts.Contains(context)).ToList();
+
+            if (contextTasks.Any())
+            {
+                <h5 class="mt-4 mb-2">@context</h5>
+                @foreach (var task in contextTasks.OrderBy(t => t.Priority))
+                {
+                    <SelfOrganizer.App.Components.Shared.TaskCard
+                        Task="@task"
+                        OnComplete="CompleteTask"
+                        OnEdit="EditTask"
+                        OnDelete="DeleteTask"
+                        OnDeactivate="DeactivateTask"
+                        ShowDeactivate="true" />
+                }
+            }
+        }
+    }
+    else if (_groupBy == "priority")
+    {
+        var filteredList = FilteredTasks.ToList();
+        var priorities = new[] { (1, "High Priority"), (2, "Normal Priority"), (3, "Low Priority") };
+        @foreach (var (priority, label) in priorities)
+        {
+            var priorityTasks = filteredList.Where(t => t.Priority == priority).ToList();
+            if (priorityTasks.Any())
+            {
+                <h5 class="mt-4 mb-2">@label</h5>
+                @foreach (var task in priorityTasks.OrderBy(t => t.DueDate))
+                {
+                    <SelfOrganizer.App.Components.Shared.TaskCard
+                        Task="@task"
+                        OnComplete="CompleteTask"
+                        OnEdit="EditTask"
+                        OnDelete="DeleteTask"
+                        OnDeactivate="DeactivateTask"
+                        ShowDeactivate="true" />
+                }
+            }
+        }
+    }
+}
+
+@* Add/Edit Task Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingTask == null ? "New Task" : "Edit Task")" IsVisible="@_showModal" OnClose="CloseModal">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_taskTitle" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="_taskDescription" rows="2"></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Estimated Time (minutes)</label>
+                <input type="number" class="form-control" @bind="_taskEstimatedMinutes" min="1" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_taskPriority">
+                    <option value="1">High</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Low</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Context</label>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var ctx in _availableContexts)
+                {
+                    <button type="button"
+                            class="btn btn-sm @(_selectedContexts.Contains(ctx) ? "btn-info" : "btn-outline-info")"
+                            @onclick="() => ToggleContext(ctx)">
+                        @ctx
+                    </button>
+                }
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Due Date (optional)</label>
+            <input type="date" class="form-control" @bind="_taskDueDate" />
+        </div>
+
+        @* Advanced Options - Collapsible *@
+        <div class="mb-3">
+            <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="() => _showAdvancedOptions = !_showAdvancedOptions">
+                <span class="oi @(_showAdvancedOptions ? "oi-chevron-bottom" : "oi-chevron-right") me-1"></span>
+                Advanced Options
+            </button>
+        </div>
+
+        @if (_showAdvancedOptions)
+        {
+            <div class="border rounded p-3 mb-3 bg-light">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Energy Level (1-5)</label>
+                        <select class="form-select" @bind="_taskEnergyLevel">
+                            <option value="">Not set</option>
+                            <option value="1">1 - Very Low</option>
+                            <option value="2">2 - Low</option>
+                            <option value="3">3 - Medium</option>
+                            <option value="4">4 - High</option>
+                            <option value="5">5 - Very High</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Who is this for?</label>
+                        <input type="text" class="form-control" @bind="_taskWhoFor" placeholder="e.g., Client name, Team" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tags (comma-separated)</label>
+                    <input type="text" class="form-control" @bind="_taskTagsInput" placeholder="e.g., urgent, follow-up, research" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Links (one per line)</label>
+                    <textarea class="form-control" @bind="_taskLinksInput" rows="2" placeholder="https://example.com"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="_taskRequiresDeepWork" id="requiresDeepWork" />
+                        <label class="form-check-label" for="requiresDeepWork">Requires Deep Work (focused time)</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="_taskIsRecurring" id="isRecurring" />
+                        <label class="form-check-label" for="isRecurring">Recurring Task</label>
+                    </div>
+                </div>
+
+                @if (_taskIsRecurring)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Recurrence Pattern</label>
+                            <select class="form-select" @bind="_taskRecurrencePattern">
+                                <option value="@RecurrencePattern.Daily">Daily</option>
+                                <option value="@RecurrencePattern.Weekdays">Weekdays (Mon-Fri)</option>
+                                <option value="@RecurrencePattern.Weekly">Weekly</option>
+                                <option value="@RecurrencePattern.Biweekly">Biweekly</option>
+                                <option value="@RecurrencePattern.Monthly">Monthly</option>
+                                <option value="@RecurrencePattern.Quarterly">Quarterly</option>
+                                <option value="@RecurrencePattern.Yearly">Yearly</option>
+                                <option value="@RecurrencePattern.Custom">Custom</option>
+                            </select>
+                        </div>
+                        @if (_taskRecurrencePattern == RecurrencePattern.Custom)
+                        {
+                            <div class="col-md-6">
+                                <label class="form-label">Every X Days</label>
+                                <input type="number" class="form-control" @bind="_taskRecurrenceIntervalDays" min="1" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveTask" disabled="@string.IsNullOrWhiteSpace(_taskTitle)">
+            @(_editingTask == null ? "Create" : "Save")
+        </button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Task"
+    Message="Are you sure you want to delete this task?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+<CelebrationEffect @ref="_celebrationEffect" />
+
+@code {
+    private List<TodoTask> _tasks = new();
+    private bool _isLoading = true;
+    private string _groupBy = "none";
+    private int? _energyFilter = null;
+    private bool _showModal = false;
+    private bool _showDeleteConfirm = false;
+    private TodoTask? _editingTask;
+    private TodoTask? _deletingTask;
+    private CelebrationEffect? _celebrationEffect;
+    private bool _enableCelebrations = true;
+
+    // Filtered tasks based on energy level
+    private IEnumerable<TodoTask> FilteredTasks => _energyFilter.HasValue
+        ? _tasks.Where(t => !t.EnergyLevel.HasValue || MatchesEnergyFilter(t.EnergyLevel.Value, _energyFilter.Value))
+        : _tasks;
+
+    private static bool MatchesEnergyFilter(int taskEnergy, int filterLevel)
+    {
+        // Low (1) = tasks with energy 1-2
+        // Med (3) = tasks with energy 2-4
+        // High (5) = tasks with energy 4-5
+        return filterLevel switch
+        {
+            1 => taskEnergy <= 2,
+            3 => taskEnergy >= 2 && taskEnergy <= 4,
+            5 => taskEnergy >= 4,
+            _ => true
+        };
+    }
+
+    private static string GetEnergyLabel(int level) => level switch
+    {
+        1 => "low",
+        3 => "medium",
+        5 => "high",
+        _ => "any"
+    };
+
+    // Task form fields
+    private string _taskTitle = string.Empty;
+    private string _taskDescription = string.Empty;
+    private int _taskEstimatedMinutes = 30;
+    private int _taskPriority = 2;
+    private DateTime? _taskDueDate;
+    private List<string> _selectedContexts = new();
+    private readonly List<string> _availableContexts = new() { "@home", "@work", "@phone", "@computer", "@errands", "@anywhere" };
+
+    // Advanced options fields
+    private bool _showAdvancedOptions = false;
+    private int? _taskEnergyLevel;
+    private string _taskWhoFor = string.Empty;
+    private string _taskTagsInput = string.Empty;
+    private string _taskLinksInput = string.Empty;
+    private bool _taskRequiresDeepWork = false;
+    private bool _taskIsRecurring = false;
+    private RecurrencePattern _taskRecurrencePattern = RecurrencePattern.Daily;
+    private int _taskRecurrenceIntervalDays = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var prefsTask = PreferencesRepository.GetAllAsync();
+        var tasksTask = LoadTasks();
+
+        await Task.WhenAll(prefsTask, tasksTask);
+
+        var prefs = (await prefsTask).FirstOrDefault();
+        if (prefs != null)
+        {
+            _enableCelebrations = prefs.EnableCelebrationEffects;
+        }
+    }
+
+    private async Task LoadTasks()
+    {
+        _isLoading = true;
+        try
+        {
+            _tasks = (await TaskService.GetNextActionsAsync()).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowAddModal()
+    {
+        _editingTask = null;
+        _taskTitle = string.Empty;
+        _taskDescription = string.Empty;
+        _taskEstimatedMinutes = 30;
+        _taskPriority = 2;
+        _taskDueDate = null;
+        _selectedContexts.Clear();
+
+        // Reset advanced options
+        _showAdvancedOptions = false;
+        _taskEnergyLevel = null;
+        _taskWhoFor = string.Empty;
+        _taskTagsInput = string.Empty;
+        _taskLinksInput = string.Empty;
+        _taskRequiresDeepWork = false;
+        _taskIsRecurring = false;
+        _taskRecurrencePattern = RecurrencePattern.Daily;
+        _taskRecurrenceIntervalDays = 1;
+
+        _showModal = true;
+    }
+
+    private void EditTask(TodoTask task)
+    {
+        _editingTask = task;
+        _taskTitle = task.Title;
+        _taskDescription = task.Description ?? string.Empty;
+        _taskEstimatedMinutes = task.EstimatedMinutes;
+        _taskPriority = task.Priority;
+        _taskDueDate = task.DueDate;
+        _selectedContexts = task.Contexts.ToList();
+
+        // Load advanced options
+        _taskEnergyLevel = task.EnergyLevel;
+        _taskWhoFor = task.WhoFor ?? string.Empty;
+        _taskTagsInput = task.Tags.Any() ? string.Join(", ", task.Tags) : string.Empty;
+        _taskLinksInput = task.Links.Any() ? string.Join("\n", task.Links) : string.Empty;
+        _taskRequiresDeepWork = task.RequiresDeepWork;
+        _taskIsRecurring = task.IsRecurring;
+        _taskRecurrencePattern = task.RecurrencePattern ?? RecurrencePattern.Daily;
+        _taskRecurrenceIntervalDays = task.RecurrenceIntervalDays ?? 1;
+
+        // Show advanced options if any are populated
+        _showAdvancedOptions = _taskEnergyLevel.HasValue ||
+                               !string.IsNullOrEmpty(_taskWhoFor) ||
+                               task.Tags.Any() ||
+                               task.Links.Any() ||
+                               _taskRequiresDeepWork ||
+                               _taskIsRecurring;
+
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingTask = null;
+    }
+
+    private void ToggleContext(string context)
+    {
+        if (_selectedContexts.Contains(context))
+            _selectedContexts.Remove(context);
+        else
+            _selectedContexts.Add(context);
+    }
+
+    private async Task SaveTask()
+    {
+        if (string.IsNullOrWhiteSpace(_taskTitle)) return;
+
+        // Parse tags and links from input strings
+        var tags = string.IsNullOrWhiteSpace(_taskTagsInput)
+            ? new List<string>()
+            : _taskTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var links = string.IsNullOrWhiteSpace(_taskLinksInput)
+            ? new List<string>()
+            : _taskLinksInput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        if (_editingTask == null)
+        {
+            var task = new TodoTask
+            {
+                Title = _taskTitle,
+                Description = _taskDescription,
+                Status = TodoTaskStatus.NextAction,
+                EstimatedMinutes = _taskEstimatedMinutes,
+                Priority = _taskPriority,
+                DueDate = _taskDueDate,
+                Contexts = _selectedContexts.ToList(),
+                // Advanced options
+                EnergyLevel = _taskEnergyLevel,
+                WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor,
+                Tags = tags,
+                Links = links,
+                RequiresDeepWork = _taskRequiresDeepWork,
+                IsRecurring = _taskIsRecurring,
+                RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null,
+                RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null
+            };
+            await TaskService.CreateAsync(task);
+        }
+        else
+        {
+            _editingTask.Title = _taskTitle;
+            _editingTask.Description = _taskDescription;
+            _editingTask.EstimatedMinutes = _taskEstimatedMinutes;
+            _editingTask.Priority = _taskPriority;
+            _editingTask.DueDate = _taskDueDate;
+            _editingTask.Contexts = _selectedContexts.ToList();
+            // Advanced options
+            _editingTask.EnergyLevel = _taskEnergyLevel;
+            _editingTask.WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor;
+            _editingTask.Tags = tags;
+            _editingTask.Links = links;
+            _editingTask.RequiresDeepWork = _taskRequiresDeepWork;
+            _editingTask.IsRecurring = _taskIsRecurring;
+            _editingTask.RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null;
+            _editingTask.RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null;
+            await TaskService.UpdateAsync(_editingTask);
+        }
+
+        CloseModal();
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private async Task CompleteTask(TodoTask task)
+    {
+        // Use recurring completion if this is a recurring task
+        if (task.IsRecurring)
+        {
+            await TaskService.CompleteRecurringTaskAsync(task.Id);
+        }
+        else
+        {
+            await TaskService.CompleteAsync(task.Id);
+        }
+
+        // Show celebration effect if enabled
+        if (_enableCelebrations && _celebrationEffect != null)
+        {
+            _ = _celebrationEffect.ShowAsync($"Completed: {task.Title}");
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private async Task DeactivateTask(TodoTask task)
+    {
+        await TaskService.DeactivateAsync(task.Id);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private void DeleteTask(TodoTask task)
+    {
+        _deletingTask = task;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingTask != null)
+        {
+            await TaskService.DeleteAsync(_deletingTask.Id);
+            _deletingTask = null;
+        }
+        _showDeleteConfirm = false;
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "Description", "Priority", "Contexts", "DueDate", "EstimatedMinutes", "Category"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_tasks, "next-actions", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} tasks");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_tasks, "next-actions");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} tasks");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<TodoTask>("tasks", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+}

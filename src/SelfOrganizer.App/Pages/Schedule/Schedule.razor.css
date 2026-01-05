@@ -1,0 +1,194 @@
+/* Timeline View Styles for Schedule Page */
+
+.timeline-container {
+    position: relative;
+    min-height: 400px;
+}
+
+.timeline-header {
+    display: flex;
+    border-bottom: 2px solid var(--border-default);
+    background-color: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.timeline-gutter {
+    width: 60px;
+    min-width: 60px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-default);
+    background-color: var(--bg-secondary);
+}
+
+.timeline-day-header {
+    flex: 1;
+    padding: 8px;
+    text-align: center;
+    border-right: 1px solid var(--border-default);
+}
+
+.timeline-day-header:last-child {
+    border-right: none;
+}
+
+.timeline-day-header.today {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.timeline-body {
+    position: relative;
+}
+
+.timeline-hours {
+    position: relative;
+}
+
+.timeline-hour-row {
+    display: flex;
+    height: 60px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.timeline-hour-row .timeline-gutter {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding-right: 8px;
+    padding-top: 0;
+    transform: translateY(-8px);
+}
+
+.hour-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.timeline-hour-cell {
+    flex: 1;
+    position: relative;
+    border-right: 1px solid var(--border-default);
+}
+
+.timeline-hour-cell:last-child {
+    border-right: none;
+}
+
+.timeline-hour-cell.today-column {
+    background-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.05);
+}
+
+.half-hour-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: var(--border-default);
+    opacity: 0.5;
+}
+
+/* Events layer overlays the hour grid */
+.timeline-events-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.timeline-event {
+    position: absolute;
+    border-radius: 4px;
+    padding: 4px 6px;
+    overflow: hidden;
+    cursor: pointer;
+    pointer-events: auto;
+    font-size: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+    border-left: 3px solid;
+}
+
+.timeline-event:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transform: scale(1.02);
+    z-index: 100 !important;
+}
+
+.event-time {
+    font-weight: 600;
+    opacity: 0.8;
+    font-size: 0.65rem;
+}
+
+.event-title {
+    font-weight: 500;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event-location {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Calendar event category colors */
+.event-default {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    z-index: 5;
+}
+
+/* Scheduled Task blocks */
+.event-task {
+    background-color: #d1fae5;
+    border-color: #10b981;
+    color: #065f46;
+    z-index: 3;
+}
+
+.event-task:hover {
+    background-color: #a7f3d0;
+}
+
+.event-focus {
+    background-color: #10b981;
+    border-color: #059669;
+    color: white;
+    z-index: 3;
+}
+
+.event-interview {
+    background-color: #ec4899;
+    border-color: #db2777;
+    color: white;
+    z-index: 5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline-gutter {
+        width: 45px;
+        min-width: 45px;
+    }
+
+    .hour-label {
+        font-size: 0.65rem;
+    }
+
+    .timeline-event {
+        font-size: 0.65rem;
+        padding: 2px 4px;
+    }
+}

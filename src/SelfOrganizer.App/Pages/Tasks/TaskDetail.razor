@@ -1,0 +1,437 @@
+@page "/tasks/{Id:guid}"
+@using SelfOrganizer.Core.Models
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject NavigationManager Navigation
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_task == null)
+{
+    <div class="alert alert-warning">Task not found</div>
+}
+else
+{
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/tasks/next">Tasks</a></li>
+            <li class="breadcrumb-item active">@_task.Title</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h3 class="mb-1">
+                <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@_task.Priority" />
+                @_task.Title
+            </h3>
+            <div class="text-muted">
+                <span class="badge bg-secondary">@_task.Status</span>
+                @if (_task.Contexts.Any())
+                {
+                    @foreach (var ctx in _task.Contexts)
+                    {
+                        <SelfOrganizer.App.Components.Shared.ContextBadge Context="@ctx" />
+                    }
+                }
+                @if (!string.IsNullOrEmpty(_task.Category))
+                {
+                    <SelfOrganizer.App.Components.Shared.CategoryBadge Category="@_task.Category" />
+                }
+            </div>
+        </div>
+        <div class="btn-group">
+            @if (_task.Status != TodoTaskStatus.Completed)
+            {
+                <button class="btn btn-success" @onclick="Complete">
+                    <span class="oi oi-check me-1"></span> Complete
+                </button>
+            }
+            <button class="btn btn-outline-primary" @onclick="() => _isEditing = true">
+                <span class="oi oi-pencil me-1"></span> Edit
+            </button>
+            <button class="btn btn-outline-danger" @onclick="() => _showDeleteConfirm = true">
+                <span class="oi oi-trash me-1"></span> Delete
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">Details</div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(_task.Description))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Description</label>
+                            <p>@_task.Description</p>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_task.Notes))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Notes</label>
+                            <p class="mb-0" style="white-space: pre-wrap;">@_task.Notes</p>
+                        </div>
+                    }
+                    @if (string.IsNullOrEmpty(_task.Description) && string.IsNullOrEmpty(_task.Notes))
+                    {
+                        <p class="text-muted">No description or notes added.</p>
+                    }
+                </div>
+            </div>
+
+            @if (_task.Status == TodoTaskStatus.WaitingFor)
+            {
+                <div class="card mb-4 border-warning">
+                    <div class="card-header bg-warning text-dark">Waiting For</div>
+                    <div class="card-body">
+                        <p class="mb-1"><strong>@(_task.WaitingForNote ?? "Someone")</strong></p>
+                        @if (_task.WaitingForSince.HasValue)
+                        {
+                            var days = (int)(DateTime.UtcNow - _task.WaitingForSince.Value).TotalDays;
+                            <small class="text-muted">Since @_task.WaitingForSince.Value.ToString("MMM d, yyyy") (@days days)</small>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">Properties</div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Status</span>
+                        <span class="badge bg-secondary">@_task.Status</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Priority</span>
+                        <span>@(_task.Priority == 1 ? "High" : _task.Priority == 2 ? "Normal" : "Low")</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Estimated Time</span>
+                        <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@_task.EstimatedMinutes" />
+                    </li>
+                    @if (_task.ActualMinutes.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Actual Time</span>
+                            <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@_task.ActualMinutes.Value" />
+                        </li>
+                    }
+                    @if (_task.DueDate.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Due Date</span>
+                            <span class="@(_task.DueDate.Value < DateTime.UtcNow ? "text-danger" : "")">
+                                @_task.DueDate.Value.ToString("MMM d, yyyy")
+                            </span>
+                        </li>
+                    }
+                    @if (_task.ScheduledDate.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Scheduled</span>
+                            <span>@_task.ScheduledDate.Value.ToString("MMM d, yyyy")</span>
+                        </li>
+                    }
+                    @if (_task.CompletedAt.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Completed</span>
+                            <span class="text-success">@_task.CompletedAt.Value.ToString("MMM d, yyyy")</span>
+                        </li>
+                    }
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Created</span>
+                        <span>@_task.CreatedAt.ToString("MMM d, yyyy")</span>
+                    </li>
+                </ul>
+            </div>
+
+            @if (_task.ProjectId.HasValue && _project != null)
+            {
+                <div class="card mb-4">
+                    <div class="card-header">Project</div>
+                    <div class="card-body">
+                        <SelfOrganizer.App.Components.Shared.DrillDownLink Type="Project" Id="@_task.ProjectId">
+                            @_project.Name
+                        </SelfOrganizer.App.Components.Shared.DrillDownLink>
+                    </div>
+                </div>
+            }
+
+            <div class="card">
+                <div class="card-header">Quick Actions</div>
+                <div class="card-body d-grid gap-2">
+                    @if (_task.Status == TodoTaskStatus.NextAction)
+                    {
+                        <button class="btn btn-outline-warning btn-sm" @onclick="DeactivateTask">
+                            <span class="oi oi-action-undo me-1"></span> Move to Inbox
+                        </button>
+                    }
+                    @if (_task.Status != TodoTaskStatus.Scheduled)
+                    {
+                        <button class="btn btn-outline-primary btn-sm" @onclick="ShowScheduleModal">
+                            <span class="oi oi-calendar me-1"></span> Schedule
+                        </button>
+                    }
+                    @if (_task.Status != TodoTaskStatus.SomedayMaybe)
+                    {
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="MoveToSomeday">
+                            <span class="oi oi-star me-1"></span> Move to Someday
+                        </button>
+                    }
+                    @if (_task.Status != TodoTaskStatus.WaitingFor)
+                    {
+                        <button class="btn btn-outline-warning btn-sm" @onclick="ShowWaitingModal">
+                            <span class="oi oi-clock me-1"></span> Waiting For
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Edit Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Edit Task" IsVisible="@_isEditing" OnClose="() => _isEditing = false" Size="modal-lg">
+    <ChildContent>
+        @if (_task != null)
+        {
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="_editTitle" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" @bind="_editDescription" rows="2"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" @bind="_editNotes" rows="4"></textarea>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Priority</label>
+                    <select class="form-select" @bind="_editPriority">
+                        <option value="1">High</option>
+                        <option value="2">Normal</option>
+                        <option value="3">Low</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Estimated Minutes</label>
+                    <input type="number" class="form-control" @bind="_editEstimatedMinutes" min="1" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" class="form-control" @bind="_editDueDate" />
+                </div>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _isEditing = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveEdit">Save</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@* Schedule Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Schedule Task" IsVisible="@_showScheduleModal" OnClose="() => _showScheduleModal = false">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-control" @bind="_scheduleDate" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Time (optional)</label>
+            <input type="time" class="form-control" @bind="_scheduleTime" />
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showScheduleModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="ConfirmSchedule">Schedule</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@* Waiting For Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Waiting For" IsVisible="@_showWaitingModal" OnClose="() => _showWaitingModal = false">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Who are you waiting for?</label>
+            <input type="text" class="form-control" @bind="_waitingForNote" placeholder="Person or thing you're waiting on" />
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showWaitingModal = false">Cancel</button>
+        <button class="btn btn-warning" @onclick="ConfirmWaitingFor">Set Waiting</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Task"
+    Message="Are you sure you want to delete this task?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private TodoTask? _task;
+    private Project? _project;
+    private bool _isLoading = true;
+    private bool _isEditing = false;
+    private bool _showDeleteConfirm = false;
+    private bool _showScheduleModal = false;
+    private bool _showWaitingModal = false;
+
+    // Edit fields
+    private string _editTitle = string.Empty;
+    private string _editDescription = string.Empty;
+    private string _editNotes = string.Empty;
+    private int _editPriority = 2;
+    private int _editEstimatedMinutes = 30;
+    private DateTime? _editDueDate;
+
+    // Schedule fields
+    private DateTime _scheduleDate = DateTime.Today;
+    private TimeOnly? _scheduleTime;
+
+    // Waiting for fields
+    private string _waitingForNote = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTask();
+    }
+
+    private async Task LoadTask()
+    {
+        _isLoading = true;
+        try
+        {
+            _task = await TaskService.GetByIdAsync(Id);
+            if (_task?.ProjectId.HasValue == true)
+            {
+                _project = await ProjectService.GetByIdAsync(_task.ProjectId.Value);
+            }
+
+            if (_task != null)
+            {
+                _editTitle = _task.Title;
+                _editDescription = _task.Description ?? string.Empty;
+                _editNotes = _task.Notes ?? string.Empty;
+                _editPriority = _task.Priority;
+                _editEstimatedMinutes = _task.EstimatedMinutes;
+                _editDueDate = _task.DueDate;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task Complete()
+    {
+        if (_task != null)
+        {
+            await TaskService.CompleteAsync(_task.Id);
+            await LoadTask();
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_task != null)
+        {
+            _task.Title = _editTitle;
+            _task.Description = _editDescription;
+            _task.Notes = _editNotes;
+            _task.Priority = _editPriority;
+            _task.EstimatedMinutes = _editEstimatedMinutes;
+            _task.DueDate = _editDueDate;
+            await TaskService.UpdateAsync(_task);
+            _isEditing = false;
+            await LoadTask();
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_task != null)
+        {
+            await TaskService.DeleteAsync(_task.Id);
+            Navigation.NavigateTo("/tasks/next");
+        }
+    }
+
+    private void ShowScheduleModal()
+    {
+        _scheduleDate = _task?.ScheduledDate?.Date ?? DateTime.Today;
+        _scheduleTime = _task?.ScheduledStartTime.HasValue == true
+            ? TimeOnly.FromDateTime(_task.ScheduledStartTime.Value)
+            : null;
+        _showScheduleModal = true;
+    }
+
+    private async Task ConfirmSchedule()
+    {
+        if (_task != null)
+        {
+            DateTime? startTime = _scheduleTime.HasValue
+                ? _scheduleDate.Date.Add(_scheduleTime.Value.ToTimeSpan())
+                : null;
+            await TaskService.ScheduleAsync(_task.Id, _scheduleDate, startTime);
+            _showScheduleModal = false;
+            await LoadTask();
+        }
+    }
+
+    private async Task MoveToSomeday()
+    {
+        if (_task != null)
+        {
+            await TaskService.MoveToSomedayAsync(_task.Id);
+            await LoadTask();
+        }
+    }
+
+    private async Task DeactivateTask()
+    {
+        if (_task != null)
+        {
+            await TaskService.DeactivateAsync(_task.Id);
+            await LoadTask();
+        }
+    }
+
+    private void ShowWaitingModal()
+    {
+        _waitingForNote = _task?.WaitingForNote ?? string.Empty;
+        _showWaitingModal = true;
+    }
+
+    private async Task ConfirmWaitingFor()
+    {
+        if (_task != null)
+        {
+            _task.Status = TodoTaskStatus.WaitingFor;
+            _task.WaitingForNote = _waitingForNote;
+            _task.WaitingForSince = DateTime.UtcNow;
+            await TaskService.UpdateAsync(_task);
+            _showWaitingModal = false;
+            await LoadTask();
+        }
+    }
+}

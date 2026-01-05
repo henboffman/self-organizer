@@ -1,0 +1,90 @@
+/* ===========================================
+   Utility Classes
+   Custom utilities that complement Bootstrap
+   =========================================== */
+
+/* Min Width Utilities */
+.min-w-70 { min-width: 70px; }
+.min-w-100 { min-width: 100px; }
+.min-w-120 { min-width: 120px; }
+
+/* Max Height Utilities */
+.max-h-100 { max-height: 100px; }
+.max-h-200 { max-height: 200px; }
+
+/* Overflow */
+.overflow-hidden-y { overflow-y: hidden; }
+
+/* White Space */
+.whitespace-pre-wrap { white-space: pre-wrap; }
+
+/* Progress Bar Heights */
+.progress-sm { height: 8px; }
+.progress-md { height: 20px; }
+
+/* Text Truncation for Cards */
+.text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    background-color: var(--bg-overlay);
+}
+
+/* Time Display Column */
+.time-column {
+    min-width: 100px;
+}
+
+/* Schedule Time Column */
+.schedule-time {
+    min-width: 100px;
+}
+
+/* Event Time Display */
+.event-time {
+    min-width: 70px;
+}
+
+/* Badge Dynamic Colors */
+.badge-dynamic {
+    transition: background-color var(--transition-fast);
+}
+
+/* Context/Category Badges with dynamic colors handled via CSS */
+.context-badge {
+    background-color: var(--color-info) !important;
+}
+
+.category-badge {
+    background-color: var(--text-muted);
+}
+
+/* Priority-based background colors */
+.bg-priority-high { background-color: var(--priority-high) !important; }
+.bg-priority-normal { background-color: var(--priority-normal) !important; }
+.bg-priority-low { background-color: var(--priority-low) !important; }
+
+/* Status-based background colors */
+.bg-status-todo { background-color: var(--status-todo) !important; }
+.bg-status-in-progress { background-color: var(--status-in-progress) !important; }
+.bg-status-waiting { background-color: var(--status-waiting) !important; }
+.bg-status-completed { background-color: var(--status-completed) !important; }
+.bg-status-someday { background-color: var(--status-someday) !important; }
+
+/* Time Block Colors */
+.bg-meeting { background-color: var(--color-primary) !important; color: var(--text-on-primary); }
+.bg-meeting-prep { background-color: var(--color-warning) !important; }
+.bg-meeting-decompress { background-color: var(--color-info) !important; color: var(--text-on-primary); }
+.bg-deep-work { background-color: var(--color-success) !important; color: var(--text-on-primary); }
+.bg-shallow-work { background-color: var(--text-muted) !important; color: var(--text-on-primary); }
+.bg-break { background-color: var(--bg-tertiary) !important; }
+
+/* Stalled/Warning Border */
+.border-warning-subtle {
+    border-color: var(--color-warning) !important;
+}

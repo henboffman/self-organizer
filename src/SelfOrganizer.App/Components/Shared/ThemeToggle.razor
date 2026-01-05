@@ -1,0 +1,13 @@
+<button class="theme-toggle btn btn-link"
+        @onclick="ToggleTheme"
+        title="@(_isDark ? "Switch to light mode" : "Switch to dark mode")"
+        aria-label="@(_isDark ? "Switch to light mode" : "Switch to dark mode")">
+    @if (_isDark)
+    {
+        <span class="oi oi-sun"></span>
+    }
+    else
+    {
+        <span class="oi oi-moon"></span>
+    }
+</button>

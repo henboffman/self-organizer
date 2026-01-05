@@ -1,0 +1,187 @@
+@namespace SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.App.Services
+@inject IImportService ImportService
+@inject IJSRuntime JSRuntime
+
+<Modal Title="@($"Import {EntityName}")" IsVisible="@IsVisible" OnClose="HandleClose" Size="modal-lg">
+    <ChildContent>
+        @if (_state == ImportState.SelectFile)
+        {
+            <div class="import-section">
+                <div class="file-upload-area @(_isDragOver ? "drag-over" : "")"
+                     @ondragover="HandleDragOver"
+                     @ondragover:preventDefault
+                     @ondragleave="HandleDragLeave"
+                     @ondrop="HandleDrop"
+                     @ondrop:preventDefault>
+                    <span class="oi oi-cloud-upload upload-icon"></span>
+                    <p class="upload-text">Drag and drop a file here, or click to browse</p>
+                    <p class="upload-hint">Supports CSV and JSON files</p>
+                    <InputFile OnChange="HandleFileSelected" Accept=".csv,.json" @ref="_fileInput" class="file-input" />
+                </div>
+
+                @if (ShowTemplateDownload)
+                {
+                    <div class="template-hint">
+                        <span class="oi oi-info me-1"></span>
+                        Need a template?
+                        <button class="btn btn-link btn-sm p-0 ms-1" @onclick="HandleDownloadTemplate">
+                            Download CSV template
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else if (_state == ImportState.Preview)
+        {
+            <div class="import-section">
+                <div class="file-info">
+                    <span class="oi oi-file me-2"></span>
+                    <strong>@_fileName</strong>
+                    <span class="text-muted ms-2">(@_fileSize)</span>
+                    <button class="btn btn-link btn-sm ms-auto" @onclick="ResetToSelectFile">Change file</button>
+                </div>
+
+                @if (_validationResult != null)
+                {
+                    <div class="validation-summary @(_validationResult.IsValid ? "valid" : "invalid")">
+                        @if (_validationResult.IsValid)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>Headers validated successfully</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            <span>Header validation issues found</span>
+                        }
+                    </div>
+
+                    @if (_validationResult.Messages.Any())
+                    {
+                        <ul class="validation-messages">
+                            @foreach (var message in _validationResult.Messages)
+                            {
+                                <li>@message</li>
+                            }
+                        </ul>
+                    }
+                }
+
+                @if (_previewData.Count > 0)
+                {
+                    <div class="preview-section">
+                        <h6>Preview (first @(_previewData.Count - 1) rows)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm preview-table">
+                                <thead>
+                                    <tr>
+                                        @foreach (var header in _previewData[0])
+                                        {
+                                            <th>@header</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 1; i < _previewData.Count; i++)
+                                    {
+                                        <tr>
+                                            @foreach (var cell in _previewData[i])
+                                            {
+                                                <td>@(string.IsNullOrEmpty(cell) ? "-" : TruncateCell(cell))</td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (_state == ImportState.Importing)
+        {
+            <div class="import-section text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Importing...</span>
+                </div>
+                <p>Importing data...</p>
+            </div>
+        }
+        else if (_state == ImportState.Complete)
+        {
+            <div class="import-section">
+                @if (_importSuccess)
+                {
+                    <div class="result-summary success">
+                        <span class="oi oi-check me-2"></span>
+                        <span>@_resultMessage</span>
+                    </div>
+                }
+                else if (_partialSuccess)
+                {
+                    <div class="result-summary partial">
+                        <span class="oi oi-warning me-2"></span>
+                        <span>@_resultMessage</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="result-summary error">
+                        <span class="oi oi-x me-2"></span>
+                        <span>@_resultMessage</span>
+                    </div>
+                }
+
+                @if (_errors.Any())
+                {
+                    <div class="error-list-section">
+                        <h6>
+                            <span class="oi oi-warning me-1"></span>
+                            Errors (@_errors.Count)
+                        </h6>
+                        <div class="error-list">
+                            @foreach (var error in _errors.Take(MaxErrorsToShow))
+                            {
+                                <div class="error-item @(error.Severity == ImportErrorSeverity.Warning ? "warning" : "error")">
+                                    <span class="oi @(error.Severity == ImportErrorSeverity.Warning ? "oi-warning" : "oi-x") me-1"></span>
+                                    @error.GetDisplayMessage()
+                                </div>
+                            }
+                            @if (_errors.Count > MaxErrorsToShow)
+                            {
+                                <div class="error-item more">
+                                    ...and @(_errors.Count - MaxErrorsToShow) more errors
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        @if (_state == ImportState.SelectFile)
+        {
+            <button type="button" class="btn btn-secondary" @onclick="HandleClose">Cancel</button>
+        }
+        else if (_state == ImportState.Preview)
+        {
+            <button type="button" class="btn btn-secondary" @onclick="ResetToSelectFile">Back</button>
+            <button type="button" class="btn btn-primary" @onclick="HandleImport" disabled="@(!CanImport)">
+                <span class="oi oi-data-transfer-upload me-1"></span>
+                Import
+            </button>
+        }
+        else if (_state == ImportState.Complete)
+        {
+            @if (!_importSuccess && !_partialSuccess)
+            {
+                <button type="button" class="btn btn-secondary" @onclick="ResetToSelectFile">Try Again</button>
+            }
+            <button type="button" class="btn btn-primary" @onclick="HandleClose">
+                @(_importSuccess || _partialSuccess ? "Done" : "Close")
+            </button>
+        }
+    </Footer>
+</Modal>

@@ -1,0 +1,380 @@
+@page "/projects/{Id:guid}"
+@using SelfOrganizer.Core.Models
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject NavigationManager Navigation
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_project == null)
+{
+    <div class="alert alert-warning">Project not found</div>
+}
+else
+{
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/projects">Projects</a></li>
+            <li class="breadcrumb-item active">@_project.Name</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h3 class="mb-1">
+                <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@_project.Priority" />
+                @_project.Name
+            </h3>
+            <span class="badge bg-secondary">@_project.Status</span>
+            @if (!_hasNextAction && _project.Status == ProjectStatus.Active)
+            {
+                <span class="badge bg-warning text-dark ms-2">No Next Action</span>
+            }
+        </div>
+        <div class="btn-group">
+            @if (_project.Status == ProjectStatus.Active)
+            {
+                <button class="btn btn-success" @onclick="Complete">
+                    <span class="oi oi-check me-1"></span> Complete
+                </button>
+            }
+            <button class="btn btn-outline-primary" @onclick="() => _isEditing = true">
+                <span class="oi oi-pencil me-1"></span> Edit
+            </button>
+            <button class="btn btn-outline-danger" @onclick="() => _showDeleteConfirm = true">
+                <span class="oi oi-trash me-1"></span> Delete
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            @if (!string.IsNullOrEmpty(_project.DesiredOutcome))
+            {
+                <div class="card mb-4">
+                    <div class="card-header">Desired Outcome</div>
+                    <div class="card-body">
+                        <p class="mb-0">@_project.DesiredOutcome</p>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_project.Description))
+            {
+                <div class="card mb-4">
+                    <div class="card-header">Description</div>
+                    <div class="card-body">
+                        <p class="mb-0" style="white-space: pre-wrap;">@_project.Description</p>
+                    </div>
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Tasks (@_tasks.Count)</span>
+                    <button class="btn btn-sm btn-primary" @onclick="ShowAddTaskModal">
+                        <span class="oi oi-plus me-1"></span> Add Task
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (!_tasks.Any())
+                    {
+                        <p class="text-muted text-center py-3">No tasks yet. Add a task to define the next action.</p>
+                    }
+                    else
+                    {
+                        @foreach (var task in _tasks.OrderBy(t => t.Status == TodoTaskStatus.Completed).ThenBy(t => t.Priority))
+                        {
+                            <div class="d-flex align-items-center py-2 border-bottom">
+                                <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-secondary" : "btn-outline-success") me-2"
+                                        @onclick="() => ToggleComplete(task)" disabled="@(task.Status == TodoTaskStatus.Completed)">
+                                    <span class="oi oi-check"></span>
+                                </button>
+                                <div class="flex-grow-1">
+                                    <a href="/tasks/@task.Id" class="@(task.Status == TodoTaskStatus.Completed ? "text-decoration-line-through text-muted" : "")">
+                                        @task.Title
+                                    </a>
+                                    <div class="small text-muted">
+                                        <span class="badge bg-light text-dark">@task.Status</span>
+                                        @if (task.EstimatedMinutes > 0)
+                                        {
+                                            <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                        }
+                                    </div>
+                                </div>
+                                <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">Progress</div>
+                <div class="card-body">
+                    @if (_tasks.Any())
+                    {
+                        var completed = _tasks.Count(t => t.Status == TodoTaskStatus.Completed);
+                        var total = _tasks.Count;
+                        var percent = (int)((double)completed / total * 100);
+                        <div class="progress mb-2" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" style="width: @percent%">@percent%</div>
+                        </div>
+                        <p class="text-center mb-0">@completed of @total tasks completed</p>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center mb-0">No tasks to track</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Properties</div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Status</span>
+                        <span class="badge bg-secondary">@_project.Status</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Priority</span>
+                        <span>@(_project.Priority == 1 ? "High" : _project.Priority == 2 ? "Normal" : "Low")</span>
+                    </li>
+                    @if (_project.DueDate.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Due Date</span>
+                            <span class="@(_project.DueDate.Value < DateTime.UtcNow ? "text-danger" : "")">
+                                @_project.DueDate.Value.ToString("MMM d, yyyy")
+                            </span>
+                        </li>
+                    }
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Created</span>
+                        <span>@_project.CreatedAt.ToString("MMM d, yyyy")</span>
+                    </li>
+                    @if (_project.CompletedAt.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Completed</span>
+                            <span class="text-success">@_project.CompletedAt.Value.ToString("MMM d, yyyy")</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@* Add Task Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Add Task to Project" IsVisible="@_showAddTaskModal" OnClose="() => _showAddTaskModal = false">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_newTaskTitle" />
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Estimated Minutes</label>
+                <input type="number" class="form-control" @bind="_newTaskMinutes" min="1" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_newTaskPriority">
+                    <option value="1">High</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Low</option>
+                </select>
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showAddTaskModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="AddTask" disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)">Add Task</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@* Edit Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Edit Project" IsVisible="@_isEditing" OnClose="() => _isEditing = false" Size="modal-lg">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" class="form-control" @bind="_editName" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Desired Outcome</label>
+            <textarea class="form-control" @bind="_editOutcome" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="_editDescription" rows="3"></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_editPriority">
+                    <option value="1">High</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Low</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select class="form-select" @bind="_editStatus">
+                    <option value="@ProjectStatus.Active">Active</option>
+                    <option value="@ProjectStatus.OnHold">On Hold</option>
+                    <option value="@ProjectStatus.SomedayMaybe">Someday/Maybe</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Due Date</label>
+                <input type="date" class="form-control" @bind="_editDueDate" />
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _isEditing = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveEdit">Save</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Project"
+    Message="Are you sure you want to delete this project? Tasks will not be deleted."
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Project? _project;
+    private List<TodoTask> _tasks = new();
+    private bool _hasNextAction;
+    private bool _isLoading = true;
+    private bool _isEditing = false;
+    private bool _showDeleteConfirm = false;
+    private bool _showAddTaskModal = false;
+
+    // Edit fields
+    private string _editName = string.Empty;
+    private string _editOutcome = string.Empty;
+    private string _editDescription = string.Empty;
+    private int _editPriority = 2;
+    private ProjectStatus _editStatus = ProjectStatus.Active;
+    private DateTime? _editDueDate;
+
+    // New task fields
+    private string _newTaskTitle = string.Empty;
+    private int _newTaskMinutes = 30;
+    private int _newTaskPriority = 2;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProject();
+    }
+
+    private async Task LoadProject()
+    {
+        _isLoading = true;
+        try
+        {
+            _project = await ProjectService.GetByIdAsync(Id);
+            if (_project != null)
+            {
+                _tasks = (await TaskService.GetByProjectAsync(Id))
+                    .Where(t => t.Status != TodoTaskStatus.Deleted)
+                    .ToList();
+                _hasNextAction = await ProjectService.HasNextActionAsync(Id);
+
+                // Initialize edit fields
+                _editName = _project.Name;
+                _editOutcome = _project.DesiredOutcome ?? string.Empty;
+                _editDescription = _project.Description ?? string.Empty;
+                _editPriority = _project.Priority;
+                _editStatus = _project.Status;
+                _editDueDate = _project.DueDate;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task Complete()
+    {
+        if (_project != null)
+        {
+            await ProjectService.CompleteAsync(_project.Id);
+            await LoadProject();
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_project != null)
+        {
+            _project.Name = _editName;
+            _project.DesiredOutcome = _editOutcome;
+            _project.Description = _editDescription;
+            _project.Priority = _editPriority;
+            _project.Status = _editStatus;
+            _project.DueDate = _editDueDate;
+            await ProjectService.UpdateAsync(_project);
+            _isEditing = false;
+            await LoadProject();
+        }
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_project != null)
+        {
+            await ProjectService.DeleteAsync(_project.Id);
+            Navigation.NavigateTo("/projects");
+        }
+    }
+
+    private void ShowAddTaskModal()
+    {
+        _newTaskTitle = string.Empty;
+        _newTaskMinutes = 30;
+        _newTaskPriority = 2;
+        _showAddTaskModal = true;
+    }
+
+    private async Task AddTask()
+    {
+        if (_project == null || string.IsNullOrWhiteSpace(_newTaskTitle)) return;
+
+        var task = new TodoTask
+        {
+            Title = _newTaskTitle,
+            ProjectId = _project.Id,
+            Status = TodoTaskStatus.NextAction,
+            EstimatedMinutes = _newTaskMinutes,
+            Priority = _newTaskPriority
+        };
+        await TaskService.CreateAsync(task);
+        _showAddTaskModal = false;
+        await LoadProject();
+    }
+
+    private async Task ToggleComplete(TodoTask task)
+    {
+        if (task.Status != TodoTaskStatus.Completed)
+        {
+            await TaskService.CompleteAsync(task.Id);
+            await LoadProject();
+        }
+    }
+}

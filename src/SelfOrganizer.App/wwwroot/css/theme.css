@@ -1,0 +1,347 @@
+/* ===========================================
+   Self Organizer - Theme System
+   Color Palette:
+   - Ivory (#f6f7eb) - Light backgrounds
+   - Fiery Terracotta (#e94f37) - Accent/Warning
+   - Gunmetal (#393e41) - Dark/Text
+   - Steel Blue (#3f88c5) - Primary/Links
+   - Ocean Mist (#44bba4) - Success/Secondary
+   =========================================== */
+
+/* ----------------------------------------
+   CSS Custom Properties (Variables)
+   Organized by category for maintainability
+   ---------------------------------------- */
+
+:root {
+    /* === Font System === */
+    --font-primary: 'Poppins', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --font-monospace: 'Fira Code', 'Consolas', monospace;
+
+    /* === Spacing Scale === */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+
+    /* === Border Radius === */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+
+    /* === Shadows === */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+
+    /* === Transitions === */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s ease;
+
+    /* === Z-Index Scale === */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 400;
+    --z-modal: 500;
+    --z-tooltip: 600;
+}
+
+/* ----------------------------------------
+   Light Theme (Default)
+   WCAG AA compliant color combinations
+   ---------------------------------------- */
+:root,
+[data-theme="light"] {
+    /* === Core Colors === */
+    --color-ivory: #f6f7eb;
+    --color-terracotta: #e94f37;
+    --color-gunmetal: #393e41;
+    --color-steel-blue: #3f88c5;
+    --color-ocean-mist: #44bba4;
+
+    /* === Background Colors === */
+    --bg-primary: #f6f7eb;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #eaebe0;
+    --bg-elevated: #ffffff;
+    --bg-overlay: rgba(57, 62, 65, 0.5);
+
+    /* === Text Colors === */
+    --text-primary: #393e41;
+    --text-secondary: #5a6066;
+    --text-muted: #7a8085;
+    --text-inverse: #f6f7eb;
+    --text-on-primary: #ffffff;
+
+    /* === Interactive Colors === */
+    --color-primary: #3f88c5;
+    --color-primary-hover: #2d6fa8;
+    --color-primary-active: #245a8a;
+    --color-primary-subtle: rgba(63, 136, 197, 0.1);
+
+    --color-secondary: #44bba4;
+    --color-secondary-hover: #3aa391;
+    --color-secondary-active: #2f8a7a;
+    --color-secondary-subtle: rgba(68, 187, 164, 0.1);
+
+    --color-accent: #e94f37;
+    --color-accent-hover: #d4432c;
+    --color-accent-active: #bf3a25;
+    --color-accent-subtle: rgba(233, 79, 55, 0.1);
+
+    /* === Semantic Colors === */
+    --color-success: #44bba4;
+    --color-success-bg: rgba(68, 187, 164, 0.15);
+    --color-success-border: rgba(68, 187, 164, 0.4);
+
+    --color-warning: #e9a037;
+    --color-warning-bg: rgba(233, 160, 55, 0.15);
+    --color-warning-border: rgba(233, 160, 55, 0.4);
+
+    --color-danger: #e94f37;
+    --color-danger-bg: rgba(233, 79, 55, 0.15);
+    --color-danger-border: rgba(233, 79, 55, 0.4);
+
+    --color-info: #3f88c5;
+    --color-info-bg: rgba(63, 136, 197, 0.15);
+    --color-info-border: rgba(63, 136, 197, 0.4);
+
+    /* === Border Colors === */
+    --border-default: #d8d9cf;
+    --border-muted: #e8e9df;
+    --border-strong: #b8b9af;
+    --border-focus: var(--color-primary);
+
+    /* === Sidebar Colors === */
+    --sidebar-bg: #393e41;
+    --sidebar-bg-gradient: linear-gradient(180deg, #393e41 0%, #2a2e30 100%);
+    --sidebar-text: rgba(246, 247, 235, 0.85);
+    --sidebar-text-active: #f6f7eb;
+    --sidebar-hover-bg: rgba(246, 247, 235, 0.1);
+    --sidebar-active-bg: rgba(63, 136, 197, 0.3);
+    --sidebar-border: rgba(246, 247, 235, 0.15);
+
+    /* === Input Colors === */
+    --input-bg: #ffffff;
+    --input-border: #d8d9cf;
+    --input-border-focus: var(--color-primary);
+    --input-placeholder: #9a9fa4;
+    --input-disabled-bg: #eaebe0;
+
+    /* === Card Colors === */
+    --card-bg: #ffffff;
+    --card-border: #e8e9df;
+    --card-shadow: var(--shadow-sm);
+    --card-hover-shadow: var(--shadow-md);
+
+    /* === Priority Colors (Accessible) === */
+    --priority-high: #e94f37;
+    --priority-normal: #3f88c5;
+    --priority-low: #7a8085;
+
+    /* === Status Colors === */
+    --status-todo: #3f88c5;
+    --status-in-progress: #e9a037;
+    --status-waiting: #9a7fba;
+    --status-completed: #44bba4;
+    --status-someday: #7a8085;
+
+    /* === Focus Ring === */
+    --focus-ring: 0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--color-primary);
+}
+
+/* ----------------------------------------
+   Dark Theme
+   WCAG AA compliant color combinations
+   ---------------------------------------- */
+[data-theme="dark"] {
+    /* === Background Colors === */
+    --bg-primary: #1a1d1f;
+    --bg-secondary: #232628;
+    --bg-tertiary: #2d3133;
+    --bg-elevated: #2d3133;
+    --bg-overlay: rgba(0, 0, 0, 0.7);
+
+    /* === Text Colors === */
+    --text-primary: #f6f7eb;
+    --text-secondary: #c8c9bf;
+    --text-muted: #9a9b91;
+    --text-inverse: #393e41;
+    --text-on-primary: #ffffff;
+
+    /* === Interactive Colors (brighter for dark bg) === */
+    --color-primary: #5a9fd4;
+    --color-primary-hover: #7ab3e0;
+    --color-primary-active: #4a8fc4;
+    --color-primary-subtle: rgba(90, 159, 212, 0.15);
+
+    --color-secondary: #5dcdb5;
+    --color-secondary-hover: #7dd9c7;
+    --color-secondary-active: #4dbda5;
+    --color-secondary-subtle: rgba(93, 205, 181, 0.15);
+
+    --color-accent: #f0715d;
+    --color-accent-hover: #f58c7a;
+    --color-accent-active: #e05f4b;
+    --color-accent-subtle: rgba(240, 113, 93, 0.15);
+
+    /* === Semantic Colors === */
+    --color-success: #5dcdb5;
+    --color-success-bg: rgba(93, 205, 181, 0.2);
+    --color-success-border: rgba(93, 205, 181, 0.5);
+
+    --color-warning: #f0b05d;
+    --color-warning-bg: rgba(240, 176, 93, 0.2);
+    --color-warning-border: rgba(240, 176, 93, 0.5);
+
+    --color-danger: #f0715d;
+    --color-danger-bg: rgba(240, 113, 93, 0.2);
+    --color-danger-border: rgba(240, 113, 93, 0.5);
+
+    --color-info: #5a9fd4;
+    --color-info-bg: rgba(90, 159, 212, 0.2);
+    --color-info-border: rgba(90, 159, 212, 0.5);
+
+    /* === Border Colors === */
+    --border-default: #3d4144;
+    --border-muted: #2d3133;
+    --border-strong: #4d5154;
+
+    /* === Sidebar Colors === */
+    --sidebar-bg: #151719;
+    --sidebar-bg-gradient: linear-gradient(180deg, #1a1d1f 0%, #0f1112 100%);
+    --sidebar-text: rgba(246, 247, 235, 0.75);
+    --sidebar-text-active: #f6f7eb;
+    --sidebar-hover-bg: rgba(246, 247, 235, 0.08);
+    --sidebar-active-bg: rgba(90, 159, 212, 0.25);
+    --sidebar-border: rgba(246, 247, 235, 0.1);
+
+    /* === Input Colors === */
+    --input-bg: #2d3133;
+    --input-border: #3d4144;
+    --input-placeholder: #6a6b61;
+    --input-disabled-bg: #232628;
+
+    /* === Card Colors === */
+    --card-bg: #232628;
+    --card-border: #3d4144;
+    --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --card-hover-shadow: 0 10px 15px rgba(0, 0, 0, 0.4);
+
+    /* === Priority Colors (brighter) === */
+    --priority-high: #f0715d;
+    --priority-normal: #5a9fd4;
+    --priority-low: #9a9b91;
+
+    /* === Status Colors (brighter) === */
+    --status-todo: #5a9fd4;
+    --status-in-progress: #f0b05d;
+    --status-waiting: #b39fcc;
+    --status-completed: #5dcdb5;
+    --status-someday: #9a9b91;
+
+    /* === Shadows (stronger for dark mode) === */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* ----------------------------------------
+   System Preference Detection
+   Respects prefers-color-scheme when no
+   explicit theme is set
+   ---------------------------------------- */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        /* Apply dark theme variables */
+        --bg-primary: #1a1d1f;
+        --bg-secondary: #232628;
+        --bg-tertiary: #2d3133;
+        --bg-elevated: #2d3133;
+        --bg-overlay: rgba(0, 0, 0, 0.7);
+
+        --text-primary: #f6f7eb;
+        --text-secondary: #c8c9bf;
+        --text-muted: #9a9b91;
+        --text-inverse: #393e41;
+
+        --color-primary: #5a9fd4;
+        --color-primary-hover: #7ab3e0;
+        --color-primary-active: #4a8fc4;
+        --color-primary-subtle: rgba(90, 159, 212, 0.15);
+
+        --color-secondary: #5dcdb5;
+        --color-secondary-hover: #7dd9c7;
+        --color-secondary-active: #4dbda5;
+
+        --color-accent: #f0715d;
+        --color-accent-hover: #f58c7a;
+        --color-accent-active: #e05f4b;
+
+        --color-success: #5dcdb5;
+        --color-success-bg: rgba(93, 205, 181, 0.2);
+        --color-warning: #f0b05d;
+        --color-warning-bg: rgba(240, 176, 93, 0.2);
+        --color-danger: #f0715d;
+        --color-danger-bg: rgba(240, 113, 93, 0.2);
+        --color-info: #5a9fd4;
+        --color-info-bg: rgba(90, 159, 212, 0.2);
+
+        --border-default: #3d4144;
+        --border-muted: #2d3133;
+        --border-strong: #4d5154;
+
+        --sidebar-bg: #151719;
+        --sidebar-bg-gradient: linear-gradient(180deg, #1a1d1f 0%, #0f1112 100%);
+        --sidebar-text: rgba(246, 247, 235, 0.75);
+        --sidebar-hover-bg: rgba(246, 247, 235, 0.08);
+        --sidebar-active-bg: rgba(90, 159, 212, 0.25);
+        --sidebar-border: rgba(246, 247, 235, 0.1);
+
+        --input-bg: #2d3133;
+        --input-border: #3d4144;
+        --input-placeholder: #6a6b61;
+        --input-disabled-bg: #232628;
+
+        --card-bg: #232628;
+        --card-border: #3d4144;
+
+        --priority-high: #f0715d;
+        --priority-normal: #5a9fd4;
+        --priority-low: #9a9b91;
+
+        --status-completed: #5dcdb5;
+
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+        --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* ----------------------------------------
+   Reduced Motion
+   Respects user preference for reduced motion
+   ---------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --transition-fast: 0s;
+        --transition-normal: 0s;
+        --transition-slow: 0s;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

@@ -1,0 +1,31 @@
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    color: var(--sidebar-text);
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+    cursor: pointer;
+}
+
+.theme-toggle:hover {
+    background-color: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-active);
+}
+
+.theme-toggle:focus {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+.theme-toggle .oi {
+    font-size: 1.25rem;
+    margin: 0;
+    width: auto;
+    height: auto;
+}

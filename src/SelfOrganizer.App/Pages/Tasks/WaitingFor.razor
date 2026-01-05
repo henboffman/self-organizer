@@ -1,0 +1,168 @@
+@page "/tasks/waiting"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-clock me-2"></span>Waiting For
+    </h3>
+    <ExportButton
+        EntityName="waiting-for"
+        OnExportCsv="HandleExportCsv"
+        OnExportJson="HandleExportJson"
+        OnDownloadTemplate="HandleDownloadTemplate"
+        IsDisabled="@(!_tasks.Any())"
+        Size="small" />
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_tasks.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">Nothing waiting</h5>
+        <p class="text-muted">No tasks are waiting for someone else.</p>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Waiting For</th>
+                    <th>Since</th>
+                    <th>Days</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var task in _tasks.OrderByDescending(t => (DateTime.UtcNow - (t.WaitingForSince ?? t.CreatedAt)).TotalDays))
+                {
+                    var daysSince = task.WaitingForSince.HasValue
+                        ? (int)(DateTime.UtcNow - task.WaitingForSince.Value).TotalDays
+                        : (int)(DateTime.UtcNow - task.CreatedAt).TotalDays;
+
+                    <tr class="@(daysSince > 7 ? "table-warning" : "")">
+                        <td>
+                            <a href="/tasks/@task.Id">@task.Title</a>
+                        </td>
+                        <td>@(task.WaitingForNote ?? "Someone")</td>
+                        <td>@((task.WaitingForSince ?? task.CreatedAt).ToString("MMM d"))</td>
+                        <td>
+                            @if (daysSince > 7)
+                            {
+                                <span class="badge bg-warning text-dark">@daysSince days</span>
+                            }
+                            else
+                            {
+                                <span>@daysSince days</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => MoveToNextAction(task)" title="Move to Next Actions">
+                                <span class="oi oi-action-redo"></span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => FollowUp(task)" title="Send Follow-up">
+                                <span class="oi oi-envelope-closed"></span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => CompleteTask(task)" title="Complete">
+                                <span class="oi oi-check"></span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<TodoTask> _tasks = new();
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async Task LoadTasks()
+    {
+        _isLoading = true;
+        try
+        {
+            _tasks = (await TaskService.GetWaitingForAsync()).ToList();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task MoveToNextAction(TodoTask task)
+    {
+        task.Status = TodoTaskStatus.NextAction;
+        task.WaitingForNote = null;
+        task.WaitingForSince = null;
+        task.WaitingForContactId = null;
+        await TaskService.UpdateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    private void FollowUp(TodoTask task)
+    {
+        // TODO: Implement follow-up functionality (create a new task or send email)
+    }
+
+    private async Task CompleteTask(TodoTask task)
+    {
+        await TaskService.CompleteAsync(task.Id);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadTasks();
+    }
+
+    // Export methods
+    private static readonly string[] ExportColumns = new[]
+    {
+        "Title", "WaitingForNote", "WaitingForSince", "Description"
+    };
+
+    private async Task HandleExportCsv(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadCsvAsync(_tasks, "waiting-for", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleExportJson(ExportEventArgs args)
+    {
+        var result = await ExportService.ExportAndDownloadJsonAsync(_tasks, "waiting-for");
+        if (result.Success)
+            args.SetSuccess(result.ItemCount, $"Exported {result.ItemCount} items");
+        else
+            args.SetError(result.ErrorMessage ?? "Export failed");
+    }
+
+    private async Task HandleDownloadTemplate(ExportEventArgs args)
+    {
+        var result = await ExportService.DownloadTemplateAsync<TodoTask>("waiting-for", ExportColumns);
+        if (result.Success)
+            args.SetSuccess(0, "Template downloaded");
+        else
+            args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+}

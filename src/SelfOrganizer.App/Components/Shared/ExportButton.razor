@@ -1,0 +1,150 @@
+@namespace SelfOrganizer.App.Components.Shared
+
+<div class="export-button-container dropdown">
+    <button class="btn btn-outline-secondary dropdown-toggle @SizeClass"
+            type="button"
+            id="exportDropdown-@_id"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            disabled="@IsDisabled">
+        @if (_isExporting)
+        {
+            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            <span>Exporting...</span>
+        }
+        else
+        {
+            <span class="oi oi-data-transfer-download me-1" aria-hidden="true"></span>
+            <span>Export</span>
+        }
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown-@_id">
+        @if (ShowCsvOption)
+        {
+            <li>
+                <button class="dropdown-item" @onclick="HandleExportCsv" disabled="@_isExporting">
+                    <span class="oi oi-spreadsheet me-2"></span>
+                    Export as CSV
+                </button>
+            </li>
+        }
+        @if (ShowJsonOption)
+        {
+            <li>
+                <button class="dropdown-item" @onclick="HandleExportJson" disabled="@_isExporting">
+                    <span class="oi oi-code me-2"></span>
+                    Export as JSON
+                </button>
+            </li>
+        }
+        @if (ShowTemplateOption && (ShowCsvOption || ShowJsonOption))
+        {
+            <li><hr class="dropdown-divider" /></li>
+        }
+        @if (ShowTemplateOption)
+        {
+            <li>
+                <button class="dropdown-item" @onclick="HandleDownloadTemplate" disabled="@_isExporting">
+                    <span class="oi oi-document me-2"></span>
+                    Download CSV Template
+                </button>
+            </li>
+        }
+    </ul>
+</div>
+
+@if (_showFeedback)
+{
+    <div class="export-feedback @(_feedbackSuccess ? "success" : "error")">
+        <span class="oi @(_feedbackSuccess ? "oi-check" : "oi-warning") me-1"></span>
+        @_feedbackMessage
+    </div>
+}
+
+@code {
+    private readonly string _id = Guid.NewGuid().ToString("N")[..8];
+    private bool _isExporting;
+    private bool _showFeedback;
+    private bool _feedbackSuccess;
+    private string _feedbackMessage = "";
+
+    [Parameter] public string EntityName { get; set; } = "data";
+    [Parameter] public bool ShowCsvOption { get; set; } = true;
+    [Parameter] public bool ShowJsonOption { get; set; } = true;
+    [Parameter] public bool ShowTemplateOption { get; set; } = true;
+    [Parameter] public bool IsDisabled { get; set; }
+    [Parameter] public string Size { get; set; } = "normal"; // "small", "normal", "large"
+
+    [Parameter] public EventCallback<ExportEventArgs> OnExportCsv { get; set; }
+    [Parameter] public EventCallback<ExportEventArgs> OnExportJson { get; set; }
+    [Parameter] public EventCallback<ExportEventArgs> OnDownloadTemplate { get; set; }
+
+    private string SizeClass => Size switch
+    {
+        "small" => "btn-sm",
+        "large" => "btn-lg",
+        _ => ""
+    };
+
+    private async Task HandleExportCsv()
+    {
+        await ExecuteExport(OnExportCsv, "CSV");
+    }
+
+    private async Task HandleExportJson()
+    {
+        await ExecuteExport(OnExportJson, "JSON");
+    }
+
+    private async Task HandleDownloadTemplate()
+    {
+        await ExecuteExport(OnDownloadTemplate, "template");
+    }
+
+    private async Task ExecuteExport(EventCallback<ExportEventArgs> callback, string format)
+    {
+        if (!callback.HasDelegate)
+            return;
+
+        _isExporting = true;
+        _showFeedback = false;
+        StateHasChanged();
+
+        var args = new ExportEventArgs { EntityName = EntityName, Format = format };
+
+        try
+        {
+            await callback.InvokeAsync(args);
+
+            if (args.Success)
+            {
+                ShowFeedback(true, args.Message ?? $"Exported {args.ItemCount} {EntityName}");
+            }
+            else if (!string.IsNullOrEmpty(args.ErrorMessage))
+            {
+                ShowFeedback(false, args.ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(false, $"Export failed: {ex.Message}");
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async void ShowFeedback(bool success, string message)
+    {
+        _feedbackSuccess = success;
+        _feedbackMessage = message;
+        _showFeedback = true;
+        StateHasChanged();
+
+        await Task.Delay(4000);
+        _showFeedback = false;
+        StateHasChanged();
+    }
+}

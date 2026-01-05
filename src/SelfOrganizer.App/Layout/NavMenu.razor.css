@@ -1,0 +1,100 @@
+/* ===========================================
+   Navigation Menu Styles
+   Uses CSS variables from theme.css
+   =========================================== */
+
+.navbar-toggler {
+    background-color: var(--sidebar-hover-bg);
+    border: 1px solid var(--sidebar-border);
+}
+
+.navbar-toggler:focus {
+    box-shadow: none;
+}
+
+.top-row {
+    min-height: 3.5rem;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.navbar-brand {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--sidebar-text-active);
+    letter-spacing: -0.02em;
+}
+
+.navbar-brand:hover {
+    color: var(--sidebar-text-active);
+}
+
+.oi {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.75rem;
+}
+
+.nav-item {
+    font-size: 0.9rem;
+    padding-bottom: 0.25rem;
+}
+
+.nav-item:first-of-type {
+    padding-top: var(--space-md);
+}
+
+.nav-item:last-of-type {
+    padding-bottom: var(--space-md);
+}
+
+.nav-item ::deep a {
+    color: var(--sidebar-text);
+    border-radius: var(--radius-sm);
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    line-height: 2.5rem;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-item ::deep a.active {
+    background-color: var(--sidebar-active-bg);
+    color: var(--sidebar-text-active);
+}
+
+.nav-item ::deep a:hover {
+    background-color: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-active);
+    text-decoration: none;
+}
+
+.nav-separator {
+    border-color: var(--sidebar-border);
+    margin: var(--space-sm) var(--space-md);
+    opacity: 1;
+}
+
+.badge {
+    font-size: 0.7rem;
+}
+
+.badge.bg-accent {
+    background-color: var(--color-accent) !important;
+    color: var(--text-on-primary);
+}
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .collapse {
+        display: block;
+    }
+
+    .nav-scrollable {
+        height: calc(100vh - 3.5rem);
+        overflow-y: auto;
+    }
+}

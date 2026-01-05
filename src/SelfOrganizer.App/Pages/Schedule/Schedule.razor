@@ -1,0 +1,768 @@
+@page "/schedule"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services.Intelligence
+@inject SelfOrganizer.Core.Interfaces.ISchedulingService SchedulingService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject ITaskOptimizerService TaskOptimizer
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-spreadsheet me-2"></span>Schedule
+    </h3>
+    <div class="d-flex gap-2 align-items-center">
+        <div class="btn-group">
+            <button class="btn btn-sm @(_displayMode == DisplayMode.Timeline ? "btn-secondary" : "btn-outline-secondary")"
+                    @onclick="() => _displayMode = DisplayMode.Timeline" title="Timeline View">
+                <span class="oi oi-spreadsheet"></span>
+            </button>
+            <button class="btn btn-sm @(_displayMode == DisplayMode.List ? "btn-secondary" : "btn-outline-secondary")"
+                    @onclick="() => _displayMode = DisplayMode.List" title="List View">
+                <span class="oi oi-list"></span>
+            </button>
+        </div>
+        <div class="btn-group">
+            <button class="btn @(_viewDays == 1 ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewDays(1)">Day</button>
+            <button class="btn @(_viewDays == 3 ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewDays(3)">3-Day</button>
+            <button class="btn @(_viewDays == 5 ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewDays(5)">5-Day</button>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary" @onclick="Previous">
+            <span class="oi oi-chevron-left"></span>
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="GoToToday">Today</button>
+        <button class="btn btn-outline-secondary" @onclick="Next">
+            <span class="oi oi-chevron-right"></span>
+        </button>
+    </div>
+    <h5 class="mb-0">@GetDateRangeDisplay()</h5>
+    <div class="btn-group">
+        @if (_enablePickForMe)
+        {
+            <button class="btn btn-success" @onclick="PickRandomTask" disabled="@(!_availableTasks.Any())">
+                <span class="oi oi-random me-1"></span> Pick For Me
+            </button>
+        }
+        <button class="btn btn-primary" @onclick="GenerateSchedule" disabled="@_isRegenerating">
+            @if (_isRegenerating)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            else
+            {
+                <span class="oi oi-loop-circular me-1"></span>
+            }
+            Auto-Schedule
+        </button>
+    </div>
+</div>
+
+@* Warning if no tasks to schedule *@
+@if (!_availableTasks.Any())
+{
+    <div class="alert alert-warning mb-4">
+        <span class="oi oi-warning me-2"></span>
+        <strong>No tasks available to schedule.</strong>
+        Tasks must be in "Next Action" status to be auto-scheduled.
+        <a href="/inbox" class="alert-link">Process your inbox</a> to create actionable tasks.
+    </div>
+}
+
+@* Optimization Sliders *@
+<div class="card mb-4 @(_isRegenerating ? "opacity-75" : "")">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <span class="oi oi-dashboard me-2"></span>Schedule Optimization
+        </span>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showAdvancedSettings = !_showAdvancedSettings">
+            @(_showAdvancedSettings ? "Hide Advanced" : "Show Advanced")
+        </button>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">Adjust sliders and watch the schedule update in real-time</p>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <label class="form-label small">
+                    <span class="oi oi-target me-1"></span>
+                    Due Date Urgency: <strong>@_dueDateUrgencyWeight%</strong>
+                </label>
+                <input type="range" class="form-range" min="0" max="100"
+                       value="@_dueDateUrgencyWeight"
+                       @oninput="OnSliderInput"
+                       data-weight="dueDate"
+                       disabled="@_isRegenerating" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small">
+                    <span class="oi oi-bolt me-1"></span>
+                    Energy Matching: <strong>@_energyMatchingWeight%</strong>
+                </label>
+                <input type="range" class="form-range" min="0" max="100"
+                       value="@_energyMatchingWeight"
+                       @oninput="OnEnergyMatchingInput"
+                       disabled="@_isRegenerating" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <label class="form-label small">
+                    <span class="oi oi-map-marker me-1"></span>
+                    Context Grouping: <strong>@_contextGroupingWeight%</strong>
+                </label>
+                <input type="range" class="form-range" min="0" max="100"
+                       value="@_contextGroupingWeight"
+                       @oninput="OnContextGroupingInput"
+                       disabled="@_isRegenerating" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small">
+                    <span class="oi oi-layers me-1"></span>
+                    Similar Work Grouping: <strong>@_similarWorkGroupingWeight%</strong>
+                </label>
+                <input type="range" class="form-range" min="0" max="100"
+                       value="@_similarWorkGroupingWeight"
+                       @oninput="OnSimilarWorkInput"
+                       disabled="@_isRegenerating" />
+            </div>
+        </div>
+
+        @if (_showAdvancedSettings)
+        {
+            <hr class="my-3" />
+            <div class="row mb-3">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <label class="form-label small">Deep Work Preference: <strong>@_deepWorkPreferenceWeight%</strong></label>
+                    <input type="range" class="form-range" min="0" max="100" value="@_deepWorkPreferenceWeight"
+                           @oninput="OnDeepWorkInput" disabled="@_isRegenerating" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Stakeholder Grouping: <strong>@_stakeholderGroupingWeight%</strong></label>
+                    <input type="range" class="form-range" min="0" max="100" value="@_stakeholderGroupingWeight"
+                           @oninput="OnStakeholderInput" disabled="@_isRegenerating" />
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <label class="form-label small">Tag Similarity: <strong>@_tagSimilarityWeight%</strong></label>
+                    <input type="range" class="form-range" min="0" max="100" value="@_tagSimilarityWeight"
+                           @oninput="OnTagSimilarityInput" disabled="@_isRegenerating" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Blocked Task Penalty: <strong>@_blockedTaskPenalty%</strong></label>
+                    <input type="range" class="form-range" min="0" max="100" value="@_blockedTaskPenalty"
+                           @oninput="OnBlockedPenaltyInput" disabled="@_isRegenerating" />
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ResetToDefaults">
+                <span class="oi oi-reload me-1"></span>Reset to Defaults
+            </button>
+        }
+    </div>
+</div>
+
+@* Pick For Me Result *@
+@if (_pickedTask != null)
+{
+    <div class="alert alert-success mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong><span class="oi oi-star me-2"></span>Your next task:</strong>
+                <span class="ms-2">@_pickedTask.Title</span>
+                @if (_pickedTask.EstimatedMinutes > 0)
+                {
+                    <span class="badge bg-light text-dark ms-2">@_pickedTask.EstimatedMinutes min</span>
+                }
+            </div>
+            <button class="btn btn-sm btn-success" @onclick="StartPickedTask">
+                <span class="oi oi-media-play me-1"></span> Start
+            </button>
+        </div>
+    </div>
+}
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_displayMode == DisplayMode.Timeline)
+{
+    @* Timeline View *@
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="timeline-container">
+                @* Header for multi-day *@
+                @if (_viewDays > 1)
+                {
+                    <div class="timeline-header">
+                        <div class="timeline-gutter"></div>
+                        @foreach (var date in GetDisplayDates())
+                        {
+                            var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                            <div class="timeline-day-header @(isToday ? "today" : "")">
+                                <div class="fw-bold">@date.ToString("ddd")</div>
+                                <div class="small">@date.ToString("MMM d")</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="timeline-body">
+                    <div class="timeline-hours">
+                        @for (int hour = _startHour; hour <= _endHour; hour++)
+                        {
+                            <div class="timeline-hour-row">
+                                <div class="timeline-gutter">
+                                    <span class="hour-label">@(new TimeOnly(hour, 0).ToString("h tt"))</span>
+                                </div>
+                                @if (_viewDays == 1)
+                                {
+                                    <div class="timeline-hour-cell">
+                                        <div class="half-hour-line"></div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var date in GetDisplayDates())
+                                    {
+                                        var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+                                        <div class="timeline-hour-cell @(isToday ? "today-column" : "")">
+                                            <div class="half-hour-line"></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* Events and Tasks overlay *@
+                    <div class="timeline-events-layer">
+                        @{
+                            var dayIndex = 0;
+                        }
+                        @foreach (var date in GetDisplayDates())
+                        {
+                            @RenderDayContent(date, dayIndex)
+                            dayIndex++;
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* List View *@
+    @if (!_scheduledItems.Any() && !_calendarEvents.Any())
+    {
+        <div class="text-center py-5">
+            <p class="text-muted">No scheduled items. Click "Auto-Schedule" to generate a schedule.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var date in GetDisplayDates())
+        {
+            var dayItems = GetItemsForDate(date);
+            var isToday = date == DateOnly.FromDateTime(DateTime.Today);
+
+            <div class="card mb-3">
+                <div class="card-header @(isToday ? "bg-primary text-white" : "")">
+                    <strong>@date.ToString("dddd, MMMM d")</strong>
+                </div>
+                <div class="card-body p-0">
+                    @if (!dayItems.Any())
+                    {
+                        <p class="text-muted text-center py-3">No items scheduled</p>
+                    }
+                    else
+                    {
+                        @foreach (var item in dayItems.OrderBy(i => i.StartTime))
+                        {
+                            <div class="d-flex border-bottom">
+                                <div class="p-3 border-end text-muted" style="min-width: 100px;">
+                                    <div>@item.StartTime.ToString("h:mm tt")</div>
+                                    <small>@item.DurationMinutes min</small>
+                                </div>
+                                <div class="flex-grow-1 p-3 @item.BgClass">
+                                    <div class="fw-bold">@item.Title</div>
+                                    @if (!string.IsNullOrEmpty(item.Category))
+                                    {
+                                        <span class="badge bg-light text-dark">@item.Category</span>
+                                    }
+                                    @if (item.IsTask && item.Priority == 1)
+                                    {
+                                        <span class="badge bg-danger">High Priority</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
+}
+
+@code {
+    private enum DisplayMode { Timeline, List }
+
+    // View state
+    private DateOnly _currentDate = DateOnly.FromDateTime(DateTime.Today);
+    private int _viewDays = 1;
+    private DisplayMode _displayMode = DisplayMode.Timeline;
+    private bool _isLoading = true;
+    private bool _isRegenerating = false;
+    private bool _showAdvancedSettings = false;
+    private TodoTask? _pickedTask = null;
+
+    // Timeline settings
+    private const int _startHour = 7;
+    private const int _endHour = 20;
+    private const int HourHeightPx = 60;
+    private const int GutterWidthPx = 60;
+
+    // Data
+    private List<TimeBlock> _timeBlocks = new();
+    private List<TodoTask> _availableTasks = new();
+    private List<CalendarEvent> _calendarEvents = new();
+    private List<ScheduledItem> _scheduledItems = new();
+    private Dictionary<Guid, TodoTask> _taskLookup = new();
+
+    // Preferences
+    private bool _enablePickForMe = true;
+    private int _contextGroupingWeight = 50;
+    private int _similarWorkGroupingWeight = 50;
+    private int _energyMatchingWeight = 50;
+    private int _dueDateUrgencyWeight = 70;
+    private int _stakeholderGroupingWeight = 30;
+    private int _tagSimilarityWeight = 40;
+    private int _deepWorkPreferenceWeight = 60;
+    private int _blockedTaskPenalty = 100;
+    private UserPreferences? _preferences;
+
+    // Debounce
+    private System.Threading.Timer? _debounceTimer;
+    private const int DebounceDelayMs = 300;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPreferences();
+        await LoadAllData();
+    }
+
+    private async Task LoadPreferences()
+    {
+        var prefs = await PreferencesRepository.GetAllAsync();
+        _preferences = prefs.FirstOrDefault();
+
+        if (_preferences != null)
+        {
+            _enablePickForMe = _preferences.EnablePickForMe;
+            _contextGroupingWeight = _preferences.ContextGroupingWeight;
+            _similarWorkGroupingWeight = _preferences.SimilarWorkGroupingWeight;
+            _energyMatchingWeight = _preferences.EnergyMatchingWeight;
+            _dueDateUrgencyWeight = _preferences.DueDateUrgencyWeight;
+            _stakeholderGroupingWeight = _preferences.StakeholderGroupingWeight;
+            _tagSimilarityWeight = _preferences.TagSimilarityWeight;
+            _deepWorkPreferenceWeight = _preferences.DeepWorkPreferenceWeight;
+            _blockedTaskPenalty = _preferences.BlockedTaskPenalty;
+        }
+    }
+
+    private async Task LoadAllData()
+    {
+        _isLoading = true;
+        try
+        {
+            // Load tasks
+            _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
+            _taskLookup = _availableTasks.ToDictionary(t => t.Id);
+
+            // Load calendar events for the date range
+            var startDate = _currentDate.ToDateTime(TimeOnly.MinValue);
+            var endDate = _currentDate.AddDays(_viewDays).ToDateTime(TimeOnly.MinValue);
+            _calendarEvents = (await CalendarService.GetEventsForRangeAsync(startDate, endDate)).ToList();
+
+            // Load time blocks
+            _timeBlocks = new List<TimeBlock>();
+            foreach (var date in GetDisplayDates())
+            {
+                var blocks = await SchedulingService.GetTimeBlocksForDateAsync(date);
+                _timeBlocks.AddRange(blocks);
+            }
+
+            // Build scheduled items list
+            BuildScheduledItems();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void BuildScheduledItems()
+    {
+        _scheduledItems = new List<ScheduledItem>();
+
+        // Add calendar events
+        foreach (var evt in _calendarEvents)
+        {
+            _scheduledItems.Add(new ScheduledItem
+            {
+                Title = evt.Title,
+                StartTime = evt.StartTime,
+                EndTime = evt.EndTime,
+                Category = evt.EffectiveCategory.ToString(),
+                IsEvent = true,
+                BgClass = "bg-primary text-white"
+            });
+        }
+
+        // Add tasks from time blocks (each block now contains exactly one task)
+        foreach (var block in _timeBlocks.Where(b => b.AssignedTaskIds.Any()))
+        {
+            var taskId = block.AssignedTaskIds.FirstOrDefault();
+            if (_taskLookup.TryGetValue(taskId, out var task))
+            {
+                _scheduledItems.Add(new ScheduledItem
+                {
+                    Title = task.Title,
+                    StartTime = block.StartTime,
+                    EndTime = block.EndTime, // Use block's actual end time
+                    Category = task.Category,
+                    Priority = task.Priority,
+                    IsTask = true,
+                    TaskId = task.Id,
+                    BgClass = block.Type == TimeBlockType.DeepWork ? "bg-success text-white" : "bg-secondary text-white"
+                });
+            }
+        }
+    }
+
+    private IEnumerable<DateOnly> GetDisplayDates()
+    {
+        for (int i = 0; i < _viewDays; i++)
+            yield return _currentDate.AddDays(i);
+    }
+
+    private string GetDateRangeDisplay()
+    {
+        if (_viewDays == 1)
+            return _currentDate.ToString("dddd, MMMM d, yyyy");
+
+        var endDate = _currentDate.AddDays(_viewDays - 1);
+        return $"{_currentDate:MMM d} - {endDate:MMM d, yyyy}";
+    }
+
+    private IEnumerable<ScheduledItem> GetItemsForDate(DateOnly date)
+    {
+        return _scheduledItems.Where(i => DateOnly.FromDateTime(i.StartTime) == date);
+    }
+
+    private async Task SetViewDays(int days)
+    {
+        _viewDays = days;
+        await LoadAllData();
+    }
+
+    private async Task Previous()
+    {
+        _currentDate = _currentDate.AddDays(-_viewDays);
+        await LoadAllData();
+    }
+
+    private async Task Next()
+    {
+        _currentDate = _currentDate.AddDays(_viewDays);
+        await LoadAllData();
+    }
+
+    private async Task GoToToday()
+    {
+        _currentDate = DateOnly.FromDateTime(DateTime.Today);
+        await LoadAllData();
+    }
+
+    private async Task GenerateSchedule()
+    {
+        _isRegenerating = true;
+        StateHasChanged();
+
+        try
+        {
+            // Clear existing blocks before regenerating
+            _timeBlocks.Clear();
+            _scheduledItems.Clear();
+
+            // Clear and regenerate for each displayed day
+            foreach (var date in GetDisplayDates())
+            {
+                await SchedulingService.ClearAutoGeneratedBlocksAsync(date);
+                var blocks = await SchedulingService.AutoScheduleTasksAsync(date, _availableTasks);
+                _timeBlocks.AddRange(blocks.Where(b => b.AssignedTaskIds.Any()));
+            }
+
+            // Reload all data to get fresh state
+            await LoadAllData();
+        }
+        finally
+        {
+            _isRegenerating = false;
+        }
+    }
+
+    // Slider handlers
+    private void OnSliderInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _dueDateUrgencyWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnEnergyMatchingInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _energyMatchingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnContextGroupingInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _contextGroupingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnSimilarWorkInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _similarWorkGroupingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnDeepWorkInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _deepWorkPreferenceWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnStakeholderInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _stakeholderGroupingWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnTagSimilarityInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _tagSimilarityWeight = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void OnBlockedPenaltyInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _blockedTaskPenalty = value;
+            ScheduleDebounceRegenerate();
+        }
+    }
+
+    private void ScheduleDebounceRegenerate()
+    {
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(
+            async _ => await InvokeAsync(RegenerateScheduleWithSliders),
+            null,
+            DebounceDelayMs,
+            Timeout.Infinite
+        );
+    }
+
+    private async Task RegenerateScheduleWithSliders()
+    {
+        if (_preferences != null)
+        {
+            _preferences.ContextGroupingWeight = _contextGroupingWeight;
+            _preferences.SimilarWorkGroupingWeight = _similarWorkGroupingWeight;
+            _preferences.EnergyMatchingWeight = _energyMatchingWeight;
+            _preferences.DueDateUrgencyWeight = _dueDateUrgencyWeight;
+            _preferences.StakeholderGroupingWeight = _stakeholderGroupingWeight;
+            _preferences.TagSimilarityWeight = _tagSimilarityWeight;
+            _preferences.DeepWorkPreferenceWeight = _deepWorkPreferenceWeight;
+            _preferences.BlockedTaskPenalty = _blockedTaskPenalty;
+            await PreferencesRepository.UpdateAsync(_preferences);
+        }
+
+        await GenerateSchedule();
+        StateHasChanged();
+    }
+
+    private async Task ResetToDefaults()
+    {
+        _contextGroupingWeight = 50;
+        _similarWorkGroupingWeight = 50;
+        _energyMatchingWeight = 50;
+        _dueDateUrgencyWeight = 70;
+        _stakeholderGroupingWeight = 30;
+        _tagSimilarityWeight = 40;
+        _deepWorkPreferenceWeight = 60;
+        _blockedTaskPenalty = 100;
+        await RegenerateScheduleWithSliders();
+    }
+
+    private void PickRandomTask()
+    {
+        if (!_availableTasks.Any()) return;
+
+        var context = new SchedulingContext
+        {
+            Preferences = _preferences ?? new UserPreferences(),
+            TargetDate = DateOnly.FromDateTime(DateTime.Today),
+            TargetHour = DateTime.Now.Hour,
+            CurrentEnergyLevel = GetCurrentEnergyLevel()
+        };
+
+        var scoredTasks = TaskOptimizer.OptimizeTasks(_availableTasks, context);
+        var topTasks = scoredTasks.Take(3).ToList();
+        if (topTasks.Any())
+        {
+            var randomIndex = Random.Shared.Next(topTasks.Count);
+            _pickedTask = topTasks[randomIndex].Task;
+        }
+    }
+
+    private int GetCurrentEnergyLevel()
+    {
+        var hour = DateTime.Now.Hour;
+        var morningPeak = _preferences?.MorningEnergyPeak ?? 10;
+        var afternoonPeak = _preferences?.AfternoonEnergyPeak ?? 15;
+
+        if (Math.Abs(hour - morningPeak) <= 1) return 5;
+        if (Math.Abs(hour - afternoonPeak) <= 1) return 4;
+        if (hour >= 12 && hour <= 14) return 2;
+        if (hour < 9 || hour > 17) return 2;
+        return 3;
+    }
+
+    private void StartPickedTask()
+    {
+        _pickedTask = null;
+    }
+
+    // Timeline rendering
+    private RenderFragment RenderDayContent(DateOnly date, int dayIndex) => __builder =>
+    {
+        var dayEvents = _calendarEvents.Where(e => DateOnly.FromDateTime(e.StartTime) == date).ToList();
+        var dayItems = _scheduledItems.Where(i => DateOnly.FromDateTime(i.StartTime) == date).ToList();
+
+        // Render calendar events
+        foreach (var evt in dayEvents)
+        {
+            var topPx = GetEventTopPosition(evt.StartTime);
+            var heightPx = GetEventHeight(evt.StartTime, evt.EndTime);
+            var leftCalc = GetEventLeftPosition(dayIndex, 0, 1);
+            var widthCalc = GetEventWidth();
+
+            <div class="timeline-event event-default"
+                 style="top: @(topPx)px; height: @(heightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);">
+                <div class="event-time">@evt.StartTime.ToString("h:mm")</div>
+                <div class="event-title">@evt.Title</div>
+            </div>
+        }
+
+        // Render scheduled tasks
+        foreach (var item in dayItems.Where(i => i.IsTask))
+        {
+            var topPx = GetEventTopPosition(item.StartTime);
+            var heightPx = GetEventHeight(item.StartTime, item.EndTime);
+            var leftCalc = GetEventLeftPosition(dayIndex, 0, 1);
+            var widthCalc = GetEventWidth();
+
+            var taskClass = item.Priority == 1 ? "event-interview" : "event-focus";
+
+            <div class="timeline-event @taskClass"
+                 style="top: @(topPx)px; height: @(heightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);">
+                <div class="event-time">@item.StartTime.ToString("h:mm")</div>
+                <div class="event-title">@item.Title</div>
+                @if (!string.IsNullOrEmpty(item.Category))
+                {
+                    <div class="event-location">@item.Category</div>
+                }
+            </div>
+        }
+    };
+
+    private double GetEventTopPosition(DateTime startTime)
+    {
+        var minutesFromStart = (startTime.Hour - _startHour) * 60 + startTime.Minute;
+        return minutesFromStart * (HourHeightPx / 60.0);
+    }
+
+    private double GetEventHeight(DateTime startTime, DateTime endTime)
+    {
+        var durationMinutes = (endTime - startTime).TotalMinutes;
+        return Math.Max(20, durationMinutes * (HourHeightPx / 60.0));
+    }
+
+    private string GetEventLeftPosition(int dayIndex, int column, int totalColumns)
+    {
+        var dayFraction = (dayIndex + (column / (double)Math.Max(1, totalColumns))) / _viewDays;
+        return $"calc({GutterWidthPx}px + {dayFraction * 100:F2}% - {GutterWidthPx * dayFraction:F2}px)";
+    }
+
+    private string GetEventWidth()
+    {
+        var fraction = 1.0 / _viewDays;
+        return $"calc({fraction * 100:F2}% - {GutterWidthPx * fraction:F2}px)";
+    }
+
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+
+    // Helper class for scheduled items
+    private class ScheduledItem
+    {
+        public string Title { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public string? Category { get; set; }
+        public int Priority { get; set; } = 2;
+        public bool IsEvent { get; set; }
+        public bool IsTask { get; set; }
+        public Guid? TaskId { get; set; }
+        public string BgClass { get; set; } = "";
+        public int DurationMinutes => (int)(EndTime - StartTime).TotalMinutes;
+    }
+}

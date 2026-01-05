@@ -1,0 +1,725 @@
+/* ===========================================
+   Self Organizer - Global Application Styles
+   Uses CSS variables from theme.css
+   =========================================== */
+
+/* ----------------------------------------
+   Base Styles
+   ---------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: var(--font-primary);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* ----------------------------------------
+   Typography
+   ---------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 0;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.25rem; }
+h5 { font-size: 1.125rem; }
+h6 { font-size: 1rem; }
+
+h1:focus {
+    outline: none;
+}
+
+p {
+    color: var(--text-secondary);
+}
+
+/* ----------------------------------------
+   Links
+   ---------------------------------------- */
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+a:hover,
+a:focus {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+}
+
+.btn-link {
+    color: var(--color-primary);
+}
+
+.btn-link:hover {
+    color: var(--color-primary-hover);
+}
+
+/* ----------------------------------------
+   Buttons
+   ---------------------------------------- */
+.btn {
+    font-family: var(--font-primary);
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    padding: 0.5rem 1rem;
+}
+
+.btn:focus,
+.btn:active:focus {
+    box-shadow: var(--focus-ring);
+}
+
+.btn-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--text-on-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    color: var(--text-on-primary);
+}
+
+.btn-primary:active {
+    background-color: var(--color-primary-active);
+    border-color: var(--color-primary-active);
+}
+
+.btn-secondary {
+    background-color: var(--color-secondary);
+    border-color: var(--color-secondary);
+    color: var(--text-on-primary);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus {
+    background-color: var(--color-secondary-hover);
+    border-color: var(--color-secondary-hover);
+}
+
+.btn-success {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: var(--text-on-primary);
+}
+
+.btn-danger {
+    background-color: var(--color-danger);
+    border-color: var(--color-danger);
+    color: var(--text-on-primary);
+}
+
+.btn-warning {
+    background-color: var(--color-warning);
+    border-color: var(--color-warning);
+    color: var(--text-primary);
+}
+
+.btn-outline-primary {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background-color: transparent;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--text-on-primary);
+}
+
+.btn-outline-secondary {
+    color: var(--color-secondary);
+    border-color: var(--color-secondary);
+    background-color: transparent;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--color-secondary);
+    color: var(--text-on-primary);
+}
+
+.btn-outline-danger {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+    background-color: transparent;
+}
+
+.btn-outline-danger:hover {
+    background-color: var(--color-danger);
+    color: var(--text-on-primary);
+}
+
+/* ----------------------------------------
+   Form Controls
+   ---------------------------------------- */
+.form-control,
+.form-select {
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-control::placeholder {
+    color: var(--input-placeholder);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-border-focus);
+    color: var(--text-primary);
+    box-shadow: var(--focus-ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+    background-color: var(--input-disabled-bg);
+    color: var(--text-muted);
+}
+
+.form-check-input:focus {
+    box-shadow: var(--focus-ring);
+}
+
+.form-check-input:checked {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.form-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+}
+
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
+    color: var(--input-placeholder);
+}
+
+/* ----------------------------------------
+   Cards
+   ---------------------------------------- */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--card-shadow);
+    transition: box-shadow var(--transition-normal);
+}
+
+.card:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.card-header {
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.card-footer {
+    background-color: var(--bg-tertiary);
+    border-top: 1px solid var(--card-border);
+}
+
+.card-body {
+    color: var(--text-secondary);
+}
+
+.card-title {
+    color: var(--text-primary);
+}
+
+.card-text {
+    color: var(--text-secondary);
+}
+
+/* ----------------------------------------
+   Alerts
+   ---------------------------------------- */
+.alert {
+    border-radius: var(--radius-md);
+    border: 1px solid;
+}
+
+.alert-success {
+    background-color: var(--color-success-bg);
+    border-color: var(--color-success-border);
+    color: var(--color-success);
+}
+
+.alert-warning {
+    background-color: var(--color-warning-bg);
+    border-color: var(--color-warning-border);
+    color: var(--color-warning);
+}
+
+.alert-danger {
+    background-color: var(--color-danger-bg);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger);
+}
+
+.alert-info {
+    background-color: var(--color-info-bg);
+    border-color: var(--color-info-border);
+    color: var(--color-info);
+}
+
+/* ----------------------------------------
+   Badges
+   ---------------------------------------- */
+.badge {
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+}
+
+.badge.bg-primary,
+.bg-primary {
+    background-color: var(--color-primary) !important;
+}
+
+.badge.bg-secondary,
+.bg-secondary {
+    background-color: var(--text-muted) !important;
+}
+
+.badge.bg-success,
+.bg-success {
+    background-color: var(--color-success) !important;
+}
+
+.badge.bg-danger,
+.bg-danger {
+    background-color: var(--color-danger) !important;
+}
+
+.badge.bg-warning,
+.bg-warning {
+    background-color: var(--color-warning) !important;
+    color: var(--text-primary) !important;
+}
+
+.badge.bg-info,
+.bg-info {
+    background-color: var(--color-info) !important;
+}
+
+/* ----------------------------------------
+   Tables
+   ---------------------------------------- */
+.table {
+    color: var(--text-primary);
+}
+
+.table > thead {
+    background-color: var(--bg-tertiary);
+}
+
+.table > tbody > tr {
+    border-color: var(--border-default);
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* ----------------------------------------
+   Modals
+   ---------------------------------------- */
+.modal-content {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-default);
+    color: var(--text-primary);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-default);
+}
+
+.modal-backdrop {
+    background-color: var(--bg-overlay);
+}
+
+/* ----------------------------------------
+   Progress Bars
+   ---------------------------------------- */
+.progress {
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+}
+
+.progress-bar {
+    background-color: var(--color-primary);
+}
+
+/* ----------------------------------------
+   Accordion
+   ---------------------------------------- */
+.accordion-item {
+    background-color: var(--card-bg);
+    border-color: var(--border-default);
+}
+
+.accordion-button {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary);
+}
+
+.accordion-button:focus {
+    box-shadow: var(--focus-ring);
+    border-color: var(--border-focus);
+}
+
+.accordion-body {
+    background-color: var(--card-bg);
+    color: var(--text-secondary);
+}
+
+/* ----------------------------------------
+   List Groups
+   ---------------------------------------- */
+.list-group-item {
+    background-color: var(--card-bg);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+
+.list-group-item-action:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* ----------------------------------------
+   Dropdowns
+   ---------------------------------------- */
+.dropdown-menu {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.dropdown-item {
+    color: var(--text-primary);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.dropdown-divider {
+    border-color: var(--border-default);
+}
+
+/* ----------------------------------------
+   Spinner
+   ---------------------------------------- */
+.spinner-border {
+    color: var(--color-primary);
+}
+
+/* ----------------------------------------
+   Close Button
+   ---------------------------------------- */
+.btn-close {
+    filter: var(--btn-close-filter, none);
+}
+
+[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ----------------------------------------
+   Utility Classes
+   ---------------------------------------- */
+.text-primary {
+    color: var(--text-primary) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.text-success {
+    color: var(--color-success) !important;
+}
+
+.text-danger {
+    color: var(--color-danger) !important;
+}
+
+.text-warning {
+    color: var(--color-warning) !important;
+}
+
+.text-info {
+    color: var(--color-info) !important;
+}
+
+.bg-light {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.bg-dark {
+    background-color: var(--sidebar-bg) !important;
+}
+
+.border {
+    border-color: var(--border-default) !important;
+}
+
+.border-bottom {
+    border-bottom-color: var(--border-default) !important;
+}
+
+/* ----------------------------------------
+   Content Area
+   ---------------------------------------- */
+.content {
+    padding-top: var(--space-md);
+}
+
+main {
+    background-color: var(--bg-primary);
+}
+
+article {
+    background-color: var(--bg-primary);
+}
+
+/* ----------------------------------------
+   Code
+   ---------------------------------------- */
+code {
+    color: var(--color-accent);
+    background-color: var(--bg-tertiary);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+}
+
+pre {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+/* ----------------------------------------
+   Validation States
+   ---------------------------------------- */
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid var(--color-success);
+}
+
+.invalid {
+    outline: 1px solid var(--color-danger);
+}
+
+.validation-message {
+    color: var(--color-danger);
+}
+
+/* ----------------------------------------
+   Blazor Loading & Error UI
+   ---------------------------------------- */
+#blazor-error-ui {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-top: 1px solid var(--color-danger-border);
+    bottom: 0;
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.blazor-error-boundary {
+    background-color: var(--color-danger);
+    padding: var(--space-md) var(--space-md) var(--space-md) var(--space-2xl);
+    color: var(--text-on-primary);
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
+
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    margin: 20vh auto 1rem auto;
+}
+
+.loading-progress circle {
+    fill: none;
+    stroke: var(--border-default);
+    stroke-width: 0.6rem;
+    transform-origin: 50% 50%;
+    transform: rotate(-90deg);
+}
+
+.loading-progress circle:last-child {
+    stroke: var(--color-primary);
+    stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+    transition: stroke-dasharray 0.05s ease-in-out;
+}
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    color: var(--text-primary);
+    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+}
+
+.loading-progress-text::after {
+    content: var(--blazor-load-percentage-text, "Loading");
+}
+
+/* ----------------------------------------
+   Scrollbar Styling
+   ---------------------------------------- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* ----------------------------------------
+   Animations
+   ---------------------------------------- */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(99, 102, 241, 0.8);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn var(--transition-normal) ease-out;
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.animate-slide-in-down {
+    animation: slideInDown 0.3s ease-out;
+}
+
+/* ----------------------------------------
+   Focus Visible
+   Modern focus styling for keyboard nav
+   ---------------------------------------- */
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* ----------------------------------------
+   Selection
+   ---------------------------------------- */
+::selection {
+    background-color: var(--color-primary-subtle);
+    color: var(--text-primary);
+}

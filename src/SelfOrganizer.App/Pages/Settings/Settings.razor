@@ -1,0 +1,452 @@
+@page "/settings"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject SelfOrganizer.App.Services.Data.IIndexedDbService DbService
+@inject IExportService ExportService
+@inject IImportService ImportService
+
+<h3 class="mb-4">
+    <span class="oi oi-cog me-2"></span>Settings
+</h3>
+
+<div class="row">
+    <div class="col-lg-8">
+        @* Work Schedule *@
+        <div class="card mb-4">
+            <div class="card-header">Work Schedule</div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Work Day Start</label>
+                        <input type="time" class="form-control" @bind="_workDayStart" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Work Day End</label>
+                        <input type="time" class="form-control" @bind="_workDayEnd" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Scheduling Preferences *@
+        <div class="card mb-4">
+            <div class="card-header">Scheduling Preferences</div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Default Task Duration (min)</label>
+                        <input type="number" class="form-control" @bind="_defaultTaskDuration" min="5" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Minimum Block Size (min)</label>
+                        <input type="number" class="form-control" @bind="_minimumBlockSize" min="5" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Deep Work Minimum (min)</label>
+                        <input type="number" class="form-control" @bind="_deepWorkMinimum" min="30" />
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Default Break (min)</label>
+                        <input type="number" class="form-control" @bind="_defaultBreak" min="5" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Buffer Between Meetings (min)</label>
+                        <input type="number" class="form-control" @bind="_bufferBetweenMeetings" min="0" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Max Consecutive Meetings (min)</label>
+                        <input type="number" class="form-control" @bind="_maxConsecutiveMeetings" min="30" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Review Settings *@
+        <div class="card mb-4">
+            <div class="card-header">Review Settings</div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Daily Review Reminder Hour</label>
+                        <select class="form-select" @bind="_dailyReviewHour">
+                            @for (int i = 0; i < 24; i++)
+                            {
+                                var hour = i == 0 ? 12 : (i > 12 ? i - 12 : i);
+                                var ampm = i < 12 ? "AM" : "PM";
+                                <option value="@i">@hour:00 @ampm</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Weekly Review Day</label>
+                        <select class="form-select" @bind="_weeklyReviewDay">
+                            <option value="0">Sunday</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ADHD & Focus Accommodations *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-target me-2"></span>ADHD & Focus Accommodations
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Features to help with decision fatigue and provide positive reinforcement during planning and task completion.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="celebrationEffects" @bind="_enableCelebrationEffects" />
+                        <label class="form-check-label" for="celebrationEffects">
+                            <strong>Celebration Effects</strong>
+                            <br /><small class="text-muted">Show confetti and animations when you complete tasks (dopamine hits!)</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-0">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pickForMe" @bind="_enablePickForMe" />
+                        <label class="form-check-label" for="pickForMe">
+                            <strong>"Pick For Me" Button</strong>
+                            <br /><small class="text-muted">Reduces decision fatigue by randomly selecting your next task from available options</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Schedule Optimization *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-spreadsheet me-2"></span>Schedule Optimization
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Adjust how the auto-scheduler groups your tasks. Higher values give more weight to that factor.
+                </p>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        Context Grouping: <strong>@_contextGroupingWeight%</strong>
+                    </label>
+                    <input type="range" class="form-range" min="0" max="100" @bind="_contextGroupingWeight" />
+                    <small class="text-muted">Group tasks by context (@@home, @@work, @@errands)</small>
+                </div>
+
+                <div class="mb-0">
+                    <label class="form-label">
+                        Similar Work Grouping: <strong>@_similarWorkGroupingWeight%</strong>
+                    </label>
+                    <input type="range" class="form-range" min="0" max="100" @bind="_similarWorkGroupingWeight" />
+                    <small class="text-muted">Group tasks by category or project</small>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" @onclick="SaveSettings">
+            <span class="oi oi-check me-1"></span> Save Settings
+        </button>
+        @if (_saveSuccess)
+        {
+            <span class="text-success ms-3">
+                <span class="oi oi-check"></span> Saved!
+            </span>
+        }
+    </div>
+
+    <div class="col-lg-4">
+        @* Data Management *@
+        <div class="card mb-4">
+            <div class="card-header">Data Management</div>
+            <div class="card-body">
+                <h6 class="mb-2">Export Data</h6>
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-primary" @onclick="ExportAllJson" disabled="@_isExporting">
+                        @if (_isExporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-data-transfer-download me-1"></span>
+                        }
+                        Export All (JSON)
+                    </button>
+                </div>
+
+                @if (_exportResult != null)
+                {
+                    <div class="alert @(_exportResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
+                        @if (_exportResult.Success)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>Exported to @_exportResult.Filename</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            <span>@_exportResult.ErrorMessage</span>
+                        }
+                    </div>
+                }
+
+                <h6 class="mb-2">Import Data</h6>
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-secondary" @onclick="() => _showImportModal = true">
+                        <span class="oi oi-data-transfer-upload me-1"></span> Import Data (JSON)
+                    </button>
+                </div>
+
+                @if (_importResult != null)
+                {
+                    <div class="alert @(_importResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
+                        @if (_importResult.Success)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>@_importResult.Message</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            <span>@_importResult.Message</span>
+                        }
+                    </div>
+                }
+
+                <hr />
+                <h6 class="mb-2 text-danger">Danger Zone</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-danger" @onclick="() => _showClearConfirm = true">
+                        <span class="oi oi-trash me-1"></span> Clear All Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">About</div>
+            <div class="card-body">
+                <p class="mb-1"><strong>Self Organizer</strong></p>
+                <p class="text-muted small mb-0">GTD-inspired task management with smart scheduling.</p>
+                <hr />
+                <p class="small text-muted mb-0">Built with Blazor WebAssembly and .NET 9</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ConfirmDialog
+    Title="Clear All Data"
+    Message="This will permanently delete all your tasks, projects, and settings. This action cannot be undone!"
+    IsVisible="@_showClearConfirm"
+    OnConfirm="ClearAllData"
+    OnCancel="() => _showClearConfirm = false" />
+
+<ImportModal
+    IsVisible="@_showImportModal"
+    OnClose="CloseImportModal"
+    EntityName="Database"
+    ShowTemplateDownload="false"
+    OnImportRequested="HandleImportRequested" />
+
+@code {
+    private TimeOnly _workDayStart = new TimeOnly(9, 0);
+    private TimeOnly _workDayEnd = new TimeOnly(17, 0);
+    private int _defaultTaskDuration = 30;
+    private int _minimumBlockSize = 15;
+    private int _deepWorkMinimum = 60;
+    private int _defaultBreak = 10;
+    private int _bufferBetweenMeetings = 5;
+    private int _maxConsecutiveMeetings = 180;
+    private int _dailyReviewHour = 17;
+    private int _weeklyReviewDay = 5;
+    private bool _saveSuccess = false;
+    private bool _showClearConfirm = false;
+    private bool _showImportModal = false;
+    private UserPreferences? _preferences;
+
+    // Export/Import state
+    private bool _isExporting;
+    private ExportResult? _exportResult;
+    private ImportResultInfo? _importResult;
+
+    private class ImportResultInfo
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+    }
+
+    // ADHD Accommodation settings
+    private bool _enableCelebrationEffects = true;
+    private bool _enablePickForMe = true;
+
+    // Schedule optimization settings
+    private int _contextGroupingWeight = 50;
+    private int _similarWorkGroupingWeight = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var prefs = await PreferencesRepository.GetAllAsync();
+        _preferences = prefs.FirstOrDefault();
+
+        if (_preferences != null)
+        {
+            // Work schedule
+            _workDayStart = TimeOnly.FromTimeSpan(_preferences.WorkDayStart);
+            _workDayEnd = TimeOnly.FromTimeSpan(_preferences.WorkDayEnd);
+            _defaultTaskDuration = _preferences.DefaultTaskDurationMinutes;
+            _minimumBlockSize = _preferences.MinimumUsableBlockMinutes;
+            _deepWorkMinimum = _preferences.DeepWorkMinimumMinutes;
+            _defaultBreak = _preferences.DefaultBreakMinutes;
+            _bufferBetweenMeetings = _preferences.BufferBetweenMeetingsMinutes;
+            _maxConsecutiveMeetings = _preferences.MaxConsecutiveMeetingMinutes;
+            _dailyReviewHour = _preferences.DailyReviewReminderHour;
+            _weeklyReviewDay = _preferences.WeeklyReviewDay;
+
+            // ADHD accommodations
+            _enableCelebrationEffects = _preferences.EnableCelebrationEffects;
+            _enablePickForMe = _preferences.EnablePickForMe;
+
+            // Schedule optimization
+            _contextGroupingWeight = _preferences.ContextGroupingWeight;
+            _similarWorkGroupingWeight = _preferences.SimilarWorkGroupingWeight;
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        _saveSuccess = false;
+
+        if (_preferences == null)
+        {
+            _preferences = new UserPreferences();
+        }
+
+        // Work schedule
+        _preferences.WorkDayStart = _workDayStart.ToTimeSpan();
+        _preferences.WorkDayEnd = _workDayEnd.ToTimeSpan();
+        _preferences.DefaultTaskDurationMinutes = _defaultTaskDuration;
+        _preferences.MinimumUsableBlockMinutes = _minimumBlockSize;
+        _preferences.DeepWorkMinimumMinutes = _deepWorkMinimum;
+        _preferences.DefaultBreakMinutes = _defaultBreak;
+        _preferences.BufferBetweenMeetingsMinutes = _bufferBetweenMeetings;
+        _preferences.MaxConsecutiveMeetingMinutes = _maxConsecutiveMeetings;
+        _preferences.DailyReviewReminderHour = _dailyReviewHour;
+        _preferences.WeeklyReviewDay = _weeklyReviewDay;
+
+        // ADHD accommodations
+        _preferences.EnableCelebrationEffects = _enableCelebrationEffects;
+        _preferences.EnablePickForMe = _enablePickForMe;
+
+        // Schedule optimization
+        _preferences.ContextGroupingWeight = _contextGroupingWeight;
+        _preferences.SimilarWorkGroupingWeight = _similarWorkGroupingWeight;
+
+        if (_preferences.CreatedAt == default)
+        {
+            await PreferencesRepository.AddAsync(_preferences);
+        }
+        else
+        {
+            await PreferencesRepository.UpdateAsync(_preferences);
+        }
+
+        _saveSuccess = true;
+    }
+
+    private async Task ExportAllJson()
+    {
+        _isExporting = true;
+        _exportResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var json = await DbService.ExportAllAsync();
+            var filename = $"self-organizer-backup-{DateTime.Now:yyyy-MM-dd}.json";
+            _exportResult = await ExportService.DownloadFileAsync(filename, json, "application/json");
+        }
+        catch (Exception ex)
+        {
+            _exportResult = ExportResult.Failed($"Export failed: {ex.Message}");
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private void CloseImportModal()
+    {
+        _showImportModal = false;
+    }
+
+    private async Task HandleImportRequested(ImportRequestEventArgs args)
+    {
+        if (args.IsValidationOnly)
+        {
+            // For JSON full database import, just mark as valid
+            args.ValidationResult = new ImportValidationResult { IsValid = true };
+            return;
+        }
+
+        try
+        {
+            // Import the full database
+            await DbService.ImportAllAsync(args.Content);
+
+            args.Success = true;
+            args.ImportedCount = 1;
+            args.TotalCount = 1;
+            args.ResultMessage = "Database imported successfully. Please refresh the page to see updated data.";
+
+            _importResult = new ImportResultInfo
+            {
+                Success = true,
+                Message = "Import successful! Refresh to see changes."
+            };
+        }
+        catch (Exception ex)
+        {
+            args.Success = false;
+            args.Errors.Add(new ImportError
+            {
+                RowNumber = 0,
+                Message = $"Import failed: {ex.Message}"
+            });
+        }
+    }
+
+    private async Task ClearAllData()
+    {
+        // Clear all stores
+        await DbService.ClearAsync("captures");
+        await DbService.ClearAsync("tasks");
+        await DbService.ClearAsync("projects");
+        await DbService.ClearAsync("events");
+        await DbService.ClearAsync("timeBlocks");
+        await DbService.ClearAsync("contacts");
+        await DbService.ClearAsync("references");
+        await DbService.ClearAsync("contexts");
+        await DbService.ClearAsync("categories");
+        await DbService.ClearAsync("preferences");
+        await DbService.ClearAsync("dailySnapshots");
+
+        _showClearConfirm = false;
+        _preferences = null;
+    }
+}
