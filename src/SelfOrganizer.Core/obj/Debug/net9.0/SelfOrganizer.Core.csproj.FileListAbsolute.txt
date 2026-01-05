@@ -1,0 +1,11 @@
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/bin/Debug/net9.0/SelfOrganizer.Core.deps.json
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/bin/Debug/net9.0/SelfOrganizer.Core.dll
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/bin/Debug/net9.0/SelfOrganizer.Core.pdb
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfoInputs.cache
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfo.cs
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.csproj.CoreCompileInputs.cache
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.dll
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/refint/SelfOrganizer.Core.dll
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.pdb
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/ref/SelfOrganizer.Core.dll
