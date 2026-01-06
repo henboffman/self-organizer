@@ -1,0 +1,305 @@
+.onboarding-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+}
+
+.onboarding-wizard {
+    background: var(--bs-body-bg, white);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Progress Indicator */
+.progress-indicator {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+}
+
+.progress-indicator::before {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: var(--bs-border-color, #dee2e6);
+    z-index: 0;
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    z-index: 1;
+    flex: 1;
+}
+
+.step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bs-body-bg, white);
+    border: 2px solid var(--bs-border-color, #dee2e6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--bs-secondary, #6c757d);
+    transition: all 0.2s ease;
+}
+
+.progress-step.active .step-dot {
+    background: var(--bs-primary, #0d6efd);
+    border-color: var(--bs-primary, #0d6efd);
+    color: white;
+    transform: scale(1.1);
+}
+
+.progress-step.completed .step-dot {
+    background: var(--bs-success, #198754);
+    border-color: var(--bs-success, #198754);
+    color: white;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: var(--bs-secondary, #6c757d);
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.progress-step.active .step-label {
+    color: var(--bs-primary, #0d6efd);
+    font-weight: 600;
+}
+
+/* Step Content */
+.step-content {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.step-icon,
+.welcome-icon {
+    opacity: 0.9;
+}
+
+/* Features Grid */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bs-light, #f8f9fa);
+    border-radius: 8px;
+}
+
+.feature-item .oi {
+    font-size: 1.25rem;
+    color: var(--bs-primary, #0d6efd);
+}
+
+/* Workflow Steps */
+.workflow-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.workflow-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--bs-light, #f8f9fa);
+    border-radius: 8px;
+}
+
+.workflow-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bs-primary, #0d6efd);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.workflow-text {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.workflow-text small {
+    color: var(--bs-secondary, #6c757d);
+    font-size: 0.75rem;
+}
+
+.workflow-arrow {
+    color: var(--bs-secondary, #6c757d);
+}
+
+/* Provider Selection */
+.provider-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.provider-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--bs-light, #f8f9fa);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.provider-option:hover {
+    background: var(--bs-body-bg, white);
+    border-color: var(--bs-border-color, #dee2e6);
+}
+
+.provider-option.selected {
+    border-color: var(--bs-primary, #0d6efd);
+    background: rgba(13, 110, 253, 0.05);
+}
+
+.provider-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: white;
+}
+
+.google-icon {
+    background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335);
+}
+
+.outlook-icon {
+    background: #0078d4;
+}
+
+.skip-icon {
+    background: var(--bs-secondary, #6c757d);
+}
+
+.provider-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.selected-check {
+    color: var(--bs-primary, #0d6efd);
+}
+
+/* Context Examples */
+.context-examples {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.context-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Tip Box */
+.tip-box {
+    background: var(--bs-light, #f8f9fa);
+    border-left: 4px solid var(--bs-primary, #0d6efd);
+    padding: 1rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    text-align: left;
+    margin: 1.5rem auto 0;
+    max-width: 400px;
+}
+
+.tip-box kbd {
+    background: var(--bs-dark, #212529);
+    color: white;
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+/* Navigation */
+.wizard-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+    .onboarding-wizard {
+        padding: 1.5rem;
+    }
+
+    .step-label {
+        display: none;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .workflow-steps {
+        flex-direction: column;
+    }
+
+    .workflow-arrow {
+        transform: rotate(90deg);
+    }
+}

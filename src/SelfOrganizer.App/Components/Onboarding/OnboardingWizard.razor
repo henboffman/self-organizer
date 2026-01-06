@@ -1,0 +1,300 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject IRepository<UserPreferences> PreferencesRepository
+
+@if (IsVisible)
+{
+    <div class="onboarding-overlay">
+        <div class="onboarding-wizard">
+            @* Progress Indicator *@
+            <div class="progress-indicator mb-4">
+                @for (int i = 0; i < TotalSteps; i++)
+                {
+                    var stepIndex = i;
+                    <div class="progress-step @(stepIndex == _currentStep ? "active" : "") @(stepIndex < _currentStep ? "completed" : "")"
+                         @onclick="() => GoToStep(stepIndex)">
+                        <div class="step-dot">
+                            @if (stepIndex < _currentStep)
+                            {
+                                <span class="oi oi-check"></span>
+                            }
+                            else
+                            {
+                                @(stepIndex + 1)
+                            }
+                        </div>
+                        <span class="step-label">@GetStepLabel(stepIndex)</span>
+                    </div>
+                }
+            </div>
+
+            @* Step Content *@
+            <div class="step-content">
+                @switch (_currentStep)
+                {
+                    case 0:
+                        @* Welcome *@
+                        <div class="text-center">
+                            <div class="welcome-icon mb-3">
+                                <span class="oi oi-task" style="font-size: 4rem; color: var(--bs-primary);"></span>
+                            </div>
+                            <h2 class="mb-3">Welcome to Self Organizer</h2>
+                            <p class="lead text-muted mb-4">
+                                A GTD-inspired task management app designed to help you capture, organize, and focus on what matters.
+                            </p>
+                            <div class="features-grid">
+                                <div class="feature-item">
+                                    <span class="oi oi-inbox"></span>
+                                    <span>Quick Capture</span>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="oi oi-calendar"></span>
+                                    <span>Smart Scheduling</span>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="oi oi-target"></span>
+                                    <span>Focus Mode</span>
+                                </div>
+                                <div class="feature-item">
+                                    <span class="oi oi-graph"></span>
+                                    <span>Progress Tracking</span>
+                                </div>
+                            </div>
+                        </div>
+                        break;
+
+                    case 1:
+                        @* Capture Flow *@
+                        <div class="text-center">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-inbox" style="font-size: 3rem; color: var(--bs-success);"></span>
+                            </div>
+                            <h2 class="mb-3">Capture Everything</h2>
+                            <p class="text-muted mb-4">
+                                Get things out of your head and into your inbox. Quick capture lets you jot down thoughts, tasks, and ideas instantly.
+                            </p>
+                            <div class="workflow-steps">
+                                <div class="workflow-step">
+                                    <div class="workflow-number">1</div>
+                                    <div class="workflow-text">
+                                        <strong>Capture</strong>
+                                        <small>Write it down quickly</small>
+                                    </div>
+                                </div>
+                                <div class="workflow-arrow">
+                                    <span class="oi oi-arrow-right"></span>
+                                </div>
+                                <div class="workflow-step">
+                                    <div class="workflow-number">2</div>
+                                    <div class="workflow-text">
+                                        <strong>Clarify</strong>
+                                        <small>Process your inbox</small>
+                                    </div>
+                                </div>
+                                <div class="workflow-arrow">
+                                    <span class="oi oi-arrow-right"></span>
+                                </div>
+                                <div class="workflow-step">
+                                    <div class="workflow-number">3</div>
+                                    <div class="workflow-text">
+                                        <strong>Organize</strong>
+                                        <small>Put it where it belongs</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        break;
+
+                    case 2:
+                        @* Calendar Provider *@
+                        <div class="text-center">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-calendar" style="font-size: 3rem; color: var(--bs-info);"></span>
+                            </div>
+                            <h2 class="mb-3">Calendar Integration</h2>
+                            <p class="text-muted mb-4">
+                                Choose your preferred calendar provider to sync meetings and schedule tasks around your existing commitments.
+                            </p>
+                            <div class="provider-selection">
+                                <button class="provider-option @(_selectedProvider == CalendarProvider.Google ? "selected" : "")"
+                                        @onclick="() => SelectProvider(CalendarProvider.Google)">
+                                    <div class="provider-icon google-icon">G</div>
+                                    <span class="provider-name">Google Calendar</span>
+                                    @if (_selectedProvider == CalendarProvider.Google)
+                                    {
+                                        <span class="oi oi-check selected-check"></span>
+                                    }
+                                </button>
+                                <button class="provider-option @(_selectedProvider == CalendarProvider.Outlook ? "selected" : "")"
+                                        @onclick="() => SelectProvider(CalendarProvider.Outlook)">
+                                    <div class="provider-icon outlook-icon">O</div>
+                                    <span class="provider-name">Outlook Calendar</span>
+                                    @if (_selectedProvider == CalendarProvider.Outlook)
+                                    {
+                                        <span class="oi oi-check selected-check"></span>
+                                    }
+                                </button>
+                                <button class="provider-option skip-option @(_selectedProvider == CalendarProvider.None ? "selected" : "")"
+                                        @onclick="() => SelectProvider(CalendarProvider.None)">
+                                    <div class="provider-icon skip-icon">
+                                        <span class="oi oi-x"></span>
+                                    </div>
+                                    <span class="provider-name">Skip for now</span>
+                                    @if (_selectedProvider == CalendarProvider.None)
+                                    {
+                                        <span class="oi oi-check selected-check"></span>
+                                    }
+                                </button>
+                            </div>
+                            <p class="text-muted small mt-3">
+                                You can change this later in Settings.
+                            </p>
+                        </div>
+                        break;
+
+                    case 3:
+                        @* Contexts *@
+                        <div class="text-center">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-tag" style="font-size: 3rem; color: var(--bs-warning);"></span>
+                            </div>
+                            <h2 class="mb-3">Work in Context</h2>
+                            <p class="text-muted mb-4">
+                                Contexts help you filter tasks based on where you are or what tools you have available. Focus on what you can do right now.
+                            </p>
+                            <div class="context-examples">
+                                <span class="context-badge" style="background-color: #e83e8c;">home</span>
+                                <span class="context-badge" style="background-color: #17a2b8;">work</span>
+                                <span class="context-badge" style="background-color: #6610f2;">computer</span>
+                                <span class="context-badge" style="background-color: #dc3545;">call</span>
+                                <span class="context-badge" style="background-color: #20c997;">errand</span>
+                                <span class="context-badge" style="background-color: #fd7e14;">read</span>
+                            </div>
+                            <p class="text-muted small mt-4">
+                                You can create your own custom contexts in Settings.
+                            </p>
+                        </div>
+                        break;
+
+                    case 4:
+                        @* Get Started *@
+                        <div class="text-center">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-bolt" style="font-size: 3rem; color: var(--bs-success);"></span>
+                            </div>
+                            <h2 class="mb-3">You're All Set!</h2>
+                            <p class="text-muted mb-4">
+                                Start by capturing your first thought or task. Remember: getting things out of your head is the first step to staying organized.
+                            </p>
+                            <div class="tip-box">
+                                <strong>Pro Tip:</strong> Use the keyboard shortcut <kbd>C</kbd> anywhere in the app to quickly capture a new item.
+                            </div>
+                        </div>
+                        break;
+                }
+            </div>
+
+            @* Navigation *@
+            <div class="wizard-navigation mt-4">
+                @if (_currentStep > 0)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="PreviousStep">
+                        <span class="oi oi-arrow-left me-1"></span> Back
+                    </button>
+                }
+                else
+                {
+                    <div></div>
+                }
+
+                @if (_currentStep < TotalSteps - 1)
+                {
+                    <button class="btn btn-primary" @onclick="NextStep">
+                        Next <span class="oi oi-arrow-right ms-1"></span>
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-success btn-lg" @onclick="CompleteOnboarding">
+                        <span class="oi oi-check me-1"></span> Get Started
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback OnCompleted { get; set; }
+
+    private const int TotalSteps = 5;
+    private int _currentStep = 0;
+    private CalendarProvider _selectedProvider = CalendarProvider.None;
+
+    private string GetStepLabel(int step) => step switch
+    {
+        0 => "Welcome",
+        1 => "Capture",
+        2 => "Calendar",
+        3 => "Contexts",
+        4 => "Start",
+        _ => ""
+    };
+
+    private void GoToStep(int step)
+    {
+        if (step <= _currentStep)
+        {
+            _currentStep = step;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (_currentStep < TotalSteps - 1)
+        {
+            _currentStep++;
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (_currentStep > 0)
+        {
+            _currentStep--;
+        }
+    }
+
+    private void SelectProvider(CalendarProvider provider)
+    {
+        _selectedProvider = provider;
+    }
+
+    private async Task CompleteOnboarding()
+    {
+        // Save preferences
+        var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (prefs == null)
+        {
+            prefs = new UserPreferences();
+        }
+
+        prefs.OnboardingCompleted = true;
+        prefs.PreferredCalendarProvider = _selectedProvider;
+
+        if (prefs.CreatedAt == default)
+        {
+            await PreferencesRepository.AddAsync(prefs);
+        }
+        else
+        {
+            await PreferencesRepository.UpdateAsync(prefs);
+        }
+
+        await OnCompleted.InvokeAsync();
+    }
+}

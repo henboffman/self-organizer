@@ -1,0 +1,112 @@
+@namespace SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.Core.Services
+
+@* Renders text with tags styled as clickable entities *@
+@if (_segments.Any())
+{
+    <span class="tag-display">
+        @foreach (var segment in _segments)
+        {
+            @if (segment.IsTag)
+            {
+                <a href="/tags/@segment.TagName" class="entity-tag" @onclick="() => OnTagClick(segment.TagName)" @onclick:preventDefault="true">
+                    <span class="tag-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                        </svg>
+                    </span>
+                    <span class="tag-text">@segment.TagName</span>
+                </a>
+            }
+            else
+            {
+                @segment.Text
+            }
+        }
+    </span>
+}
+else
+{
+    @Text
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public EventCallback<string> OnTagClicked { get; set; }
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private List<TextSegment> _segments = new();
+
+    protected override void OnParametersSet()
+    {
+        ParseText();
+    }
+
+    private void ParseText()
+    {
+        _segments.Clear();
+
+        if (string.IsNullOrWhiteSpace(Text))
+            return;
+
+        var matches = TagParsingService.FindTagMatches(Text);
+        if (!matches.Any())
+        {
+            _segments.Add(new TextSegment { Text = Text });
+            return;
+        }
+
+        int lastIndex = 0;
+        foreach (var match in matches.OrderBy(m => m.StartIndex))
+        {
+            // Add text before the tag
+            if (match.StartIndex > lastIndex)
+            {
+                _segments.Add(new TextSegment
+                {
+                    Text = Text.Substring(lastIndex, match.StartIndex - lastIndex)
+                });
+            }
+
+            // Add the tag
+            _segments.Add(new TextSegment
+            {
+                IsTag = true,
+                TagName = match.TagName,
+                Text = match.FullMatch
+            });
+
+            lastIndex = match.StartIndex + match.Length;
+        }
+
+        // Add remaining text after last tag
+        if (lastIndex < Text.Length)
+        {
+            _segments.Add(new TextSegment
+            {
+                Text = Text.Substring(lastIndex)
+            });
+        }
+    }
+
+    private async Task OnTagClick(string tagName)
+    {
+        if (OnTagClicked.HasDelegate)
+        {
+            await OnTagClicked.InvokeAsync(tagName);
+        }
+        else
+        {
+            // Default: navigate to tag page
+            NavigationManager.NavigateTo($"/tags/{tagName}");
+        }
+    }
+
+    private class TextSegment
+    {
+        public bool IsTag { get; set; }
+        public string TagName { get; set; } = "";
+        public string Text { get; set; } = "";
+    }
+}

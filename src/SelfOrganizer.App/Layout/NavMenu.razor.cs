@@ -26,10 +26,7 @@ public partial class NavMenu : IDisposable
 
     // Count fields for sidebar badges
     private int _inboxCount = 0;
-    private int _nextActionsCount = 0;
-    private int _waitingForCount = 0;
-    private int _scheduledCount = 0;
-    private int _somedayCount = 0;
+    private int _totalTasksCount = 0;
     private int _projectsCount = 0;
     private int _todayEventsCount = 0;
 
@@ -66,21 +63,22 @@ public partial class NavMenu : IDisposable
             var nextActionsTask = TaskService.GetByStatusAsync(TodoTaskStatus.NextAction);
             var waitingForTask = TaskService.GetWaitingForAsync();
             var scheduledTask = TaskService.GetScheduledAsync();
-            var somedayTask = TaskService.GetSomedayMaybeAsync();
             var projectsTask = ProjectService.GetActiveAsync();
             var eventsTask = CalendarService.GetEventsForDateAsync(DateOnly.FromDateTime(DateTime.Today));
 
-            await Task.WhenAll(capturesTask, inboxTasksTask, nextActionsTask, waitingForTask, scheduledTask, somedayTask, projectsTask, eventsTask);
+            await Task.WhenAll(capturesTask, inboxTasksTask, nextActionsTask, waitingForTask, scheduledTask, projectsTask, eventsTask);
 
             // Inbox count = unprocessed captures + tasks with Inbox status
             var capturesCount = await capturesTask;
             var inboxTasksCount = (await inboxTasksTask).Count();
             _inboxCount = capturesCount + inboxTasksCount;
 
-            _nextActionsCount = (await nextActionsTask).Count();
-            _waitingForCount = (await waitingForTask).Count();
-            _scheduledCount = (await scheduledTask).Count();
-            _somedayCount = (await somedayTask).Count();
+            // Total active tasks (excluding completed and inbox)
+            var nextActions = (await nextActionsTask).Count();
+            var waitingFor = (await waitingForTask).Count();
+            var scheduled = (await scheduledTask).Count();
+            _totalTasksCount = nextActions + waitingFor + scheduled;
+
             _projectsCount = (await projectsTask).Count();
             _todayEventsCount = (await eventsTask).Count();
         }
@@ -88,10 +86,7 @@ public partial class NavMenu : IDisposable
         {
             // Reset to 0 on error
             _inboxCount = 0;
-            _nextActionsCount = 0;
-            _waitingForCount = 0;
-            _scheduledCount = 0;
-            _somedayCount = 0;
+            _totalTasksCount = 0;
             _projectsCount = 0;
             _todayEventsCount = 0;
         }

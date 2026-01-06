@@ -48,6 +48,9 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<ICalendarService, CalendarService>();
 builder.Services.AddScoped<ISchedulingService, SchedulingService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IContextService, ContextService>();
+builder.Services.AddScoped<IMeetingInsightService, MeetingInsightService>();
+builder.Services.AddScoped<IExternalCalendarService, ExternalCalendarService>();
 
 // Intelligence Services
 builder.Services.AddScoped<ICategoryMatcherService, CategoryMatcherService>();

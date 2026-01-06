@@ -5,6 +5,10 @@ namespace SelfOrganizer.Core.Models;
 /// </summary>
 public class UserPreferences : BaseEntity
 {
+    // Onboarding
+    public bool OnboardingCompleted { get; set; } = false;
+    public CalendarProvider? PreferredCalendarProvider { get; set; }
+
     // Work Schedule Settings
     public TimeSpan WorkDayStart { get; set; } = TimeSpan.FromHours(9);
     public TimeSpan WorkDayEnd { get; set; } = TimeSpan.FromHours(17);

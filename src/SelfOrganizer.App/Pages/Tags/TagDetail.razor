@@ -1,0 +1,316 @@
+@page "/tags/{TagName}"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
+@inject SelfOrganizer.Core.Interfaces.IRepository<Project> ProjectRepository
+@inject NavigationManager NavigationManager
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="/">Home</a></li>
+                <li class="breadcrumb-item"><a href="/tags">Tags</a></li>
+                <li class="breadcrumb-item active">@TagName</li>
+            </ol>
+        </nav>
+        <h3 class="mb-0">
+            <span class="tag-header-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+            </span>
+            @TagName
+        </h3>
+    </div>
+    <div>
+        <span class="badge bg-primary fs-6">@TotalReferenceCount references</span>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-8">
+            @* Tasks Section *@
+            @if (_taggedTasks.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <span class="oi oi-check me-2"></span>Tasks
+                        </span>
+                        <span class="badge bg-secondary">@_taggedTasks.Count</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var task in _taggedTasks.OrderByDescending(t => t.CreatedAt))
+                        {
+                            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-bold">
+                                            @if (task.Status == TodoTaskStatus.Completed)
+                                            {
+                                                <span class="text-muted text-decoration-line-through">@task.Title</span>
+                                            }
+                                            else
+                                            {
+                                                @task.Title
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(task.Description))
+                                        {
+                                            <small class="text-muted">
+                                                <TagDisplay Text="@task.Description" />
+                                            </small>
+                                        }
+                                    </div>
+                                    <div class="text-end">
+                                        @switch (task.Status)
+                                        {
+                                            case TodoTaskStatus.Completed:
+                                                <span class="badge bg-success">Completed</span>
+                                                break;
+                                            case TodoTaskStatus.NextAction:
+                                                <span class="badge bg-primary">Next Action</span>
+                                                break;
+                                            case TodoTaskStatus.Inbox:
+                                                <span class="badge bg-warning text-dark">Inbox</span>
+                                                break;
+                                            case TodoTaskStatus.Scheduled:
+                                                <span class="badge bg-info">Scheduled</span>
+                                                break;
+                                            default:
+                                                <span class="badge bg-secondary">@task.Status</span>
+                                                break;
+                                        }
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* Events Section *@
+            @if (_taggedEvents.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <span class="oi oi-calendar me-2"></span>Calendar Events
+                        </span>
+                        <span class="badge bg-secondary">@_taggedEvents.Count</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var evt in _taggedEvents.OrderByDescending(e => e.StartTime))
+                        {
+                            <a href="/calendar/day/@evt.StartTime.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-bold">@evt.Title</div>
+                                        @if (!string.IsNullOrWhiteSpace(evt.Description))
+                                        {
+                                            <small class="text-muted">
+                                                <TagDisplay Text="@evt.Description" />
+                                            </small>
+                                        }
+                                    </div>
+                                    <div class="text-end text-muted">
+                                        <div>@evt.StartTime.ToString("MMM d, yyyy")</div>
+                                        <small>@evt.StartTime.ToString("h:mm tt")</small>
+                                    </div>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* Projects Section *@
+            @if (_taggedProjects.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <span class="oi oi-folder me-2"></span>Projects
+                        </span>
+                        <span class="badge bg-secondary">@_taggedProjects.Count</span>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        @foreach (var project in _taggedProjects)
+                        {
+                            <a href="/projects/@project.Id" class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">@project.Name</span>
+                                    <span class="badge bg-secondary">@project.Status</span>
+                                </div>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!_taggedTasks.Any() && !_taggedEvents.Any() && !_taggedProjects.Any())
+            {
+                <div class="alert alert-info">
+                    <span class="oi oi-info me-2"></span>
+                    No items found with this tag. Start using <strong>#@TagName</strong> in your tasks or events to build this collection.
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            @* Related Tags *@
+            @if (_relatedTags.Any())
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <span class="oi oi-link-intact me-2"></span>Related Tags
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var tag in _relatedTags)
+                            {
+                                <a href="/tags/@tag.Key" class="badge bg-primary text-decoration-none">
+                                    #@tag.Key <span class="badge bg-light text-dark ms-1">@tag.Value</span>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* Quick Stats *@
+            <div class="card">
+                <div class="card-header">
+                    <span class="oi oi-bar-chart me-2"></span>Statistics
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-primary">@_taggedTasks.Count</div>
+                            <small class="text-muted">Tasks</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-info">@_taggedEvents.Count</div>
+                            <small class="text-muted">Events</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 fw-bold text-success">@_taggedProjects.Count</div>
+                            <small class="text-muted">Projects</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string TagName { get; set; } = "";
+
+    private bool _isLoading = true;
+    private List<TodoTask> _taggedTasks = new();
+    private List<CalendarEvent> _taggedEvents = new();
+    private List<Project> _taggedProjects = new();
+    private Dictionary<string, int> _relatedTags = new();
+
+    private int TotalReferenceCount => _taggedTasks.Count + _taggedEvents.Count + _taggedProjects.Count;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadTagReferences();
+    }
+
+    private async Task LoadTagReferences()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // Normalize tag name for case-insensitive matching
+            var normalizedTag = TagName.ToLowerInvariant();
+
+            // Load all tasks and filter by tag (case-insensitive)
+            var allTasks = await TaskService.GetAllAsync();
+            _taggedTasks = allTasks
+                .Where(t => TagParsingService.ContainsTag(t.Tags, normalizedTag) ||
+                           TextContainsTag(t.Title, normalizedTag) ||
+                           TextContainsTag(t.Description, normalizedTag))
+                .ToList();
+
+            // Load all events and filter by tag (case-insensitive)
+            var startOfTime = DateTime.MinValue;
+            var endOfTime = DateTime.MaxValue;
+            var allEvents = await CalendarService.GetEventsForRangeAsync(startOfTime, endOfTime);
+            _taggedEvents = allEvents
+                .Where(e => TagParsingService.ContainsTag(e.Tags, normalizedTag) ||
+                           TextContainsTag(e.Title, normalizedTag) ||
+                           TextContainsTag(e.Description, normalizedTag))
+                .ToList();
+
+            // Load all projects and filter by tag
+            var allProjects = await ProjectRepository.GetAllAsync();
+            _taggedProjects = allProjects
+                .Where(p => TagParsingService.ContainsTag(p.Tags, normalizedTag) ||
+                           TextContainsTag(p.Name, normalizedTag) ||
+                           TextContainsTag(p.Description, normalizedTag))
+                .ToList();
+
+            // Find related tags (tags that appear together with this tag)
+            var relatedTagCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var task in _taggedTasks)
+            {
+                foreach (var tag in task.Tags.Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
+                {
+                    var lowerTag = tag.ToLowerInvariant();
+                    relatedTagCounts[lowerTag] = relatedTagCounts.GetValueOrDefault(lowerTag) + 1;
+                }
+            }
+
+            foreach (var evt in _taggedEvents)
+            {
+                foreach (var tag in evt.Tags.Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
+                {
+                    var lowerTag = tag.ToLowerInvariant();
+                    relatedTagCounts[lowerTag] = relatedTagCounts.GetValueOrDefault(lowerTag) + 1;
+                }
+            }
+
+            _relatedTags = relatedTagCounts
+                .OrderByDescending(kv => kv.Value)
+                .Take(10)
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading tag references: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool TextContainsTag(string? text, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var tags = TagParsingService.ExtractTags(text);
+        return tags.Any(t => TagParsingService.TagsMatch(t, tag));
+    }
+}

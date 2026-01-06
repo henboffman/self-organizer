@@ -1,5 +1,6 @@
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
+using SelfOrganizer.Core.Services;
 
 namespace SelfOrganizer.App.Services.Domain;
 
@@ -14,9 +15,14 @@ public class CaptureService : ICaptureService
 
     public async Task<CaptureItem> CaptureAsync(string rawText)
     {
+        // Parse tags from the raw text
+        var (cleanedText, tags) = TagParsingService.ParseTextAndTags(rawText);
+
         var item = new CaptureItem
         {
             RawText = rawText,
+            CleanedText = cleanedText,
+            ExtractedTags = tags,
             IsProcessed = false
         };
         return await _repository.AddAsync(item);

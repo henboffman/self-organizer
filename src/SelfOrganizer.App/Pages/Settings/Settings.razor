@@ -1,11 +1,13 @@
 @page "/settings"
 @using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
 @using SelfOrganizer.App.Services
 @using SelfOrganizer.App.Components.Shared
-@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject IRepository<UserPreferences> PreferencesRepository
 @inject SelfOrganizer.App.Services.Data.IIndexedDbService DbService
 @inject IExportService ExportService
 @inject IImportService ImportService
+@inject IContextService ContextService
 
 <h3 class="mb-4">
     <span class="oi oi-cog me-2"></span>Settings
@@ -129,31 +131,61 @@
             </div>
         </div>
 
-        @* Schedule Optimization *@
+        @* Context Management *@
         <div class="card mb-4">
             <div class="card-header">
-                <span class="oi oi-spreadsheet me-2"></span>Schedule Optimization
+                <span class="oi oi-tag me-2"></span>Context Management
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    Adjust how the auto-scheduler groups your tasks. Higher values give more weight to that factor.
+                    Contexts define where or how you can do tasks (e.g., home, computer, errands). Built-in contexts cannot be deleted.
                 </p>
 
-                <div class="mb-4">
-                    <label class="form-label">
-                        Context Grouping: <strong>@_contextGroupingWeight%</strong>
-                    </label>
-                    <input type="range" class="form-range" min="0" max="100" @bind="_contextGroupingWeight" />
-                    <small class="text-muted">Group tasks by context (@@home, @@work, @@errands)</small>
-                </div>
+                @if (_contexts == null)
+                {
+                    <div class="text-center py-2">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                    </div>
+                }
+                else
+                {
+                    <div class="context-list mb-3">
+                        @foreach (var context in _contexts)
+                        {
+                            <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <span class="context-color-dot me-2" style="background-color: @context.Color; width: 12px; height: 12px; border-radius: 50%; display: inline-block;"></span>
+                                    <span>@context.Name</span>
+                                    @if (context.IsBuiltIn)
+                                    {
+                                        <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Built-in</span>
+                                    }
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted me-2">Used @context.UsageCount times</small>
+                                    @if (!context.IsBuiltIn)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteContext(context.Id)"
+                                                title="Delete context">
+                                            <span class="oi oi-trash"></span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
 
-                <div class="mb-0">
-                    <label class="form-label">
-                        Similar Work Grouping: <strong>@_similarWorkGroupingWeight%</strong>
-                    </label>
-                    <input type="range" class="form-range" min="0" max="100" @bind="_similarWorkGroupingWeight" />
-                    <small class="text-muted">Group tasks by category or project</small>
-                </div>
+                    @* Add new context *@
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="New context name..."
+                               @bind="_newContextName" @bind:event="oninput"
+                               @onkeydown="HandleNewContextKeyDown" />
+                        <button class="btn btn-outline-success" @onclick="AddNewContext"
+                                disabled="@string.IsNullOrWhiteSpace(_newContextName)">
+                            <span class="oi oi-plus me-1"></span> Add
+                        </button>
+                    </div>
+                }
             </div>
         </div>
 
@@ -294,9 +326,9 @@
     private bool _enableCelebrationEffects = true;
     private bool _enablePickForMe = true;
 
-    // Schedule optimization settings
-    private int _contextGroupingWeight = 50;
-    private int _similarWorkGroupingWeight = 50;
+    // Context management
+    private List<Context>? _contexts;
+    private string _newContextName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -320,11 +352,47 @@
             // ADHD accommodations
             _enableCelebrationEffects = _preferences.EnableCelebrationEffects;
             _enablePickForMe = _preferences.EnablePickForMe;
-
-            // Schedule optimization
-            _contextGroupingWeight = _preferences.ContextGroupingWeight;
-            _similarWorkGroupingWeight = _preferences.SimilarWorkGroupingWeight;
         }
+
+        // Load contexts
+        await LoadContexts();
+    }
+
+    private async Task LoadContexts()
+    {
+        _contexts = (await ContextService.GetAllSortedByMruAsync()).ToList();
+    }
+
+    private async Task AddNewContext()
+    {
+        if (string.IsNullOrWhiteSpace(_newContextName))
+            return;
+
+        try
+        {
+            await ContextService.CreateAsync(_newContextName.Trim().ToLowerInvariant());
+            _newContextName = string.Empty;
+            await LoadContexts();
+        }
+        catch (InvalidOperationException)
+        {
+            // Context already exists - just clear the input
+            _newContextName = string.Empty;
+        }
+    }
+
+    private async Task HandleNewContextKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddNewContext();
+        }
+    }
+
+    private async Task DeleteContext(Guid contextId)
+    {
+        await ContextService.DeleteAsync(contextId);
+        await LoadContexts();
     }
 
     private async Task SaveSettings()
@@ -351,10 +419,6 @@
         // ADHD accommodations
         _preferences.EnableCelebrationEffects = _enableCelebrationEffects;
         _preferences.EnablePickForMe = _enablePickForMe;
-
-        // Schedule optimization
-        _preferences.ContextGroupingWeight = _contextGroupingWeight;
-        _preferences.SimilarWorkGroupingWeight = _similarWorkGroupingWeight;
 
         if (_preferences.CreatedAt == default)
         {

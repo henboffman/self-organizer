@@ -22,5 +22,11 @@ public class CalendarEvent : BaseEntity
     public bool RequiresPrep { get; set; }
     public bool RequiresFollowUp { get; set; }
 
+    /// <summary>
+    /// Tags extracted from description or manually added.
+    /// Used for grouping, filtering, and smart scheduling.
+    /// </summary>
+    public List<string> Tags { get; set; } = new();
+
     public MeetingCategory EffectiveCategory => OverrideCategory ?? AutoCategory ?? MeetingCategory.Other;
 }

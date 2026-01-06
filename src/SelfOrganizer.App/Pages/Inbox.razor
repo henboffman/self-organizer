@@ -417,7 +417,8 @@ else
     private void OpenProcessModal(CaptureItem item)
     {
         _selectedItem = item;
-        _newTaskTitle = item.RawText;
+        // Use cleaned text (without tags) as default title, fallback to raw text
+        _newTaskTitle = !string.IsNullOrWhiteSpace(item.CleanedText) ? item.CleanedText : item.RawText;
         _processStep = 1;
         _isActionable = false;
         _newTaskEstimatedMinutes = 30;
@@ -430,7 +431,8 @@ else
         _showAdvancedOptions = false;
         _newTaskEnergyLevel = null;
         _newTaskWhoFor = string.Empty;
-        _newTaskTagsInput = string.Empty;
+        // Pre-populate tags from extracted tags
+        _newTaskTagsInput = item.ExtractedTags.Any() ? string.Join(", ", item.ExtractedTags) : string.Empty;
         _newTaskLinksInput = string.Empty;
         _newTaskRequiresDeepWork = false;
         _newTaskIsRecurring = false;

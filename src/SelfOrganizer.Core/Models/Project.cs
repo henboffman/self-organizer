@@ -15,4 +15,5 @@ public class Project : BaseEntity
     public int Priority { get; set; } = 2;
     public List<string> Tags { get; set; } = new();
     public string? Notes { get; set; }
+    public string? Url { get; set; }
 }

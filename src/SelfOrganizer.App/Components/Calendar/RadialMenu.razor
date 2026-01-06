@@ -1,0 +1,123 @@
+@namespace SelfOrganizer.App.Components.Calendar
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="radial-menu-overlay @(_isVisible ? "visible" : "")" @onclick="HandleOverlayClick">
+    <div class="radial-menu @(_isVisible ? "visible" : "")"
+         style="left: @(_positionX)px; top: @(_positionY)px;">
+        <div class="radial-menu-center">
+            <div class="radial-time-display">
+                <div class="time-range">@_timeRangeDisplay</div>
+                <div class="duration">@_durationDisplay</div>
+            </div>
+        </div>
+
+        @foreach (var (option, index) in _options.Select((o, i) => (o, i)))
+        {
+            var angle = GetAngleForIndex(index);
+            var transform = $"rotate({angle}deg) translateY(-80px) rotate(-{angle}deg)";
+            <div class="radial-menu-item @(option.IsHovered ? "hovered" : "")"
+                 style="transform: @transform; animation-delay: @(index * 50)ms;"
+                 @onmouseenter="() => OnItemHover(index, true)"
+                 @onmouseleave="() => OnItemHover(index, false)"
+                 @onclick="() => SelectOption(option)"
+                 @onclick:stopPropagation="true">
+                <div class="radial-item-icon" style="background-color: @option.Color;">
+                    <span class="oi @option.Icon"></span>
+                </div>
+                <div class="radial-item-label">@option.Label</div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback<RadialMenuSelection> OnSelected { get; set; }
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private bool _isVisible = false;
+    private double _positionX;
+    private double _positionY;
+    private DateTime _startTime;
+    private DateTime _endTime;
+    private string _timeRangeDisplay = "";
+    private string _durationDisplay = "";
+
+    private List<RadialMenuOption> _options = new()
+    {
+        new RadialMenuOption { Type = "focus", Label = "Focus", Icon = "oi-target", Color = "#6366f1" },
+        new RadialMenuOption { Type = "deepwork", Label = "Deep Work", Icon = "oi-layers", Color = "#8b5cf6" },
+        new RadialMenuOption { Type = "meeting", Label = "Meeting", Icon = "oi-people", Color = "#06b6d4" },
+        new RadialMenuOption { Type = "break", Label = "Break", Icon = "oi-media-pause", Color = "#22c55e" },
+        new RadialMenuOption { Type = "admin", Label = "Admin", Icon = "oi-envelope-closed", Color = "#f59e0b" },
+        new RadialMenuOption { Type = "event", Label = "Event", Icon = "oi-calendar", Color = "#ec4899" }
+    };
+
+    public void Show(double x, double y, DateTime startTime, DateTime endTime)
+    {
+        _positionX = x;
+        _positionY = y;
+        _startTime = startTime;
+        _endTime = endTime;
+
+        _timeRangeDisplay = $"{startTime:h:mm} - {endTime:h:mm tt}";
+        var duration = endTime - startTime;
+        _durationDisplay = duration.TotalMinutes >= 60
+            ? $"{(int)duration.TotalHours}h {duration.Minutes}m"
+            : $"{(int)duration.TotalMinutes}m";
+
+        _isVisible = true;
+        StateHasChanged();
+    }
+
+    public void Hide()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private double GetAngleForIndex(int index)
+    {
+        var totalOptions = _options.Count;
+        var angleStep = 360.0 / totalOptions;
+        return -90 + (index * angleStep); // Start from top (-90 deg)
+    }
+
+    private void OnItemHover(int index, bool isHovered)
+    {
+        _options[index].IsHovered = isHovered;
+        StateHasChanged();
+    }
+
+    private async Task SelectOption(RadialMenuOption option)
+    {
+        _isVisible = false;
+        await OnSelected.InvokeAsync(new RadialMenuSelection
+        {
+            Type = option.Type,
+            StartTime = _startTime,
+            EndTime = _endTime
+        });
+    }
+
+    private async Task HandleOverlayClick()
+    {
+        _isVisible = false;
+        await OnCancelled.InvokeAsync();
+    }
+
+    private class RadialMenuOption
+    {
+        public string Type { get; set; } = "";
+        public string Label { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+        public bool IsHovered { get; set; }
+    }
+
+    public class RadialMenuSelection
+    {
+        public string Type { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+    }
+}

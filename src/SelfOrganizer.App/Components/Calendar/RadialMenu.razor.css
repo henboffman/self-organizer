@@ -1,0 +1,192 @@
+/* Radial Menu Overlay */
+.radial-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.radial-menu-overlay.visible {
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 1;
+    pointer-events: all;
+    backdrop-filter: blur(2px);
+}
+
+/* Radial Menu Container */
+.radial-menu {
+    position: fixed;
+    width: 200px;
+    height: 200px;
+    margin-left: -100px;
+    margin-top: -100px;
+    z-index: 9999;
+    pointer-events: none;
+    transform: scale(0);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+}
+
+.radial-menu.visible {
+    transform: scale(1);
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Center Display */
+.radial-menu-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(135deg, #1e1e2e 0%, #2d2d3f 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.4),
+        0 0 0 3px rgba(99, 102, 241, 0.3),
+        inset 0 2px 10px rgba(255, 255, 255, 0.05);
+    z-index: 10;
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.radial-time-display {
+    text-align: center;
+    color: white;
+}
+
+.time-range {
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.duration {
+    font-size: 0.65rem;
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+/* Menu Items */
+.radial-menu-item {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-left: -30px;
+    margin-top: -30px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    animation: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.radial-menu.visible .radial-menu-item {
+    opacity: 1;
+}
+
+.radial-menu-item:hover,
+.radial-menu-item.hovered {
+    transform: scale(1.15);
+}
+
+.radial-item-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.3),
+        0 0 20px var(--glow-color, rgba(99, 102, 241, 0.3));
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.radial-menu-item:hover .radial-item-icon,
+.radial-menu-item.hovered .radial-item-icon {
+    box-shadow:
+        0 6px 25px rgba(0, 0, 0, 0.4),
+        0 0 30px var(--glow-color, rgba(99, 102, 241, 0.5));
+    transform: translateY(-2px);
+}
+
+.radial-item-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: white;
+    margin-top: 4px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+/* Animations */
+@keyframes pop-in {
+    0% {
+        opacity: 0;
+        transform: scale(0) translateY(0);
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(-80px);
+    }
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow:
+            0 4px 20px rgba(0, 0, 0, 0.4),
+            0 0 0 3px rgba(99, 102, 241, 0.3),
+            inset 0 2px 10px rgba(255, 255, 255, 0.05);
+    }
+    50% {
+        box-shadow:
+            0 4px 25px rgba(0, 0, 0, 0.5),
+            0 0 0 5px rgba(99, 102, 241, 0.4),
+            inset 0 2px 10px rgba(255, 255, 255, 0.08);
+    }
+}
+
+/* Ripple effect on selection */
+.radial-menu-item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.radial-menu-item:active::after {
+    width: 80px;
+    height: 80px;
+    opacity: 1;
+    transition: width 0s, height 0s, opacity 0s;
+}

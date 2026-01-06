@@ -168,6 +168,27 @@ else
                             <span class="text-success">@_project.CompletedAt.Value.ToString("MMM d, yyyy")</span>
                         </li>
                     }
+                    @if (_project.Tags.Any())
+                    {
+                        <li class="list-group-item">
+                            <div class="mb-1"><strong>Tags</strong></div>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var tag in _project.Tags)
+                                {
+                                    <a href="/tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
+                                }
+                            </div>
+                        </li>
+                    }
+                    @if (!string.IsNullOrEmpty(_project.Url))
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>External Link</span>
+                            <a href="@_project.Url" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <span class="oi oi-external-link me-1"></span>Open
+                            </a>
+                        </li>
+                    }
                 </ul>
             </div>
         </div>
@@ -239,6 +260,14 @@ else
                 <input type="date" class="form-control" @bind="_editDueDate" />
             </div>
         </div>
+        <div class="mb-3">
+            <label class="form-label">Tags</label>
+            <input type="text" class="form-control" @bind="_editTags" placeholder="Use #hashtags separated by spaces" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">External URL</label>
+            <input type="url" class="form-control" @bind="_editUrl" placeholder="https://..." />
+        </div>
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="() => _isEditing = false">Cancel</button>
@@ -271,6 +300,8 @@ else
     private int _editPriority = 2;
     private ProjectStatus _editStatus = ProjectStatus.Active;
     private DateTime? _editDueDate;
+    private string _editTags = string.Empty;
+    private string? _editUrl;
 
     // New task fields
     private string _newTaskTitle = string.Empty;
@@ -302,6 +333,8 @@ else
                 _editPriority = _project.Priority;
                 _editStatus = _project.Status;
                 _editDueDate = _project.DueDate;
+                _editTags = _project.Tags.Any() ? string.Join(" ", _project.Tags.Select(t => $"#{t}")) : string.Empty;
+                _editUrl = _project.Url;
             }
         }
         finally
@@ -329,6 +362,8 @@ else
             _project.Priority = _editPriority;
             _project.Status = _editStatus;
             _project.DueDate = _editDueDate;
+            _project.Tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_editTags);
+            _project.Url = string.IsNullOrWhiteSpace(_editUrl) ? null : _editUrl;
             await ProjectService.UpdateAsync(_project);
             _isEditing = false;
             await LoadProject();

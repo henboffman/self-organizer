@@ -5,6 +5,7 @@
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfoInputs.cache
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfo.cs
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.csproj.CoreCompileInputs.cache
+/Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.sourcelink.json
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.dll
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/refint/SelfOrganizer.Core.dll
 /Users/benjaminhoffman/Documents/code/self-organizer/src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.pdb

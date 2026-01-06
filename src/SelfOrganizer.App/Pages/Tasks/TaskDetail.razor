@@ -237,6 +237,12 @@ else
                     <input type="date" class="form-control" @bind="_editDueDate" />
                 </div>
             </div>
+            <div class="mb-3">
+                <SelfOrganizer.App.Components.Shared.ContextSelector
+                    Label="Contexts"
+                    SelectedContexts="_editContexts"
+                    SelectedContextsChanged="OnContextsChanged" />
+            </div>
         }
     </ChildContent>
     <Footer>
@@ -302,6 +308,7 @@ else
     private int _editPriority = 2;
     private int _editEstimatedMinutes = 30;
     private DateTime? _editDueDate;
+    private List<string> _editContexts = new();
 
     // Schedule fields
     private DateTime _scheduleDate = DateTime.Today;
@@ -334,6 +341,7 @@ else
                 _editPriority = _task.Priority;
                 _editEstimatedMinutes = _task.EstimatedMinutes;
                 _editDueDate = _task.DueDate;
+                _editContexts = new List<string>(_task.Contexts);
             }
         }
         finally
@@ -361,10 +369,16 @@ else
             _task.Priority = _editPriority;
             _task.EstimatedMinutes = _editEstimatedMinutes;
             _task.DueDate = _editDueDate;
+            _task.Contexts = new List<string>(_editContexts);
             await TaskService.UpdateAsync(_task);
             _isEditing = false;
             await LoadTask();
         }
+    }
+
+    private void OnContextsChanged(List<string> contexts)
+    {
+        _editContexts = contexts;
     }
 
     private async Task ConfirmDelete()

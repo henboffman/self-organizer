@@ -1,0 +1,337 @@
+@page "/tags"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Services
+@using SelfOrganizer.App.Services.Intelligence
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
+@inject SelfOrganizer.Core.Interfaces.IRepository<Project> ProjectRepository
+@inject IEntityExtractionService EntityExtraction
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-tags me-2"></span>Tags & Entities
+    </h3>
+    <div class="d-flex gap-2 align-items-center">
+        @if (_lastExtractionRun.HasValue)
+        {
+            <small class="text-muted">
+                Last scan: @_lastExtractionRun.Value.ToString("MMM d, h:mm tt")
+            </small>
+        }
+        <button class="btn btn-outline-primary" @onclick="RunEntityExtraction" disabled="@_isExtracting">
+            @if (_isExtracting)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+                <span>Scanning...</span>
+            }
+            else
+            {
+                <span class="oi oi-loop-circular me-1"></span>
+                <span>Scan for Entities</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (_extractionResult != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-4">
+        <strong>Entity scan complete!</strong>
+        <div class="mt-2">
+            <span class="me-3"><strong>@_extractionResult.TotalEntitiesFound</strong> entities found</span>
+            <span class="me-3"><strong>@_extractionResult.TotalTagsFound</strong> tags</span>
+        </div>
+        <div class="small mt-2">
+            @if (_extractionResult.PeopleFound > 0)
+            {
+                <span class="badge bg-info me-1">@_extractionResult.PeopleFound people</span>
+            }
+            @if (_extractionResult.OrganizationsFound > 0)
+            {
+                <span class="badge bg-primary me-1">@_extractionResult.OrganizationsFound orgs</span>
+            }
+            @if (_extractionResult.DatesFound > 0)
+            {
+                <span class="badge bg-secondary me-1">@_extractionResult.DatesFound dates</span>
+            }
+            @if (_extractionResult.UrlsFound > 0)
+            {
+                <span class="badge bg-dark me-1">@_extractionResult.UrlsFound URLs</span>
+            }
+        </div>
+        <div class="small text-muted mt-2">
+            Processed @_extractionResult.TasksProcessed tasks and @_extractionResult.EventsProcessed events.
+            @if (_extractionResult.TasksUpdated > 0 || _extractionResult.EventsUpdated > 0)
+            {
+                <span>Updated @(_extractionResult.TasksUpdated + _extractionResult.EventsUpdated) items.</span>
+            }
+        </div>
+        <button type="button" class="btn-close" @onclick="() => _extractionResult = null"></button>
+    </div>
+}
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-8">
+            @* Search *@
+            <div class="mb-4">
+                <div class="input-group">
+                    <span class="input-group-text"><span class="oi oi-magnifying-glass"></span></span>
+                    <input type="text" class="form-control" placeholder="Search tags..." @bind="_searchTerm" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @if (!GetFilteredTags().Any())
+            {
+                <div class="text-center py-5">
+                    <h5 class="text-muted">No tags found</h5>
+                    <p class="text-muted">
+                        Use #hashtags in your tasks, events, and projects to create tags.
+                        <br/>Or click "Scan for Entities" to extract tags from existing content.
+                    </p>
+                </div>
+            }
+            else
+            {
+                @* Tags Grid *@
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                    @foreach (var tagInfo in GetFilteredTags())
+                    {
+                        <div class="col">
+                            <div class="card h-100 tag-card" @onclick="() => NavigateToTag(tagInfo.Name)" style="cursor: pointer;">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h5 class="card-title mb-1">
+                                            <span class="text-primary">#</span>@tagInfo.Name
+                                        </h5>
+                                        <span class="badge bg-primary">@tagInfo.TotalCount</span>
+                                    </div>
+                                    <div class="small text-muted mt-2">
+                                        @if (tagInfo.TaskCount > 0)
+                                        {
+                                            <span class="me-2"><span class="oi oi-task me-1"></span>@tagInfo.TaskCount tasks</span>
+                                        }
+                                        @if (tagInfo.EventCount > 0)
+                                        {
+                                            <span class="me-2"><span class="oi oi-calendar me-1"></span>@tagInfo.EventCount events</span>
+                                        }
+                                        @if (tagInfo.ProjectCount > 0)
+                                        {
+                                            <span><span class="oi oi-folder me-1"></span>@tagInfo.ProjectCount projects</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            @* Stats Summary *@
+            <div class="card mb-4">
+                <div class="card-header">
+                    <span class="oi oi-bar-chart me-2"></span>Overview
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="fs-3 fw-bold text-primary">@_allTags.Count</div>
+                            <small class="text-muted">Tags</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-3 fw-bold text-success">@_allTags.Sum(t => t.TaskCount)</div>
+                            <small class="text-muted">Tagged Tasks</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-3 fw-bold text-info">@_allTags.Sum(t => t.EventCount)</div>
+                            <small class="text-muted">Tagged Events</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Popular Tags *@
+            <div class="card mb-4">
+                <div class="card-header">
+                    <span class="oi oi-star me-2"></span>Most Used
+                </div>
+                <div class="card-body">
+                    @if (_allTags.Any())
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var tag in _allTags.OrderByDescending(t => t.TotalCount).Take(10))
+                            {
+                                <a href="/tags/@tag.Name" class="badge bg-primary text-decoration-none tag-badge">
+                                    #@tag.Name
+                                    <span class="badge bg-light text-dark ms-1">@tag.TotalCount</span>
+                                </a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No tags yet</p>
+                    }
+                </div>
+            </div>
+
+            @* Recent Tags *@
+            <div class="card">
+                <div class="card-header">
+                    <span class="oi oi-clock me-2"></span>Recently Used
+                </div>
+                <div class="card-body">
+                    @if (_recentTags.Any())
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var tag in _recentTags)
+                            {
+                                <a href="/tags/@tag" class="badge bg-secondary text-decoration-none">#@tag</a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No recent tags</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .tag-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tag-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .tag-badge {
+        transition: transform 0.2s;
+    }
+    .tag-badge:hover {
+        transform: scale(1.05);
+    }
+</style>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isExtracting = false;
+    private string _searchTerm = "";
+    private List<TagInfo> _allTags = new();
+    private List<string> _recentTags = new();
+    private DateTime? _lastExtractionRun = null;
+    private RetroactiveTaggingResult? _extractionResult = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataChangeNotification.OnDataChanged += HandleDataChanged;
+        await LoadTags();
+    }
+
+    private async void HandleDataChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadTags();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadTags()
+    {
+        _isLoading = true;
+        try
+        {
+            _allTags = await EntityExtraction.GetAllTagsAsync();
+            _recentTags = await GetRecentlyUsedTags();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task<List<string>> GetRecentlyUsedTags()
+    {
+        var recentTags = new List<string>();
+
+        // Get tags from recently modified tasks
+        var tasks = await TaskService.GetAllAsync();
+        var recentTasks = tasks
+            .OrderByDescending(t => t.ModifiedAt > t.CreatedAt ? t.ModifiedAt : t.CreatedAt)
+            .Take(20);
+
+        foreach (var task in recentTasks)
+        {
+            recentTags.AddRange(task.Tags);
+        }
+
+        // Get tags from recent events
+        var events = await CalendarService.GetEventsForRangeAsync(DateTime.Today.AddDays(-7), DateTime.Today.AddDays(7));
+        foreach (var evt in events.OrderByDescending(e => e.StartTime).Take(10))
+        {
+            recentTags.AddRange(evt.Tags);
+        }
+
+        return recentTags.Distinct().Take(15).ToList();
+    }
+
+    private IEnumerable<TagInfo> GetFilteredTags()
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm))
+            return _allTags.OrderByDescending(t => t.TotalCount);
+
+        var term = _searchTerm.ToLower();
+        return _allTags
+            .Where(t => t.Name.ToLower().Contains(term))
+            .OrderByDescending(t => t.TotalCount);
+    }
+
+    private async Task RunEntityExtraction()
+    {
+        _isExtracting = true;
+        _extractionResult = null;
+        StateHasChanged();
+
+        try
+        {
+            _extractionResult = await EntityExtraction.ProcessAllEntitiesAsync();
+            _lastExtractionRun = DateTime.Now;
+            await LoadTags();
+            DataChangeNotification.NotifyDataChanged();
+        }
+        finally
+        {
+            _isExtracting = false;
+        }
+    }
+
+    private void NavigateToTag(string tag)
+    {
+        NavigationManager.NavigateTo($"/tags/{tag}");
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotification.OnDataChanged -= HandleDataChanged;
+    }
+
+}

@@ -1,0 +1,170 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject IContextService ContextService
+
+<div class="context-selector">
+    <label class="form-label">@Label</label>
+
+    @* Selected contexts *@
+    <div class="selected-contexts mb-2">
+        @foreach (var contextName in SelectedContexts)
+        {
+            var ctx = _availableContexts.FirstOrDefault(c => c.Name == contextName);
+            <span class="badge me-1 mb-1" style="background-color: @(ctx?.Color ?? "#6c757d"); cursor: pointer;"
+                  @onclick="() => RemoveContext(contextName)"
+                  title="Click to remove">
+                @contextName
+                <span class="ms-1">&times;</span>
+            </span>
+        }
+        @if (!SelectedContexts.Any())
+        {
+            <span class="text-muted small">No contexts selected</span>
+        }
+    </div>
+
+    @* Context picker dropdown *@
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+                @onclick="ToggleDropdown" @onclick:stopPropagation="true">
+            <span class="oi oi-plus me-1"></span> Add Context
+        </button>
+
+        @if (_showDropdown)
+        {
+            <div class="dropdown-menu show context-dropdown" @onclick:stopPropagation="true">
+                @* New context input *@
+                <div class="px-2 py-1">
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" placeholder="New context..."
+                               @bind="_newContextName" @bind:event="oninput"
+                               @onkeydown="HandleKeyDown" />
+                        <button class="btn btn-outline-success" type="button" @onclick="CreateNewContext"
+                                disabled="@string.IsNullOrWhiteSpace(_newContextName)">
+                            <span class="oi oi-plus"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+
+                @* Available contexts (MRU sorted) *@
+                <div class="context-list">
+                    @foreach (var context in GetFilteredContexts())
+                    {
+                        var isSelected = SelectedContexts.Contains(context.Name);
+                        <button class="dropdown-item d-flex align-items-center @(isSelected ? "disabled" : "")"
+                                @onclick="() => AddContext(context.Name)"
+                                disabled="@isSelected">
+                            <span class="context-color-dot me-2" style="background-color: @context.Color;"></span>
+                            <span class="flex-grow-1">@context.Name</span>
+                            @if (context.UsageCount > 0)
+                            {
+                                <small class="text-muted ms-2">@context.UsageCount</small>
+                            }
+                            @if (isSelected)
+                            {
+                                <span class="oi oi-check ms-2 text-success"></span>
+                            }
+                        </button>
+                    }
+                    @if (!GetFilteredContexts().Any())
+                    {
+                        <div class="dropdown-item text-muted">No matching contexts</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "Contexts";
+
+    [Parameter]
+    public List<string> SelectedContexts { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<string>> SelectedContextsChanged { get; set; }
+
+    private List<Context> _availableContexts = new();
+    private bool _showDropdown = false;
+    private string _newContextName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadContexts();
+    }
+
+    private async Task LoadContexts()
+    {
+        _availableContexts = (await ContextService.GetAllSortedByMruAsync()).ToList();
+    }
+
+    private IEnumerable<Context> GetFilteredContexts()
+    {
+        if (string.IsNullOrWhiteSpace(_newContextName))
+            return _availableContexts;
+
+        return _availableContexts.Where(c =>
+            c.Name.Contains(_newContextName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ToggleDropdown()
+    {
+        _showDropdown = !_showDropdown;
+    }
+
+    private async Task AddContext(string contextName)
+    {
+        if (!SelectedContexts.Contains(contextName))
+        {
+            var updatedList = new List<string>(SelectedContexts) { contextName };
+            await SelectedContextsChanged.InvokeAsync(updatedList);
+
+            // Record usage for MRU sorting
+            await ContextService.RecordUsageAsync(contextName);
+            await LoadContexts();
+        }
+    }
+
+    private async Task RemoveContext(string contextName)
+    {
+        var updatedList = new List<string>(SelectedContexts);
+        updatedList.Remove(contextName);
+        await SelectedContextsChanged.InvokeAsync(updatedList);
+    }
+
+    private async Task CreateNewContext()
+    {
+        if (string.IsNullOrWhiteSpace(_newContextName))
+            return;
+
+        var name = _newContextName.Trim().ToLowerInvariant();
+
+        // Check if it already exists
+        var existing = _availableContexts.FirstOrDefault(c =>
+            c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if (existing == null)
+        {
+            await ContextService.CreateAsync(name);
+            await LoadContexts();
+        }
+
+        await AddContext(name);
+        _newContextName = string.Empty;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CreateNewContext();
+        }
+        else if (e.Key == "Escape")
+        {
+            _showDropdown = false;
+        }
+    }
+}

@@ -2,9 +2,11 @@
 @page "/calendar/day/{DateParam?}"
 @page "/calendar/week/{DateParam?}"
 @using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Services
 @using SelfOrganizer.App.Services
 @using SelfOrganizer.App.Services.Intelligence
 @using SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.App.Components.Calendar
 @using Microsoft.JSInterop
 @inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
@@ -82,6 +84,18 @@
             <button class="btn @(_viewMode == ViewMode.ThreeDay ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewMode(ViewMode.ThreeDay)">3-Day</button>
             <button class="btn @(_viewMode == ViewMode.FiveDay ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetViewMode(ViewMode.FiveDay)">5-Day</button>
         </div>
+        @if (_displayStyle == DisplayStyle.Timeline)
+        {
+            <div class="btn-group ms-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ZoomOut" disabled="@(HourHeightPx <= MinHourHeight)" title="Zoom Out">
+                    <span class="oi oi-minus"></span>
+                </button>
+                <span class="btn btn-sm btn-outline-secondary disabled" style="min-width: 50px;">@_zoomLevel%</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ZoomIn" disabled="@(HourHeightPx >= MaxHourHeight)" title="Zoom In">
+                    <span class="oi oi-plus"></span>
+                </button>
+            </div>
+        }
     </div>
 </div>
 
@@ -102,6 +116,30 @@
         <span class="d-flex align-items-center gap-1">
             <span class="legend-block task-block"></span> Scheduled Tasks
         </span>
+    </div>
+}
+
+@* Focus Optimization Suggestions *@
+@if (_focusSuggestions.Any() && !_dismissedFocusSuggestions)
+{
+    <div class="alert alert-warning alert-dismissible fade show mb-3">
+        <div class="d-flex align-items-start">
+            <span class="oi oi-lightbulb me-2 fs-5 text-warning"></span>
+            <div class="flex-grow-1">
+                <strong>Focus Optimization Suggestions</strong>
+                <ul class="mb-0 mt-2 small">
+                    @foreach (var suggestion in _focusSuggestions.Take(3))
+                    {
+                        <li>@suggestion</li>
+                    }
+                </ul>
+                @if (_focusSuggestions.Count > 3)
+                {
+                    <small class="text-muted">+@(_focusSuggestions.Count - 3) more suggestions</small>
+                }
+            </div>
+            <button type="button" class="btn-close" @onclick="DismissFocusSuggestions"></button>
+        </div>
     </div>
 }
 
@@ -512,6 +550,8 @@ else
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
 
+<RadialMenu @ref="_radialMenu" OnSelected="HandleRadialMenuSelection" OnCancelled="HandleRadialMenuCancelled" />
+
 @code {
     [Parameter] public string? DateParam { get; set; }
 
@@ -534,8 +574,11 @@ else
     // Timeline view settings
     private int _startHour = 7;
     private int _endHour = 20;
-    private const int HourHeightPx = 60;
+    private int HourHeightPx = 60; // Mutable for zoom
     private const int GutterWidthPx = 60;
+    private const int MinHourHeight = 30;
+    private const int MaxHourHeight = 120;
+    private int _zoomLevel = 100; // Percentage
 
     // Drag and drop state
     private bool _isDragging = false;
@@ -561,6 +604,10 @@ else
     private List<ScheduledTaskItem> _scheduledTasks = new();
     private UserPreferences? _preferences;
 
+    // Focus optimization
+    private List<string> _focusSuggestions = new();
+    private bool _dismissedFocusSuggestions = false;
+
     // Optimizer weights
     private int _dueDateUrgencyWeight = 70;
     private int _energyMatchingWeight = 50;
@@ -570,6 +617,13 @@ else
     // Debounce timer for slider changes
     private System.Threading.Timer? _debounceTimer;
     private const int DebounceDelayMs = 500;
+
+    // Quick block creation with radial menu
+    private RadialMenu? _radialMenu;
+    private DotNetObjectReference<Calendar>? _dotNetRef;
+    private DateTime _quickBlockStartTime;
+    private DateTime _quickBlockEndTime;
+    private int _quickBlockDayIndex;
 
     protected override async Task OnInitializedAsync()
     {
@@ -588,8 +642,166 @@ else
         {
             await LoadCalendarSettings();
             _settingsLoaded = true;
+
+            // Initialize JS interops
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await InitializeQuickBlockInterop();
+            await InitializeResizeInterop();
+
             StateHasChanged();
         }
+    }
+
+    private async Task InitializeQuickBlockInterop()
+    {
+        try
+        {
+            var config = new
+            {
+                startHour = _startHour,
+                hourHeightPx = HourHeightPx,
+                gutterWidthPx = GutterWidthPx,
+                daysInView = GetDaysInView()
+            };
+            await JSRuntime.InvokeVoidAsync("quickBlockInterop.init", _dotNetRef, config);
+        }
+        catch
+        {
+            // Ignore errors - feature just won't work
+        }
+    }
+
+    private async Task InitializeResizeInterop()
+    {
+        try
+        {
+            var config = new
+            {
+                startHour = _startHour,
+                hourHeightPx = HourHeightPx,
+                gutterWidthPx = GutterWidthPx,
+                daysInView = GetDaysInView()
+            };
+            await JSRuntime.InvokeVoidAsync("resizeInterop.init", _dotNetRef, config);
+        }
+        catch
+        {
+            // Ignore errors - feature just won't work
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnResizeCompleted(string itemType, string itemId, int startHour, int startMinute, int endHour, int endMinute, int dayIndex)
+    {
+        var startTime = new TimeOnly(startHour, startMinute);
+        var endTime = new TimeOnly(endHour, endMinute);
+        var date = _currentDate.AddDays(dayIndex);
+        var newStartDateTime = date.ToDateTime(startTime);
+        var newEndDateTime = date.ToDateTime(endTime);
+
+        if (itemType == "task")
+        {
+            var taskId = Guid.Parse(itemId);
+            var scheduledTask = _scheduledTasks.FirstOrDefault(t => t.Task.Id == taskId);
+            if (scheduledTask != null)
+            {
+                // Delete the old time block
+                var oldDate = DateOnly.FromDateTime(scheduledTask.StartTime);
+                var blocks = await SchedulingService.GetTimeBlocksForDateAsync(oldDate);
+                var oldBlock = blocks.FirstOrDefault(b => b.AssignedTaskIds.Contains(taskId));
+                if (oldBlock != null)
+                {
+                    await SchedulingService.DeleteTimeBlockAsync(oldBlock.Id);
+                }
+
+                // Create a new time block with the new duration
+                var duration = newEndDateTime - newStartDateTime;
+                var newBlock = new TimeBlock
+                {
+                    StartTime = newStartDateTime,
+                    EndTime = newEndDateTime,
+                    Type = duration.TotalMinutes >= (_preferences?.DeepWorkMinimumMinutes ?? 90)
+                        ? TimeBlockType.DeepWork
+                        : TimeBlockType.ShallowWork,
+                    IsAutoGenerated = true,
+                    AssignedTaskIds = new List<Guid> { taskId }
+                };
+                await SchedulingService.CreateTimeBlockAsync(newBlock);
+                await LoadScheduledTasks();
+                DataChangeNotification.NotifyDataChanged();
+            }
+        }
+        else if (itemType == "event")
+        {
+            var eventId = Guid.Parse(itemId);
+            var evt = _events.FirstOrDefault(e => e.Id == eventId);
+            if (evt != null && string.IsNullOrEmpty(evt.ExternalId))
+            {
+                evt.StartTime = newStartDateTime;
+                evt.EndTime = newEndDateTime;
+                await CalendarService.UpdateAsync(evt);
+                await LoadEvents();
+                DataChangeNotification.NotifyDataChanged();
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnQuickBlockCreated(int startHour, int startMinute, int endHour, int endMinute, int dayIndex, double centerX, double centerY)
+    {
+        var date = _currentDate.AddDays(dayIndex);
+        _quickBlockStartTime = date.ToDateTime(new TimeOnly(startHour, startMinute));
+        _quickBlockEndTime = date.ToDateTime(new TimeOnly(endHour, endMinute));
+        _quickBlockDayIndex = dayIndex;
+
+        _radialMenu?.Show(centerX, centerY, _quickBlockStartTime, _quickBlockEndTime);
+        StateHasChanged();
+    }
+
+    private async Task HandleRadialMenuSelection(RadialMenu.RadialMenuSelection selection)
+    {
+        // Create the appropriate event/block based on selection
+        var category = selection.Type switch
+        {
+            "focus" => MeetingCategory.Focus,
+            "deepwork" => MeetingCategory.Focus,
+            "meeting" => MeetingCategory.TeamMeeting,
+            "break" => MeetingCategory.Break,
+            "admin" => MeetingCategory.Other,
+            "event" => MeetingCategory.Other,
+            _ => MeetingCategory.Other
+        };
+
+        var title = selection.Type switch
+        {
+            "focus" => "Focus Time",
+            "deepwork" => "Deep Work",
+            "meeting" => "Meeting",
+            "break" => "Break",
+            "admin" => "Admin Time",
+            "event" => "Event",
+            _ => "Block"
+        };
+
+        var evt = new CalendarEvent
+        {
+            Title = title,
+            StartTime = selection.StartTime,
+            EndTime = selection.EndTime,
+            OverrideCategory = category,
+            Source = "Manual"
+        };
+
+        await CalendarService.CreateAsync(evt);
+        DataChangeNotification.NotifyDataChanged();
+        await LoadEvents();
+    }
+
+    private void HandleRadialMenuCancelled()
+    {
+        // Nothing to do - just close the menu
     }
 
     private async Task LoadCalendarSettings()
@@ -600,11 +812,18 @@ else
             var showSmartBlocks = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.showSmartBlocks");
             var viewMode = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.viewMode");
             var displayStyle = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.displayStyle");
+            var zoomLevel = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "calendar.zoomLevel");
 
             if (showScheduler != null) _showScheduler = showScheduler == "true";
             if (showSmartBlocks != null) _showSmartBlocks = showSmartBlocks == "true";
             if (viewMode != null && Enum.TryParse<ViewMode>(viewMode, out var vm)) _viewMode = vm;
             if (displayStyle != null && Enum.TryParse<DisplayStyle>(displayStyle, out var ds)) _displayStyle = ds;
+            if (zoomLevel != null && int.TryParse(zoomLevel, out var zl))
+            {
+                _zoomLevel = zl;
+                HourHeightPx = (int)Math.Round(zl / 100.0 * 60);
+                HourHeightPx = Math.Max(MinHourHeight, Math.Min(MaxHourHeight, HourHeightPx));
+            }
 
             // Reload events if view mode changed
             await LoadEvents();
@@ -635,10 +854,10 @@ else
     private async Task OnMouseDownItem(MouseEventArgs e, string itemType, string itemId)
     {
         // Start the hold-to-drag timer in JS
-        // After 200ms, drag will be allowed
+        // After 200ms, drag will be allowed and the element will become draggable
         _dragAllowed = false;
         await JSRuntime.InvokeVoidAsync("dragDropInterop.initHoldToDrag",
-            null, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+            itemType, itemId, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
     }
 
     private async Task OnMouseUpItem(MouseEventArgs e)
@@ -792,6 +1011,9 @@ else
 
         // Reload scheduled tasks
         await LoadScheduledTasks();
+
+        // Force UI refresh
+        StateHasChanged();
     }
 
     private async Task MoveEvent(Guid eventId, DateTime newStartTime)
@@ -800,12 +1022,22 @@ else
         if (evt == null) return;
 
         var duration = evt.EndTime - evt.StartTime;
+
+        // Create updated event with new times
         evt.StartTime = newStartTime;
         evt.EndTime = newStartTime.Add(duration);
 
+        // Save to storage
         await CalendarService.UpdateAsync(evt);
+
+        // Notify other components
         DataChangeNotification.NotifyDataChanged();
+
+        // Force reload all events from storage to ensure UI is in sync
         await LoadEvents();
+
+        // Force UI refresh
+        StateHasChanged();
     }
 
     private async Task LoadPreferences()
@@ -898,11 +1130,90 @@ else
                 var endDateTime = _currentDate.AddDays(GetDaysInView()).ToDateTime(TimeOnly.MinValue);
                 _events = (await CalendarService.GetEventsForRangeAsync(startDateTime, endDateTime)).ToList();
             }
+
+            // Analyze for focus optimization suggestions
+            AnalyzeFocusFragmentation();
         }
         finally
         {
             _isLoading = false;
         }
+    }
+
+    private void AnalyzeFocusFragmentation()
+    {
+        _focusSuggestions.Clear();
+        _dismissedFocusSuggestions = false;
+
+        if (!_events.Any()) return;
+
+        // Group events by day
+        var eventsByDay = _events.GroupBy(e => e.StartTime.Date).ToList();
+
+        foreach (var dayGroup in eventsByDay)
+        {
+            var dayEvents = dayGroup.OrderBy(e => e.StartTime).ToList();
+            var dayName = dayGroup.Key.DayOfWeek.ToString();
+            var dateStr = dayGroup.Key.ToString("MMM d");
+
+            // Check for fragmented meetings with small gaps
+            for (int i = 0; i < dayEvents.Count - 1; i++)
+            {
+                var current = dayEvents[i];
+                var next = dayEvents[i + 1];
+                var gap = next.StartTime - current.EndTime;
+
+                // Small gap (15-45 min) between meetings fragments focus
+                if (gap.TotalMinutes >= 15 && gap.TotalMinutes <= 45)
+                {
+                    _focusSuggestions.Add($"{dayName}: {(int)gap.TotalMinutes}-minute gap between \"{TruncateTitle(current.Title)}\" and \"{TruncateTitle(next.Title)}\" - consider scheduling back-to-back or adding buffer time.");
+                }
+            }
+
+            // Check for scattered meetings throughout the day
+            if (dayEvents.Count >= 3)
+            {
+                var firstMeeting = dayEvents.First().StartTime;
+                var lastMeeting = dayEvents.Last().EndTime;
+                var totalMeetingTime = dayEvents.Sum(e => (e.EndTime - e.StartTime).TotalMinutes);
+                var totalSpan = (lastMeeting - firstMeeting).TotalMinutes;
+
+                // If meetings take less than 50% of the time span, they're scattered
+                if (totalSpan > 120 && totalMeetingTime / totalSpan < 0.5)
+                {
+                    _focusSuggestions.Add($"{dayName} ({dateStr}): Meetings are scattered across {(int)(totalSpan / 60)} hours - consider consolidating to unlock focus time blocks.");
+                }
+            }
+
+            // Check for meetings that could be batched
+            var shortMeetings = dayEvents.Where(e => (e.EndTime - e.StartTime).TotalMinutes <= 30).ToList();
+            if (shortMeetings.Count >= 3)
+            {
+                _focusSuggestions.Add($"{dayName}: {shortMeetings.Count} short meetings (<30 min) - consider batching these together.");
+            }
+
+            // Check for meetings interrupting prime focus time (morning 9-12)
+            var morningMeetings = dayEvents.Where(e =>
+                e.StartTime.Hour >= 9 && e.StartTime.Hour < 12 &&
+                (e.EndTime - e.StartTime).TotalMinutes <= 60).ToList();
+            if (morningMeetings.Count >= 2)
+            {
+                _focusSuggestions.Add($"{dayName}: Multiple morning meetings (9-12 AM) may interrupt focus time - consider moving to afternoon.");
+            }
+        }
+
+        // Limit to top 5 most actionable suggestions
+        _focusSuggestions = _focusSuggestions.Take(5).ToList();
+    }
+
+    private string TruncateTitle(string title)
+    {
+        return title.Length > 20 ? title.Substring(0, 17) + "..." : title;
+    }
+
+    private void DismissFocusSuggestions()
+    {
+        _dismissedFocusSuggestions = true;
     }
 
     private async Task SetViewMode(ViewMode mode)
@@ -919,6 +1230,48 @@ else
     {
         _displayStyle = style;
         await SaveCalendarSetting("displayStyle", style.ToString());
+    }
+
+    private async Task ZoomIn()
+    {
+        if (HourHeightPx < MaxHourHeight)
+        {
+            HourHeightPx = Math.Min(MaxHourHeight, HourHeightPx + 15);
+            _zoomLevel = (int)Math.Round(HourHeightPx / 60.0 * 100);
+            await UpdateJsInteropConfig();
+            await SaveCalendarSetting("zoomLevel", _zoomLevel.ToString());
+        }
+    }
+
+    private async Task ZoomOut()
+    {
+        if (HourHeightPx > MinHourHeight)
+        {
+            HourHeightPx = Math.Max(MinHourHeight, HourHeightPx - 15);
+            _zoomLevel = (int)Math.Round(HourHeightPx / 60.0 * 100);
+            await UpdateJsInteropConfig();
+            await SaveCalendarSetting("zoomLevel", _zoomLevel.ToString());
+        }
+    }
+
+    private async Task UpdateJsInteropConfig()
+    {
+        try
+        {
+            var config = new
+            {
+                startHour = _startHour,
+                hourHeightPx = HourHeightPx,
+                gutterWidthPx = GutterWidthPx,
+                daysInView = GetDaysInView()
+            };
+            await JSRuntime.InvokeVoidAsync("quickBlockInterop.updateConfig", config);
+            await JSRuntime.InvokeVoidAsync("resizeInterop.updateConfig", config);
+        }
+        catch
+        {
+            // Ignore errors
+        }
     }
 
     private async Task OnShowSchedulerChanged(ChangeEventArgs e)
@@ -1041,6 +1394,11 @@ else
     {
         if (string.IsNullOrWhiteSpace(_eventTitle)) return;
 
+        // Parse tags from title and description
+        var titleTags = TagParsingService.ExtractTags(_eventTitle);
+        var descriptionTags = TagParsingService.ExtractTags(_eventDescription);
+        var allTags = TagParsingService.MergeTags(titleTags, descriptionTags);
+
         if (_editingEvent == null)
         {
             var evt = new CalendarEvent
@@ -1054,7 +1412,8 @@ else
                 PrepTimeMinutes = _eventPrepTime,
                 DecompressTimeMinutes = _eventDecompressTime,
                 RequiresPrep = _eventPrepTime > 0,
-                RequiresFollowUp = _eventRequiresFollowUp
+                RequiresFollowUp = _eventRequiresFollowUp,
+                Tags = allTags
             };
             await CalendarService.CreateAsync(evt);
         }
@@ -1070,6 +1429,8 @@ else
             _editingEvent.DecompressTimeMinutes = _eventDecompressTime;
             _editingEvent.RequiresPrep = _eventPrepTime > 0;
             _editingEvent.RequiresFollowUp = _eventRequiresFollowUp;
+            // Merge existing tags with newly extracted tags
+            _editingEvent.Tags = TagParsingService.MergeTags(_editingEvent.Tags, allTags);
             await CalendarService.UpdateAsync(_editingEvent);
         }
 
@@ -1213,22 +1574,23 @@ else
                 var taskWidthCalc = GetEventWidth(daysCount, taskPos.TotalColumns);
 
                 var taskClass = scheduledTask.BlockType == TimeBlockType.DeepWork ? "event-task-deep" : "event-task";
+                var taskSizeClass = taskHeightPx < 35 ? "event-compact" : taskHeightPx < 60 ? "event-small" : "";
 
                 var taskIdStr = scheduledTask.Task.Id.ToString();
                 var taskTooltip = $"{scheduledTask.Task.Title}\n{scheduledTask.StartTime:h:mm tt} - {scheduledTask.EndTime:h:mm tt}\nHold to drag, click to view";
-                <div class="timeline-event @taskClass draggable-item"
+                <div class="timeline-event @taskClass @taskSizeClass draggable-item resizable"
                      style="top: @(taskTopPx)px; height: @(taskHeightPx)px; left: @taskLeftCalc; width: calc(@taskWidthCalc - 4px); z-index: 1;"
                      title="@taskTooltip"
                      draggable="true"
                      data-item-type="task"
                      data-item-id="@taskIdStr"
-                     @onmousedown="async (e) => await OnMouseDownItem(e, \"task\", taskIdStr)"
+                     @onmousedown='async (e) => await OnMouseDownItem(e, "task", taskIdStr)'
                      @onmouseup="async (e) => await OnMouseUpItem(e)"
                      @onclick="() => ShowTaskDetails(scheduledTask.Task)"
                      @onclick:stopPropagation="true"
                      @ondragstart="async (e) => await OnDragStartTask(e, taskIdStr)"
                      @ondragend="async (e) => await OnDragEnd(e)">
-                    <div class="event-time">@scheduledTask.StartTime.ToString("h:mm")</div>
+                    <div class="event-time">@scheduledTask.StartTime.ToString("h:mm tt")</div>
                     <div class="event-title">@scheduledTask.Task.Title</div>
                     @if (scheduledTask.Task.Priority == 1)
                     {
@@ -1284,9 +1646,10 @@ else
             var isDraggableEvent = string.IsNullOrEmpty(evt.ExternalId);
             var eventTooltip = $"{evt.Title}\n{evt.StartTime:h:mm tt} - {evt.EndTime:h:mm tt}" + (isDraggableEvent ? "\nHold to drag, click to edit" : "");
             var eventIdStr = evt.Id.ToString();
-            <div class="timeline-event @categoryClass @(isDraggableEvent ? "draggable-item" : "")"
+            var sizeClass = heightPx < 35 ? "event-compact" : heightPx < 60 ? "event-small" : "";
+            <div class="timeline-event @categoryClass @sizeClass @(isDraggableEvent ? "draggable-item resizable" : "")"
                  style="top: @(topPx)px; height: @(heightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
-                 @onmousedown="async (e) => { if (isDraggableEvent) await OnMouseDownItem(e, \"event\", eventIdStr); }"
+                 @onmousedown='async (e) => { if (isDraggableEvent) await OnMouseDownItem(e, "event", eventIdStr); }'
                  @onmouseup="async (e) => await OnMouseUpItem(e)"
                  @onclick="() => EditEvent(evt)"
                  @onclick:stopPropagation="true"
@@ -1296,7 +1659,7 @@ else
                  data-item-id="@eventIdStr"
                  @ondragstart="async (e) => { if (isDraggableEvent) await OnDragStartEvent(e, eventIdStr); }"
                  @ondragend="async (e) => await OnDragEnd(e)">
-                <div class="event-time">@evt.StartTime.ToString("h:mm")</div>
+                <div class="event-time">@evt.StartTime.ToString("h:mm tt")</div>
                 <div class="event-title">@evt.Title</div>
                 @if (!string.IsNullOrEmpty(evt.Location) && heightPx > 50)
                 {
@@ -1558,11 +1921,35 @@ else
                 await PreferencesRepository.UpdateAsync(_preferences);
             }
 
-            // Clear and regenerate for each displayed day
+            // Clear all auto-generated blocks first
             foreach (var date in GetDisplayDates())
             {
                 await SchedulingService.ClearAutoGeneratedBlocksAsync(date);
-                await SchedulingService.AutoScheduleTasksAsync(date, _availableTasks);
+            }
+
+            // Track which tasks have been scheduled to avoid duplicates across days
+            var scheduledTaskIds = new HashSet<Guid>();
+            var remainingTasks = _availableTasks.ToList();
+
+            // Schedule tasks across days - each task only gets scheduled once
+            foreach (var date in GetDisplayDates())
+            {
+                if (!remainingTasks.Any())
+                    break;
+
+                var scheduledBlocks = await SchedulingService.AutoScheduleTasksAsync(date, remainingTasks);
+
+                // Remove scheduled tasks from the remaining list
+                foreach (var block in scheduledBlocks)
+                {
+                    foreach (var taskId in block.AssignedTaskIds)
+                    {
+                        if (scheduledTaskIds.Add(taskId))
+                        {
+                            remainingTasks.RemoveAll(t => t.Id == taskId);
+                        }
+                    }
+                }
             }
 
             await LoadScheduledTasks();
@@ -1625,6 +2012,9 @@ else
         _debounceTimer = new System.Threading.Timer(
             async _ => await InvokeAsync(async () =>
             {
+                // Save settings to preferences
+                await SaveSchedulingSettings();
+
                 if (_scheduledTasks.Any())
                 {
                     await AutoScheduleTasks();
@@ -1637,12 +2027,38 @@ else
         );
     }
 
+    private async Task SaveSchedulingSettings()
+    {
+        if (_preferences == null)
+        {
+            _preferences = new UserPreferences();
+        }
+
+        _preferences.DueDateUrgencyWeight = _dueDateUrgencyWeight;
+        _preferences.EnergyMatchingWeight = _energyMatchingWeight;
+        _preferences.ContextGroupingWeight = _contextGroupingWeight;
+        _preferences.SimilarWorkGroupingWeight = _similarWorkGroupingWeight;
+
+        if (_preferences.CreatedAt == default)
+        {
+            await PreferencesRepository.AddAsync(_preferences);
+        }
+        else
+        {
+            await PreferencesRepository.UpdateAsync(_preferences);
+        }
+    }
+
     private async Task ResetToDefaults()
     {
         _dueDateUrgencyWeight = 70;
         _energyMatchingWeight = 50;
         _contextGroupingWeight = 50;
         _similarWorkGroupingWeight = 50;
+
+        // Save the defaults to preferences
+        await SaveSchedulingSettings();
+
         if (_scheduledTasks.Any())
         {
             await AutoScheduleTasks();
@@ -1657,7 +2073,16 @@ else
     public async ValueTask DisposeAsync()
     {
         _debounceTimer?.Dispose();
-        await Task.CompletedTask; // Satisfy async requirement
+        _dotNetRef?.Dispose();
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("quickBlockInterop.dispose");
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
     }
 
     // Helper class for scheduled task display

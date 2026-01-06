@@ -1,0 +1,380 @@
+@page "/tasks"
+@page "/tasks/{Status}"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-task me-2"></span>Tasks
+    </h3>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ShowAddModal">
+            <span class="oi oi-plus me-1"></span> New Task
+        </button>
+    </div>
+</div>
+
+@* Status Tabs *@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link @(CurrentStatus == "next" ? "active" : "")" href="/tasks/next">
+            Next Actions
+            @if (_nextCount > 0)
+            {
+                <span class="badge bg-success ms-1">@_nextCount</span>
+            }
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(CurrentStatus == "waiting" ? "active" : "")" href="/tasks/waiting">
+            Waiting For
+            @if (_waitingCount > 0)
+            {
+                <span class="badge bg-warning text-dark ms-1">@_waitingCount</span>
+            }
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(CurrentStatus == "scheduled" ? "active" : "")" href="/tasks/scheduled">
+            Scheduled
+            @if (_scheduledCount > 0)
+            {
+                <span class="badge bg-info ms-1">@_scheduledCount</span>
+            }
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(CurrentStatus == "someday" ? "active" : "")" href="/tasks/someday">
+            Someday/Maybe
+            @if (_somedayCount > 0)
+            {
+                <span class="badge bg-secondary ms-1">@_somedayCount</span>
+            }
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(CurrentStatus == "completed" ? "active" : "")" href="/tasks/completed">
+            Completed
+        </a>
+    </li>
+</ul>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_filteredTasks.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">No @GetStatusLabel() tasks</h5>
+        <p class="text-muted">@GetEmptyMessage()</p>
+    </div>
+}
+else
+{
+    @* Filter bar *@
+    <div class="d-flex flex-wrap gap-3 mb-3 align-items-center">
+        <div class="input-group" style="max-width: 300px;">
+            <span class="input-group-text"><span class="oi oi-magnifying-glass"></span></span>
+            <input type="text" class="form-control" placeholder="Search tasks..." @bind="_searchTerm" @bind:event="oninput" />
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">Group:</span>
+            <select class="form-select form-select-sm" style="width: auto;" @bind="_groupBy">
+                <option value="none">None</option>
+                <option value="context">Context</option>
+                <option value="priority">Priority</option>
+                <option value="project">Project</option>
+            </select>
+        </div>
+    </div>
+
+    @* Task List *@
+    <div class="list-group">
+        @foreach (var task in GetDisplayTasks())
+        {
+            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-start gap-2">
+                        <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-secondary")"
+                                @onclick="() => ToggleComplete(task)"
+                                @onclick:stopPropagation="true"
+                                @onclick:preventDefault="true">
+                            <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
+                        </button>
+                        <div>
+                            <div class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                @task.Title
+                            </div>
+                            @if (!string.IsNullOrEmpty(task.Description))
+                            {
+                                <div class="small text-muted text-truncate" style="max-width: 400px;">
+                                    <TagDisplay Text="@task.Description" />
+                                </div>
+                            }
+                            @if (task.Tags.Any())
+                            {
+                                <div class="mt-1">
+                                    @foreach (var tag in task.Tags.Take(3))
+                                    {
+                                        <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1" @onclick:stopPropagation="true">#@tag</a>
+                                    }
+                                    @if (task.Tags.Count > 3)
+                                    {
+                                        <span class="badge bg-secondary">+@(task.Tags.Count - 3)</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        @if (task.Priority == 1)
+                        {
+                            <span class="badge bg-danger">High</span>
+                        }
+                        @if (task.DueDate.HasValue)
+                        {
+                            var isOverdue = task.DueDate.Value.Date < DateTime.Today;
+                            <div class="small @(isOverdue ? "text-danger" : "text-muted")">
+                                <span class="oi oi-calendar me-1"></span>@task.DueDate.Value.ToString("MMM d")
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(task.Category))
+                        {
+                            <div class="small text-muted">@@@task.Category</div>
+                        }
+                    </div>
+                </div>
+            </a>
+        }
+    </div>
+}
+
+@* Add Task Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="New Task" IsVisible="@_showAddModal" OnClose="CloseAddModal">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_newTask.Title" placeholder="What needs to be done?" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" rows="3" @bind="_newTask.Description" placeholder="Add details, use #tags..."></textarea>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" @bind="_newTask.Status">
+                    <option value="@TodoTaskStatus.NextAction">Next Action</option>
+                    <option value="@TodoTaskStatus.WaitingFor">Waiting For</option>
+                    <option value="@TodoTaskStatus.Scheduled">Scheduled</option>
+                    <option value="@TodoTaskStatus.SomedayMaybe">Someday/Maybe</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_newTask.Priority">
+                    <option value="3">Normal</option>
+                    <option value="1">High</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Context</label>
+            <input type="text" class="form-control" @bind="_newTask.Category" placeholder="e.g., @@computer, @@phone, @@office" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Due Date (optional)</label>
+            <input type="date" class="form-control" @bind="_newTask.DueDate" />
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseAddModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="AddTask" disabled="@string.IsNullOrWhiteSpace(_newTask.Title)">Add Task</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@code {
+    [Parameter] public string? Status { get; set; }
+
+    private string CurrentStatus => Status?.ToLower() ?? "next";
+
+    private bool _isLoading = true;
+    private List<TodoTask> _allTasks = new();
+    private List<TodoTask> _filteredTasks = new();
+    private string _searchTerm = "";
+    private string _groupBy = "none";
+
+    private int _nextCount;
+    private int _waitingCount;
+    private int _scheduledCount;
+    private int _somedayCount;
+
+    private bool _showAddModal = false;
+    private TodoTask _newTask = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataChangeNotification.OnDataChanged += HandleDataChanged;
+        await LoadTasks();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadTasks();
+    }
+
+    private async void HandleDataChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadTasks();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadTasks()
+    {
+        _isLoading = true;
+        try
+        {
+            _allTasks = (await TaskService.GetAllAsync()).ToList();
+
+            // Update counts
+            _nextCount = _allTasks.Count(t => t.Status == TodoTaskStatus.NextAction);
+            _waitingCount = _allTasks.Count(t => t.Status == TodoTaskStatus.WaitingFor);
+            _scheduledCount = _allTasks.Count(t => t.Status == TodoTaskStatus.Scheduled);
+            _somedayCount = _allTasks.Count(t => t.Status == TodoTaskStatus.SomedayMaybe);
+
+            // Filter by current status
+            _filteredTasks = CurrentStatus switch
+            {
+                "next" => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList(),
+                "waiting" => _allTasks.Where(t => t.Status == TodoTaskStatus.WaitingFor).ToList(),
+                "scheduled" => _allTasks.Where(t => t.Status == TodoTaskStatus.Scheduled).ToList(),
+                "someday" => _allTasks.Where(t => t.Status == TodoTaskStatus.SomedayMaybe).ToList(),
+                "completed" => _allTasks.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.ModifiedAt).Take(50).ToList(),
+                _ => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList()
+            };
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private IEnumerable<TodoTask> GetDisplayTasks()
+    {
+        var tasks = _filteredTasks.AsEnumerable();
+
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            var term = _searchTerm.ToLower();
+            tasks = tasks.Where(t =>
+                t.Title.ToLower().Contains(term) ||
+                (t.Description?.ToLower().Contains(term) ?? false) ||
+                (t.Category?.ToLower().Contains(term) ?? false) ||
+                t.Tags.Any(tag => tag.ToLower().Contains(term)));
+        }
+
+        // Apply sorting based on grouping
+        return _groupBy switch
+        {
+            "context" => tasks.OrderBy(t => t.Category ?? "zzz").ThenBy(t => t.Priority).ThenBy(t => t.Title),
+            "priority" => tasks.OrderBy(t => t.Priority).ThenBy(t => t.Title),
+            "project" => tasks.OrderBy(t => t.ProjectId.HasValue ? 0 : 1).ThenBy(t => t.Title),
+            _ => tasks.OrderBy(t => t.Priority).ThenBy(t => t.DueDate).ThenBy(t => t.Title)
+        };
+    }
+
+    private string GetStatusLabel() => CurrentStatus switch
+    {
+        "next" => "next action",
+        "waiting" => "waiting for",
+        "scheduled" => "scheduled",
+        "someday" => "someday/maybe",
+        "completed" => "completed",
+        _ => ""
+    };
+
+    private string GetEmptyMessage() => CurrentStatus switch
+    {
+        "next" => "Process your inbox to identify next actions.",
+        "waiting" => "No tasks are waiting for someone else.",
+        "scheduled" => "No tasks are scheduled for specific dates.",
+        "someday" => "No items in your someday/maybe list.",
+        "completed" => "No completed tasks yet.",
+        _ => ""
+    };
+
+    private async Task ToggleComplete(TodoTask task)
+    {
+        if (task.Status == TodoTaskStatus.Completed)
+        {
+            task.Status = TodoTaskStatus.NextAction;
+        }
+        else
+        {
+            task.Status = TodoTaskStatus.Completed;
+        }
+
+        await TaskService.UpdateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+    }
+
+    private void ShowAddModal()
+    {
+        _newTask = new TodoTask
+        {
+            Status = CurrentStatus switch
+            {
+                "next" => TodoTaskStatus.NextAction,
+                "waiting" => TodoTaskStatus.WaitingFor,
+                "scheduled" => TodoTaskStatus.Scheduled,
+                "someday" => TodoTaskStatus.SomedayMaybe,
+                _ => TodoTaskStatus.NextAction
+            },
+            Priority = 3
+        };
+        _showAddModal = true;
+    }
+
+    private void CloseAddModal()
+    {
+        _showAddModal = false;
+        _newTask = new();
+    }
+
+    private async Task AddTask()
+    {
+        if (string.IsNullOrWhiteSpace(_newTask.Title)) return;
+
+        // Extract tags from title and description
+        var (cleanTitle, titleTags) = SelfOrganizer.Core.Services.TagParsingService.ParseTextAndTags(_newTask.Title);
+        var (cleanDesc, descTags) = SelfOrganizer.Core.Services.TagParsingService.ParseTextAndTags(_newTask.Description);
+
+        _newTask.Title = cleanTitle;
+        _newTask.Description = cleanDesc;
+        _newTask.Tags = SelfOrganizer.Core.Services.TagParsingService.MergeTags(titleTags, descTags);
+
+        await TaskService.CreateAsync(_newTask);
+        DataChangeNotification.NotifyDataChanged();
+        CloseAddModal();
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotification.OnDataChanged -= HandleDataChanged;
+    }
+}

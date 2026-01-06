@@ -1,0 +1,151 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject IMeetingInsightService InsightService
+
+@if (_analysis != null && _analysis.Insights.Any())
+{
+    <div class="meeting-insights-panel @(IsCollapsed ? "collapsed" : "")">
+        <div class="insights-header" @onclick="ToggleCollapse">
+            <div class="header-content">
+                @if (_analysis.HasCriticalIssues)
+                {
+                    <span class="oi oi-warning text-danger me-2"></span>
+                }
+                else if (_analysis.HasWarnings)
+                {
+                    <span class="oi oi-bell text-warning me-2"></span>
+                }
+                else
+                {
+                    <span class="oi oi-info text-info me-2"></span>
+                }
+                <span class="header-title">
+                    @_analysis.Insights.Count insight@(_analysis.Insights.Count != 1 ? "s" : "") for today
+                </span>
+            </div>
+            <div class="header-stats">
+                <span class="stat-item">
+                    <span class="stat-value">@_analysis.TotalMeetings</span>
+                    <span class="stat-label">meetings</span>
+                </span>
+                <span class="stat-item">
+                    <span class="stat-value">@FormatDuration(_analysis.TotalMeetingMinutes)</span>
+                    <span class="stat-label">total</span>
+                </span>
+                <span class="stat-item">
+                    <span class="stat-value">@FormatDuration(_analysis.AvailableFocusMinutes)</span>
+                    <span class="stat-label">focus time</span>
+                </span>
+                <span class="oi @(IsCollapsed ? "oi-chevron-bottom" : "oi-chevron-top") ms-2"></span>
+            </div>
+        </div>
+
+        @if (!IsCollapsed)
+        {
+            <div class="insights-body">
+                @foreach (var insight in _analysis.Insights)
+                {
+                    <div class="insight-item @GetSeverityClass(insight.Severity)">
+                        <div class="insight-icon">
+                            <span class="oi @GetInsightIcon(insight.Type)"></span>
+                        </div>
+                        <div class="insight-content">
+                            <div class="insight-message">@insight.Message</div>
+                            @if (!string.IsNullOrEmpty(insight.Suggestion))
+                            {
+                                <div class="insight-suggestion">
+                                    <span class="oi oi-lightbulb me-1"></span>@insight.Suggestion
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else if (_analysis != null && !_analysis.Insights.Any() && _analysis.TotalMeetings > 0)
+{
+    <div class="meeting-insights-panel healthy">
+        <div class="insights-header">
+            <div class="header-content">
+                <span class="oi oi-check text-success me-2"></span>
+                <span class="header-title">Meeting schedule looks good!</span>
+            </div>
+            <div class="header-stats">
+                <span class="stat-item">
+                    <span class="stat-value">@_analysis.TotalMeetings</span>
+                    <span class="stat-label">meetings</span>
+                </span>
+                <span class="stat-item">
+                    <span class="stat-value">@FormatDuration(_analysis.AvailableFocusMinutes)</span>
+                    <span class="stat-label">focus time</span>
+                </span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public DateOnly Date { get; set; }
+
+    [Parameter]
+    public bool IsCollapsed { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<bool> IsCollapsedChanged { get; set; }
+
+    private DayMeetingAnalysis? _analysis;
+    private DateOnly _loadedDate;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedDate != Date)
+        {
+            _loadedDate = Date;
+            await LoadAnalysis();
+        }
+    }
+
+    private async Task LoadAnalysis()
+    {
+        _analysis = await InsightService.AnalyzeDayAsync(Date);
+    }
+
+    private async Task ToggleCollapse()
+    {
+        IsCollapsed = !IsCollapsed;
+        await IsCollapsedChanged.InvokeAsync(IsCollapsed);
+    }
+
+    private string FormatDuration(int minutes)
+    {
+        if (minutes < 60)
+            return $"{minutes}m";
+        var hours = minutes / 60;
+        var mins = minutes % 60;
+        return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
+    }
+
+    private string GetSeverityClass(MeetingInsightSeverity severity) => severity switch
+    {
+        MeetingInsightSeverity.Critical => "severity-critical",
+        MeetingInsightSeverity.Warning => "severity-warning",
+        MeetingInsightSeverity.Info => "severity-info",
+        _ => ""
+    };
+
+    private string GetInsightIcon(MeetingInsightType type) => type switch
+    {
+        MeetingInsightType.BackToBackMeetings => "oi-link-intact",
+        MeetingInsightType.NoBufferTime => "oi-timer",
+        MeetingInsightType.ConsecutiveMeetingsExceeded => "oi-warning",
+        MeetingInsightType.NoPrepTime => "oi-document",
+        MeetingInsightType.NoDecompressTime => "oi-media-pause",
+        MeetingInsightType.MeetingHeavyDay => "oi-graph",
+        MeetingInsightType.NoFocusTime => "oi-target",
+        MeetingInsightType.LunchConflict => "oi-sun",
+        _ => "oi-info"
+    };
+}

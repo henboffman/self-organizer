@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject IRepository<UserPreferences> PreferencesRepository
 
 <div class="page">
     <div class="sidebar">
@@ -19,3 +22,31 @@
         </article>
     </main>
 </div>
+
+<SelfOrganizer.App.Components.Onboarding.OnboardingWizard
+    IsVisible="_showOnboarding"
+    OnCompleted="OnOnboardingCompleted" />
+
+@code {
+    private bool _showOnboarding = false;
+    private bool _checkedOnboarding = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_checkedOnboarding)
+        {
+            _checkedOnboarding = true;
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            if (prefs == null || !prefs.OnboardingCompleted)
+            {
+                _showOnboarding = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void OnOnboardingCompleted()
+    {
+        _showOnboarding = false;
+    }
+}

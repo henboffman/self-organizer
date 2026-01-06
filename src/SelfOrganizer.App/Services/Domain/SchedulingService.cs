@@ -172,6 +172,30 @@ public class SchedulingService : ISchedulingService
         var workDayStart = date.ToDateTime(TimeOnly.FromTimeSpan(preferences.WorkDayStart));
         var workDayEnd = date.ToDateTime(TimeOnly.FromTimeSpan(preferences.WorkDayEnd));
 
+        // If scheduling for today, start from current time (rounded to next 15-min slot)
+        // This ensures we find the NEXT available slot, not the start of the day
+        var now = DateTime.Now;
+        if (date == DateOnly.FromDateTime(now) && now > workDayStart)
+        {
+            // Round up to next 15-minute increment
+            var minutes = now.Minute;
+            var roundedMinutes = ((minutes / 15) + 1) * 15;
+            if (roundedMinutes >= 60)
+            {
+                workDayStart = new DateTime(now.Year, now.Month, now.Day, now.Hour + 1, roundedMinutes - 60, 0);
+            }
+            else
+            {
+                workDayStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, roundedMinutes, 0);
+            }
+
+            // If we've already passed work day end, no scheduling possible
+            if (workDayStart >= workDayEnd)
+            {
+                return Enumerable.Empty<TimeBlock>();
+            }
+        }
+
         // Build a complete list of ALL blocked time ranges (events + prep + decompress)
         var blockedRanges = new List<(DateTime Start, DateTime End)>();
         foreach (var evt in events)

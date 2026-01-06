@@ -95,6 +95,27 @@ else
                             </div>
                             <small class="text-muted">@progress.Item1 / @progress.Item2 tasks completed</small>
                         }
+                        @if (project.Tags.Any())
+                        {
+                            <div class="mt-2">
+                                @foreach (var tag in project.Tags.Take(3))
+                                {
+                                    <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1">#@tag</a>
+                                }
+                                @if (project.Tags.Count > 3)
+                                {
+                                    <span class="badge bg-secondary">+@(project.Tags.Count - 3)</span>
+                                }
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(project.Url))
+                        {
+                            <div class="mt-2">
+                                <a href="@project.Url" target="_blank" class="small text-decoration-none" @onclick:stopPropagation="true">
+                                    <span class="oi oi-external-link me-1"></span>External Link
+                                </a>
+                            </div>
+                        }
                     </div>
                     <div class="card-footer bg-transparent">
                         <div class="d-flex justify-content-between align-items-center">
@@ -161,6 +182,16 @@ else
                 <input type="date" class="form-control" @bind="_projectDueDate" />
             </div>
         </div>
+        <div class="mb-3">
+            <label class="form-label">Tags</label>
+            <input type="text" class="form-control" @bind="_projectTags" placeholder="Use #hashtags separated by spaces (e.g., #work #client #urgent)" />
+            <small class="text-muted">Tags help organize and link related items across tasks, events, and projects.</small>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">External URL</label>
+            <input type="url" class="form-control" @bind="_projectUrl" placeholder="https://..." />
+            <small class="text-muted">Link to project documentation, repository, or external resource.</small>
+        </div>
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
@@ -196,6 +227,8 @@ else
     private int _projectPriority = 2;
     private ProjectStatus _projectStatus = ProjectStatus.Active;
     private DateTime? _projectDueDate;
+    private string _projectTags = string.Empty;
+    private string? _projectUrl;
 
     protected override async Task OnInitializedAsync()
     {
@@ -258,6 +291,8 @@ else
         _projectPriority = 2;
         _projectStatus = ProjectStatus.Active;
         _projectDueDate = null;
+        _projectTags = string.Empty;
+        _projectUrl = null;
         _showModal = true;
     }
 
@@ -270,6 +305,8 @@ else
         _projectPriority = project.Priority;
         _projectStatus = project.Status;
         _projectDueDate = project.DueDate;
+        _projectTags = project.Tags.Any() ? string.Join(" ", project.Tags.Select(t => $"#{t}")) : string.Empty;
+        _projectUrl = project.Url;
         _showModal = true;
     }
 
@@ -283,6 +320,9 @@ else
     {
         if (string.IsNullOrWhiteSpace(_projectName)) return;
 
+        // Parse tags from input
+        var tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_projectTags);
+
         if (_editingProject == null)
         {
             var project = new Project
@@ -292,7 +332,9 @@ else
                 Description = _projectDescription,
                 Priority = _projectPriority,
                 Status = _projectStatus,
-                DueDate = _projectDueDate
+                DueDate = _projectDueDate,
+                Tags = tags,
+                Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl
             };
             await ProjectService.CreateAsync(project);
         }
@@ -304,6 +346,8 @@ else
             _editingProject.Priority = _projectPriority;
             _editingProject.Status = _projectStatus;
             _editingProject.DueDate = _projectDueDate;
+            _editingProject.Tags = tags;
+            _editingProject.Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl;
             await ProjectService.UpdateAsync(_editingProject);
         }
 
