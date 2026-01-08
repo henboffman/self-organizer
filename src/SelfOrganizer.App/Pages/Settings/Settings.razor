@@ -387,8 +387,8 @@
                     @* Configuration Help *@
                     <div class="alert alert-info mt-3 py-2">
                         <small>
-                            <strong>To configure API keys:</strong> Copy <code>wwwroot/appsettings.Local.json.template</code>
-                            to <code>wwwroot/appsettings.Local.json</code> and fill in your credentials.
+                            <strong>To configure API keys:</strong> Copy <code>src/SelfOrganizer.Server/appsettings.Development.json.template</code>
+                            to <code>src/SelfOrganizer.Server/appsettings.Development.json</code> and fill in your credentials.
                             This file is git-ignored and won't be committed.
                         </small>
                     </div>
@@ -622,8 +622,8 @@
         _llmEnabled = llmSettings.IsEnabled;
         _llmProvider = llmSettings.Provider;
 
-        // Load config settings (API keys, endpoints from appsettings.json)
-        _configSettings = LlmService.GetConfigSettings();
+        // Load config settings from server (API keys, endpoints from appsettings.json)
+        _configSettings = await LlmService.GetConfigSettingsAsync();
     }
 
     private async Task LoadContexts()
