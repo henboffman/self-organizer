@@ -25,6 +25,7 @@ public partial class Goals : IDisposable
     private bool _showDetailModal = false;
     private bool _showDeleteConfirm = false;
     private bool _showCompleteConfirm = false;
+    private bool _showBulkImportModal = false;
 
     // View state
     private Goal? _viewingGoal;
@@ -178,6 +179,28 @@ public partial class Goals : IDisposable
             _deletingGoal = null;
         }
         _showDeleteConfirm = false;
+        DataChangeNotification.NotifyDataChanged();
+        await LoadGoals();
+    }
+
+    // Bulk Import
+    private void ShowBulkImportModal()
+    {
+        _showBulkImportModal = true;
+    }
+
+    private void CloseBulkImportModal()
+    {
+        _showBulkImportModal = false;
+    }
+
+    private async Task HandleBulkImport(List<Goal> goals)
+    {
+        foreach (var goal in goals)
+        {
+            await GoalService.CreateAsync(goal);
+        }
+
         DataChangeNotification.NotifyDataChanged();
         await LoadGoals();
     }

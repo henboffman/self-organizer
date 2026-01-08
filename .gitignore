@@ -86,3 +86,16 @@ secrets.json
 
 # Claude Code
 .claude/
+src/SelfOrganizer.Core/obj/project.assets.json
+src/SelfOrganizer.Core/obj/project.nuget.cache
+src/SelfOrganizer.Core/obj/SelfOrganizer.Core.csproj.nuget.dgspec.json
+src/SelfOrganizer.Core/obj/SelfOrganizer.Core.csproj.nuget.g.props
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfo.cs
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.AssemblyInfoInputs.cache
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.assets.cache
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.csproj.CoreCompileInputs.cache
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.dll
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.GeneratedMSBuildEditorConfig.editorconfig
+src/SelfOrganizer.Core/obj/Debug/net9.0/SelfOrganizer.Core.GlobalUsings.g.cs
+src/SelfOrganizer.Core/obj/Debug/net9.0/ref/SelfOrganizer.Core.dll
+src/SelfOrganizer.Core/obj/Debug/net9.0/refint/SelfOrganizer.Core.dll

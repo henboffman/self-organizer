@@ -1,0 +1,315 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Components.Shared
+
+<Modal Title="Bulk Import Goals" IsVisible="@IsVisible" OnClose="HandleClose" Size="modal-lg">
+    <ChildContent>
+        <div class="bulk-import-container">
+            @if (!_showPreview)
+            {
+                <div class="mb-3">
+                    <p class="text-muted">
+                        Paste a bulleted list of goals below. Each line will create a new goal.
+                        Use bullets like <code>-</code>, <code>*</code>, or <code>•</code>, or just plain text lines.
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Goals List</label>
+                    <textarea class="form-control font-monospace"
+                              rows="12"
+                              placeholder="- Learn a new programming language
+- Get in better shape
+- Read 12 books this year
+- Save for emergency fund
+- Improve work-life balance"
+                              @bind="_inputText"
+                              @bind:event="oninput"></textarea>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Default Category</label>
+                        <select class="form-select" @bind="_defaultCategory">
+                            <option value="@GoalCategory.Personal">Personal</option>
+                            <option value="@GoalCategory.Career">Career</option>
+                            <option value="@GoalCategory.Health">Health</option>
+                            <option value="@GoalCategory.Financial">Financial</option>
+                            <option value="@GoalCategory.Learning">Learning</option>
+                            <option value="@GoalCategory.Relationships">Relationships</option>
+                            <option value="@GoalCategory.Creative">Creative</option>
+                            <option value="@GoalCategory.Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Default Timeframe</label>
+                        <select class="form-select" @bind="_defaultTimeframe">
+                            <option value="@GoalTimeframe.Week">Week</option>
+                            <option value="@GoalTimeframe.Month">Month</option>
+                            <option value="@GoalTimeframe.Quarter">Quarter</option>
+                            <option value="@GoalTimeframe.Year">Year</option>
+                            <option value="@GoalTimeframe.MultiYear">Multi-Year</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Default Priority</label>
+                        <select class="form-select" @bind="_defaultPriority">
+                            <option value="1">High</option>
+                            <option value="2">Medium</option>
+                            <option value="3">Low</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <button class="btn btn-outline-secondary" @onclick="HandleClose">Cancel</button>
+                    <button class="btn btn-primary" @onclick="PreviewGoals" disabled="@string.IsNullOrWhiteSpace(_inputText)">
+                        <span class="oi oi-eye me-1"></span> Preview Goals
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Preview (@_parsedGoals.Count goals found)</h6>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-2" @onclick="SelectAll">Select All</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="DeselectAll">Deselect All</button>
+                        </div>
+                    </div>
+                    <div class="parsed-goals-list border rounded" style="max-height: 400px; overflow-y: auto;">
+                        @foreach (var item in _parsedGoals)
+                        {
+                            <div class="d-flex align-items-start gap-2 p-2 border-bottom">
+                                <input type="checkbox" class="form-check-input mt-1" @bind="item.IsSelected" />
+                                <div class="flex-grow-1">
+                                    <div class="fw-medium">@item.Goal.Title</div>
+                                    <div class="d-flex gap-2 mt-1">
+                                        <span class="badge bg-light text-dark">@item.Goal.Category</span>
+                                        <span class="badge bg-light text-dark">@item.Goal.Timeframe</span>
+                                        <span class="badge @GetPriorityClass(item.Goal.Priority)">
+                                            @GetPriorityLabel(item.Goal.Priority)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger py-2 mb-3">
+                        <span class="oi oi-warning me-1"></span> @_errorMessage
+                    </div>
+                }
+
+                @if (_importSuccess)
+                {
+                    <div class="alert alert-success py-2 mb-3">
+                        <span class="oi oi-check me-1"></span> Successfully imported @_importedCount goals!
+                    </div>
+                }
+
+                <div class="d-flex justify-content-between">
+                    <button class="btn btn-outline-secondary" @onclick="BackToInput">
+                        <span class="oi oi-arrow-left me-1"></span> Back
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" @onclick="HandleClose">Cancel</button>
+                        <button class="btn btn-success"
+                                @onclick="ImportSelectedGoals"
+                                disabled="@(!_parsedGoals.Any(g => g.IsSelected) || _isImporting)">
+                            @if (_isImporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Importing...</span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-plus me-1"></span>
+                                <span>Import @_parsedGoals.Count(g => g.IsSelected) Goals</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </ChildContent>
+</Modal>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<List<Goal>> OnImport { get; set; }
+
+    private string _inputText = string.Empty;
+    private bool _showPreview = false;
+    private List<SelectableGoal> _parsedGoals = new();
+    private GoalCategory _defaultCategory = GoalCategory.Personal;
+    private GoalTimeframe _defaultTimeframe = GoalTimeframe.Quarter;
+    private int _defaultPriority = 2;
+    private bool _isImporting = false;
+    private string? _errorMessage;
+    private bool _importSuccess = false;
+    private int _importedCount = 0;
+
+    private class SelectableGoal
+    {
+        public Goal Goal { get; set; } = new();
+        public bool IsSelected { get; set; } = true;
+    }
+
+    private void PreviewGoals()
+    {
+        _parsedGoals.Clear();
+        _errorMessage = null;
+        _importSuccess = false;
+
+        var lines = _inputText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            // Skip empty lines
+            if (string.IsNullOrWhiteSpace(trimmed))
+                continue;
+
+            // Remove bullet characters
+            var title = trimmed
+                .TrimStart('-', '*', '•', '–', '—', '·', '○', '●', '◦', '▪', '▫', ' ', '\t')
+                .Trim();
+
+            // Skip if nothing left after removing bullets
+            if (string.IsNullOrWhiteSpace(title))
+                continue;
+
+            // Skip numbered lists (1. item, 1) item, etc.)
+            if (System.Text.RegularExpressions.Regex.IsMatch(title, @"^\d+[\.\)]\s*"))
+            {
+                title = System.Text.RegularExpressions.Regex.Replace(title, @"^\d+[\.\)]\s*", "").Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(title))
+                continue;
+
+            _parsedGoals.Add(new SelectableGoal
+            {
+                IsSelected = true,
+                Goal = new Goal
+                {
+                    Id = Guid.NewGuid(),
+                    Title = title,
+                    Category = _defaultCategory,
+                    Timeframe = _defaultTimeframe,
+                    Priority = _defaultPriority,
+                    Status = GoalStatus.Active,
+                    CreatedAt = DateTime.UtcNow,
+                    ModifiedAt = DateTime.UtcNow
+                }
+            });
+        }
+
+        if (_parsedGoals.Count == 0)
+        {
+            _errorMessage = "No valid goals found in the input. Each line should contain a goal title.";
+            return;
+        }
+
+        _showPreview = true;
+    }
+
+    private void BackToInput()
+    {
+        _showPreview = false;
+        _importSuccess = false;
+        _errorMessage = null;
+    }
+
+    private void SelectAll()
+    {
+        foreach (var item in _parsedGoals)
+            item.IsSelected = true;
+    }
+
+    private void DeselectAll()
+    {
+        foreach (var item in _parsedGoals)
+            item.IsSelected = false;
+    }
+
+    private async Task ImportSelectedGoals()
+    {
+        _isImporting = true;
+        _errorMessage = null;
+        _importSuccess = false;
+
+        try
+        {
+            var selectedGoals = _parsedGoals
+                .Where(g => g.IsSelected)
+                .Select(g => g.Goal)
+                .ToList();
+
+            if (selectedGoals.Count == 0)
+            {
+                _errorMessage = "Please select at least one goal to import.";
+                return;
+            }
+
+            await OnImport.InvokeAsync(selectedGoals);
+
+            _importedCount = selectedGoals.Count;
+            _importSuccess = true;
+
+            // Reset after successful import
+            await Task.Delay(1500); // Brief delay to show success message
+            ResetForm();
+            await OnClose.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+
+    private async Task HandleClose()
+    {
+        ResetForm();
+        await OnClose.InvokeAsync();
+    }
+
+    private void ResetForm()
+    {
+        _inputText = string.Empty;
+        _showPreview = false;
+        _parsedGoals.Clear();
+        _errorMessage = null;
+        _importSuccess = false;
+        _importedCount = 0;
+    }
+
+    private string GetPriorityClass(int priority) => priority switch
+    {
+        1 => "bg-danger",
+        2 => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityLabel(int priority) => priority switch
+    {
+        1 => "High",
+        2 => "Medium",
+        _ => "Low"
+    };
+}

@@ -12,9 +12,14 @@
     <h3>
         <span class="bi bi-bullseye me-2"></span>Goals
     </h3>
-    <button class="btn btn-primary" @onclick="NavigateToNewGoal">
-        <span class="oi oi-plus me-1"></span> New Goal
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary" @onclick="ShowBulkImportModal" title="Import multiple goals at once">
+            <span class="oi oi-list me-1"></span> Bulk Import
+        </button>
+        <button class="btn btn-primary" @onclick="NavigateToNewGoal">
+            <span class="oi oi-plus me-1"></span> New Goal
+        </button>
+    </div>
 </div>
 
 @* Filter Tabs *@
@@ -104,7 +109,7 @@ else
         {
             <GoalDetail
                 Goal="_viewingGoal"
-                OnEdit="@(() => { CloseDetailModal(); NavigateToEditGoal(_viewingGoal!.Id); })"
+                OnEdit="@(() => { var id = _viewingGoal!.Id; CloseDetailModal(); NavigateToEditGoal(id); })"
                 OnClose="CloseDetailModal"
                 OnGoalUpdated="OnGoalUpdatedFromDetail" />
         }
@@ -124,3 +129,8 @@ else
     IsVisible="@_showCompleteConfirm"
     OnConfirm="ConfirmComplete"
     OnCancel="@(() => _showCompleteConfirm = false)" />
+
+<BulkGoalImportModal
+    IsVisible="@_showBulkImportModal"
+    OnClose="CloseBulkImportModal"
+    OnImport="HandleBulkImport" />
