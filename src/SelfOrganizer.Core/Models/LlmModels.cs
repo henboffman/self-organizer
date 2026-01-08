@@ -202,6 +202,8 @@ public class LlmSettingsFromConfig
     public string AzureDeploymentName { get; set; } = string.Empty;
     public string AzureApiVersion { get; set; } = "2024-02-01";
     public bool HasAzureApiKey { get; set; }
+    public bool UseAzureAD { get; set; }
+    public bool HasAzureADConfig { get; set; }
 
     // Anthropic
     public string AnthropicEndpoint { get; set; } = "https://api.anthropic.com";

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Azure.Identity;
 using SelfOrganizer.Core.Models;
 
 namespace SelfOrganizer.Server.Services;
@@ -84,6 +85,10 @@ public class LlmProxyService : ILlmProxyService
             AzureDeploymentName = section.GetValue<string>("AzureOpenAI:DeploymentName") ?? "",
             AzureApiVersion = section.GetValue<string>("AzureOpenAI:ApiVersion") ?? "2024-02-01",
             HasAzureApiKey = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ApiKey")),
+            UseAzureAD = section.GetValue<bool>("AzureOpenAI:UseAzureAD"),
+            HasAzureADConfig = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:TenantId")) &&
+                               !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ClientId")) &&
+                               !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ClientSecret")),
 
             AnthropicEndpoint = section.GetValue<string>("Anthropic:Endpoint") ?? "https://api.anthropic.com",
             AnthropicModel = section.GetValue<string>("Anthropic:Model") ?? "claude-3-5-sonnet-20241022",
@@ -159,13 +164,46 @@ public class LlmProxyService : ILlmProxyService
         var endpoint = section.GetValue<string>("Endpoint");
         var deploymentName = section.GetValue<string>("DeploymentName");
         var apiVersion = section.GetValue<string>("ApiVersion") ?? "2024-02-01";
+        var useAzureAD = section.GetValue<bool>("UseAzureAD");
         var apiKey = section.GetValue<string>("ApiKey");
 
         if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(deploymentName))
             return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI endpoint or deployment not configured" };
 
-        if (string.IsNullOrWhiteSpace(apiKey))
-            return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI API key not configured" };
+        // Get authentication header
+        string authHeaderValue;
+        bool useApiKeyAuth;
+
+        if (useAzureAD)
+        {
+            var tenantId = section.GetValue<string>("TenantId");
+            var clientId = section.GetValue<string>("ClientId");
+            var clientSecret = section.GetValue<string>("ClientSecret");
+
+            if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+                return new LlmProxyResponse { Success = false, ErrorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured" };
+
+            try
+            {
+                var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+                var tokenResult = await credential.GetTokenAsync(new Azure.Core.TokenRequestContext(new[] { "https://cognitiveservices.azure.com/.default" }));
+                authHeaderValue = tokenResult.Token;
+                useApiKeyAuth = false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to acquire Azure AD token");
+                return new LlmProxyResponse { Success = false, ErrorMessage = $"Failed to acquire Azure AD token: {ex.Message}" };
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI API key not configured" };
+
+            authHeaderValue = apiKey;
+            useApiKeyAuth = true;
+        }
 
         var messages = new List<OpenAIChatMessage>();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
@@ -182,7 +220,14 @@ public class LlmProxyService : ILlmProxyService
         var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Headers.Add("api-key", apiKey);
+        if (useApiKeyAuth)
+        {
+            httpRequest.Headers.Add("api-key", authHeaderValue);
+        }
+        else
+        {
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authHeaderValue);
+        }
         httpRequest.Content = new StringContent(JsonSerializer.Serialize(openAiRequest, CamelCaseOptions), Encoding.UTF8, "application/json");
 
         var response = await _httpClient.SendAsync(httpRequest);
@@ -272,16 +317,29 @@ public class LlmProxyService : ILlmProxyService
 
     private LlmConnectionStatus GetAzureOpenAIStatus(LlmSettingsFromConfig config)
     {
-        var isConfigured = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
-                          !string.IsNullOrWhiteSpace(config.AzureDeploymentName) &&
-                          config.HasAzureApiKey;
+        var hasEndpointAndDeployment = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
+                                       !string.IsNullOrWhiteSpace(config.AzureDeploymentName);
+
+        var hasValidAuth = config.UseAzureAD ? config.HasAzureADConfig : config.HasAzureApiKey;
+        var isConfigured = hasEndpointAndDeployment && hasValidAuth;
+
+        string? errorMessage = null;
+        if (!isConfigured)
+        {
+            if (!hasEndpointAndDeployment)
+                errorMessage = "Azure OpenAI endpoint or deployment not configured";
+            else if (config.UseAzureAD && !config.HasAzureADConfig)
+                errorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured";
+            else if (!config.UseAzureAD && !config.HasAzureApiKey)
+                errorMessage = "Azure OpenAI API key not configured";
+        }
 
         return new LlmConnectionStatus
         {
             IsConnected = isConfigured,
             Endpoint = config.AzureEndpoint,
             Model = config.AzureDeploymentName,
-            ErrorMessage = isConfigured ? null : "Azure OpenAI not fully configured",
+            ErrorMessage = errorMessage,
             AvailableModels = isConfigured ? new List<string> { config.AzureDeploymentName } : new List<string>()
         };
     }

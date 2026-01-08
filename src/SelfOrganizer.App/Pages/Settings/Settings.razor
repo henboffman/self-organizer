@@ -296,17 +296,30 @@
                         <div class="provider-settings border rounded p-3 bg-light">
                             <h6 class="mb-3">Azure OpenAI Settings</h6>
                             <div class="mb-3">
-                                <label class="form-label">API Key Status</label>
+                                <label class="form-label">Authentication Status</label>
                                 <div class="d-flex align-items-center">
-                                    @if (_configSettings?.HasAzureApiKey == true)
+                                    @if (_configSettings?.UseAzureAD == true)
                                     {
-                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
-                                        <span class="text-muted small">API key loaded from appsettings</span>
+                                        @if (_configSettings?.HasAzureADConfig == true)
+                                        {
+                                            <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Azure AD Configured</span>
+                                            <span class="text-muted small">Using service principal authentication</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Azure AD Not Configured</span>
+                                            <span class="text-muted small">Add TenantId, ClientId, ClientSecret to appsettings</span>
+                                        }
+                                    }
+                                    else if (_configSettings?.HasAzureApiKey == true)
+                                    {
+                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>API Key Configured</span>
+                                        <span class="text-muted small">Using API key authentication</span>
                                     }
                                     else
                                     {
                                         <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
-                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
+                                        <span class="text-muted small">Add API key or Azure AD credentials to appsettings</span>
                                     }
                                 </div>
                             </div>
@@ -331,7 +344,8 @@
                                 </div>
                             </div>
                             <small class="text-muted">
-                                Configure your Azure OpenAI endpoint, deployment name, and API key in <code>appsettings.Local.json</code>.
+                                Configure your Azure OpenAI settings in <code>appsettings.Local.json</code>.
+                                You can use either an API key or Azure AD service principal (TenantId, ClientId, ClientSecret).
                             </small>
                         </div>
                     }
