@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
@@ -16,6 +17,7 @@ public class LlmService : ILlmService
 {
     private readonly HttpClient _httpClient;
     private readonly IJSRuntime _jsRuntime;
+    private readonly IConfiguration _configuration;
     private const string SettingsKey = "llm_settings";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -32,10 +34,11 @@ public class LlmService : ILlmService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public LlmService(HttpClient httpClient, IJSRuntime jsRuntime)
+    public LlmService(HttpClient httpClient, IJSRuntime jsRuntime, IConfiguration configuration)
     {
         _httpClient = httpClient;
         _jsRuntime = jsRuntime;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -461,18 +464,25 @@ The response must be parseable JSON that matches this structure: {typeof(T).Name
     }
 
     /// <summary>
-    /// Gets the current LLM settings from localStorage
+    /// Gets the current LLM settings, merging user preferences with configuration.
+    /// User preferences control provider selection; API keys come from appsettings.
     /// </summary>
     public async Task<LlmSettings> GetSettingsAsync()
     {
+        // Start with defaults
+        var settings = new LlmSettings();
+
+        // Load user preferences from localStorage (provider selection, non-sensitive settings)
         try
         {
             var json = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", SettingsKey);
             if (!string.IsNullOrWhiteSpace(json))
             {
-                var settings = JsonSerializer.Deserialize<LlmSettings>(json);
-                if (settings != null)
-                    return settings;
+                var userPrefs = JsonSerializer.Deserialize<LlmSettings>(json);
+                if (userPrefs != null)
+                {
+                    settings = userPrefs;
+                }
             }
         }
         catch
@@ -480,7 +490,93 @@ The response must be parseable JSON that matches this structure: {typeof(T).Name
             // Ignore errors reading from localStorage
         }
 
-        return new LlmSettings();
+        // Override API keys and sensitive settings from configuration (appsettings.json / appsettings.Local.json)
+        var llmConfig = _configuration.GetSection("LlmSettings");
+
+        // Ollama settings from config
+        var ollamaEndpoint = llmConfig.GetValue<string>("Ollama:Endpoint");
+        var ollamaModel = llmConfig.GetValue<string>("Ollama:Model");
+        if (!string.IsNullOrWhiteSpace(ollamaEndpoint))
+            settings.OllamaEndpoint = ollamaEndpoint;
+        if (!string.IsNullOrWhiteSpace(ollamaModel))
+            settings.OllamaModel = ollamaModel;
+
+        // OpenAI settings from config (API key always from config)
+        var openAiApiKey = llmConfig.GetValue<string>("OpenAI:ApiKey");
+        var openAiEndpoint = llmConfig.GetValue<string>("OpenAI:Endpoint");
+        var openAiModel = llmConfig.GetValue<string>("OpenAI:Model");
+        if (!string.IsNullOrWhiteSpace(openAiApiKey))
+            settings.OpenAIApiKey = openAiApiKey;
+        if (!string.IsNullOrWhiteSpace(openAiEndpoint))
+            settings.OpenAIEndpoint = openAiEndpoint;
+        if (!string.IsNullOrWhiteSpace(openAiModel))
+            settings.OpenAIModel = openAiModel;
+
+        // Azure OpenAI settings from config (API key always from config)
+        var azureApiKey = llmConfig.GetValue<string>("AzureOpenAI:ApiKey");
+        var azureEndpoint = llmConfig.GetValue<string>("AzureOpenAI:Endpoint");
+        var azureDeployment = llmConfig.GetValue<string>("AzureOpenAI:DeploymentName");
+        var azureApiVersion = llmConfig.GetValue<string>("AzureOpenAI:ApiVersion");
+        if (!string.IsNullOrWhiteSpace(azureApiKey))
+            settings.AzureApiKey = azureApiKey;
+        if (!string.IsNullOrWhiteSpace(azureEndpoint))
+            settings.AzureEndpoint = azureEndpoint;
+        if (!string.IsNullOrWhiteSpace(azureDeployment))
+            settings.AzureDeploymentName = azureDeployment;
+        if (!string.IsNullOrWhiteSpace(azureApiVersion))
+            settings.AzureApiVersion = azureApiVersion;
+
+        // Anthropic settings from config (API key always from config)
+        var anthropicApiKey = llmConfig.GetValue<string>("Anthropic:ApiKey");
+        var anthropicEndpoint = llmConfig.GetValue<string>("Anthropic:Endpoint");
+        var anthropicModel = llmConfig.GetValue<string>("Anthropic:Model");
+        if (!string.IsNullOrWhiteSpace(anthropicApiKey))
+            settings.AnthropicApiKey = anthropicApiKey;
+        if (!string.IsNullOrWhiteSpace(anthropicEndpoint))
+            settings.AnthropicEndpoint = anthropicEndpoint;
+        if (!string.IsNullOrWhiteSpace(anthropicModel))
+            settings.AnthropicModel = anthropicModel;
+
+        // Timeout from config (if specified)
+        var timeout = llmConfig.GetValue<int?>("TimeoutSeconds");
+        if (timeout.HasValue && timeout.Value > 0)
+            settings.TimeoutSeconds = timeout.Value;
+
+        return settings;
+    }
+
+    /// <summary>
+    /// Gets LLM settings directly from configuration (without user preferences).
+    /// Used by Settings UI to show what's configured in appsettings.
+    /// </summary>
+    public LlmSettingsFromConfig GetConfigSettings()
+    {
+        var llmConfig = _configuration.GetSection("LlmSettings");
+
+        return new LlmSettingsFromConfig
+        {
+            // Ollama
+            OllamaEndpoint = llmConfig.GetValue<string>("Ollama:Endpoint") ?? "http://localhost:11434",
+            OllamaModel = llmConfig.GetValue<string>("Ollama:Model") ?? "llama3.2",
+
+            // OpenAI
+            OpenAIEndpoint = llmConfig.GetValue<string>("OpenAI:Endpoint") ?? "https://api.openai.com/v1",
+            OpenAIModel = llmConfig.GetValue<string>("OpenAI:Model") ?? "gpt-4o",
+            HasOpenAIApiKey = !string.IsNullOrWhiteSpace(llmConfig.GetValue<string>("OpenAI:ApiKey")),
+
+            // Azure OpenAI
+            AzureEndpoint = llmConfig.GetValue<string>("AzureOpenAI:Endpoint") ?? "",
+            AzureDeploymentName = llmConfig.GetValue<string>("AzureOpenAI:DeploymentName") ?? "",
+            AzureApiVersion = llmConfig.GetValue<string>("AzureOpenAI:ApiVersion") ?? "2024-02-01",
+            HasAzureApiKey = !string.IsNullOrWhiteSpace(llmConfig.GetValue<string>("AzureOpenAI:ApiKey")),
+
+            // Anthropic
+            AnthropicEndpoint = llmConfig.GetValue<string>("Anthropic:Endpoint") ?? "https://api.anthropic.com",
+            AnthropicModel = llmConfig.GetValue<string>("Anthropic:Model") ?? "claude-3-5-sonnet-20241022",
+            HasAnthropicApiKey = !string.IsNullOrWhiteSpace(llmConfig.GetValue<string>("Anthropic:ApiKey")),
+
+            TimeoutSeconds = llmConfig.GetValue<int?>("TimeoutSeconds") ?? 60
+        };
     }
 
     /// <summary>

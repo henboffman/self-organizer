@@ -181,3 +181,32 @@ public class AnthropicUsage
     public int InputTokens { get; set; }
     public int OutputTokens { get; set; }
 }
+
+/// <summary>
+/// Read-only view of LLM settings from configuration (appsettings.json).
+/// Used by Settings UI to display what's configured without exposing actual API keys.
+/// </summary>
+public class LlmSettingsFromConfig
+{
+    // Ollama
+    public string OllamaEndpoint { get; set; } = "http://localhost:11434";
+    public string OllamaModel { get; set; } = "llama3.2";
+
+    // OpenAI
+    public string OpenAIEndpoint { get; set; } = "https://api.openai.com/v1";
+    public string OpenAIModel { get; set; } = "gpt-4o";
+    public bool HasOpenAIApiKey { get; set; }
+
+    // Azure OpenAI
+    public string AzureEndpoint { get; set; } = string.Empty;
+    public string AzureDeploymentName { get; set; } = string.Empty;
+    public string AzureApiVersion { get; set; } = "2024-02-01";
+    public bool HasAzureApiKey { get; set; }
+
+    // Anthropic
+    public string AnthropicEndpoint { get; set; } = "https://api.anthropic.com";
+    public string AnthropicModel { get; set; } = "claude-3-5-sonnet-20241022";
+    public bool HasAnthropicApiKey { get; set; }
+
+    public int TimeoutSeconds { get; set; } = 60;
+}

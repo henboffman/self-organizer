@@ -378,6 +378,25 @@ a:focus {
     background-color: var(--bg-overlay);
 }
 
+/* Custom modal size for near-fullscreen dialogs */
+.modal-dialog.modal-xxl {
+    max-width: 90vw;
+    width: 90vw;
+    margin: 2vh auto;
+}
+
+.modal-dialog.modal-xxl .modal-content {
+    min-height: 90vh;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-dialog.modal-xxl .modal-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
 /* ----------------------------------------
    Progress Bars
    ---------------------------------------- */

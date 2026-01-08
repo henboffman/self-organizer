@@ -199,6 +199,7 @@
             <div class="card-body">
                 <p class="text-muted small mb-3">
                     Configure your AI provider for goal improvement, task generation, and other AI-powered features.
+                    <strong>API keys are configured in <code>appsettings.Local.json</code></strong> for security.
                 </p>
 
                 <div class="mb-3">
@@ -230,15 +231,20 @@
                             <div class="row mb-3">
                                 <div class="col-md-8">
                                     <label class="form-label">Endpoint URL</label>
-                                    <input type="text" class="form-control" @bind="_ollamaEndpoint" placeholder="http://localhost:11434" />
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                        @(_configSettings?.OllamaEndpoint ?? "http://localhost:11434")
+                                    </div>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Model</label>
-                                    <input type="text" class="form-control" @bind="_ollamaModel" placeholder="llama3.2" />
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                        @(_configSettings?.OllamaModel ?? "llama3.2")
+                                    </div>
                                 </div>
                             </div>
                             <small class="text-muted">
                                 <a href="https://ollama.ai" target="_blank">Ollama</a> runs locally and doesn't require an API key.
+                                Configure in <code>appsettings.Local.json</code>.
                             </small>
                         </div>
                     }
@@ -249,27 +255,37 @@
                         <div class="provider-settings border rounded p-3 bg-light">
                             <h6 class="mb-3">OpenAI Settings</h6>
                             <div class="mb-3">
-                                <label class="form-label">API Key</label>
-                                <input type="password" class="form-control" @bind="_openAIApiKey" placeholder="sk-..." />
+                                <label class="form-label">API Key Status</label>
+                                <div class="d-flex align-items-center">
+                                    @if (_configSettings?.HasOpenAIApiKey == true)
+                                    {
+                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
+                                        <span class="text-muted small">API key loaded from appsettings</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
+                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
+                                    }
+                                </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Model</label>
-                                    <select class="form-select" @bind="_openAIModel">
-                                        <option value="gpt-4o">GPT-4o</option>
-                                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                        <option value="gpt-4">GPT-4</option>
-                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                    </select>
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                        @(_configSettings?.OpenAIModel ?? "gpt-4o")
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Endpoint (optional)</label>
-                                    <input type="text" class="form-control" @bind="_openAIEndpoint" placeholder="https://api.openai.com/v1" />
+                                    <label class="form-label">Endpoint</label>
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.OpenAIEndpoint)">
+                                        @(_configSettings?.OpenAIEndpoint ?? "https://api.openai.com/v1")
+                                    </div>
                                 </div>
                             </div>
                             <small class="text-muted">
-                                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
+                                and add it to <code>appsettings.Local.json</code>.
                             </small>
                         </div>
                     }
@@ -279,63 +295,44 @@
                     {
                         <div class="provider-settings border rounded p-3 bg-light">
                             <h6 class="mb-3">Azure OpenAI Settings</h6>
+                            <div class="mb-3">
+                                <label class="form-label">API Key Status</label>
+                                <div class="d-flex align-items-center">
+                                    @if (_configSettings?.HasAzureApiKey == true)
+                                    {
+                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
+                                        <span class="text-muted small">API key loaded from appsettings</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
+                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
+                                    }
+                                </div>
+                            </div>
                             <div class="row mb-3">
                                 <div class="col-md-8">
-                                    <label class="form-label">Azure OpenAI Endpoint</label>
-                                    <input type="text" class="form-control" @bind="_azureEndpoint" placeholder="https://your-resource.openai.azure.com" />
+                                    <label class="form-label">Endpoint</label>
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.AzureEndpoint)">
+                                        @(string.IsNullOrEmpty(_configSettings?.AzureEndpoint) ? "(not configured)" : _configSettings.AzureEndpoint)
+                                    </div>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">API Version</label>
-                                    <input type="text" class="form-control" @bind="_azureApiVersion" placeholder="2024-02-01" />
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                        @(_configSettings?.AzureApiVersion ?? "2024-02-01")
+                                    </div>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Deployment Name</label>
-                                <input type="text" class="form-control" @bind="_azureDeploymentName" placeholder="gpt-4" />
-                            </div>
-
-                            <div class="mb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="useAzureADAuth" @bind="_useAzureADAuth" />
-                                    <label class="form-check-label" for="useAzureADAuth">
-                                        Use Azure AD Authentication (instead of API Key)
-                                    </label>
+                                <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                    @(string.IsNullOrEmpty(_configSettings?.AzureDeploymentName) ? "(not configured)" : _configSettings.AzureDeploymentName)
                                 </div>
                             </div>
-
-                            @if (!_useAzureADAuth)
-                            {
-                                <div class="mb-3">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" @bind="_azureApiKey" />
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="alert alert-warning py-2">
-                                    <small>Azure AD authentication fields are collected but not yet functional in browser context.</small>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Tenant ID</label>
-                                        <input type="text" class="form-control" @bind="_azureTenantId" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Client ID</label>
-                                        <input type="text" class="form-control" @bind="_azureClientId" />
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Client Secret</label>
-                                        <input type="password" class="form-control" @bind="_azureClientSecret" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Scope</label>
-                                        <input type="text" class="form-control" @bind="_azureScope" placeholder="https://cognitiveservices.azure.com/.default" />
-                                    </div>
-                                </div>
-                            }
+                            <small class="text-muted">
+                                Configure your Azure OpenAI endpoint, deployment name, and API key in <code>appsettings.Local.json</code>.
+                            </small>
                         </div>
                     }
 
@@ -345,34 +342,55 @@
                         <div class="provider-settings border rounded p-3 bg-light">
                             <h6 class="mb-3">Anthropic Claude Settings</h6>
                             <div class="mb-3">
-                                <label class="form-label">API Key</label>
-                                <input type="password" class="form-control" @bind="_anthropicApiKey" placeholder="sk-ant-..." />
+                                <label class="form-label">API Key Status</label>
+                                <div class="d-flex align-items-center">
+                                    @if (_configSettings?.HasAnthropicApiKey == true)
+                                    {
+                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
+                                        <span class="text-muted small">API key loaded from appsettings</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
+                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
+                                    }
+                                </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Model</label>
-                                    <select class="form-select" @bind="_anthropicModel">
-                                        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                                        <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                                        <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                                        <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-                                        <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                                    </select>
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
+                                        @(_configSettings?.AnthropicModel ?? "claude-3-5-sonnet-20241022")
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Endpoint (optional)</label>
-                                    <input type="text" class="form-control" @bind="_anthropicEndpoint" placeholder="https://api.anthropic.com" />
+                                    <label class="form-label">Endpoint</label>
+                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.AnthropicEndpoint)">
+                                        @(_configSettings?.AnthropicEndpoint ?? "https://api.anthropic.com")
+                                    </div>
                                 </div>
                             </div>
                             <small class="text-muted">
-                                Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic Console</a>.
+                                Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic Console</a>
+                                and add it to <code>appsettings.Local.json</code>.
                             </small>
                         </div>
                     }
 
                     <div class="mt-3">
-                        <label class="form-label">Request Timeout (seconds)</label>
-                        <input type="number" class="form-control" style="max-width: 150px;" @bind="_llmTimeoutSeconds" min="10" max="300" />
+                        <label class="form-label">Request Timeout</label>
+                        <div class="form-control-plaintext bg-white border rounded px-3 py-2" style="max-width: 150px;">
+                            @(_configSettings?.TimeoutSeconds ?? 60) seconds
+                        </div>
+                    </div>
+
+                    @* Configuration Help *@
+                    <div class="alert alert-info mt-3 py-2">
+                        <small>
+                            <strong>To configure API keys:</strong> Copy <code>wwwroot/appsettings.Local.json.template</code>
+                            to <code>wwwroot/appsettings.Local.json</code> and fill in your credentials.
+                            This file is git-ignored and won't be committed.
+                        </small>
                     </div>
 
                     @* Connection Status *@
@@ -562,34 +580,9 @@
     // LLM Settings
     private bool _llmEnabled = true;
     private LlmProvider _llmProvider = LlmProvider.Ollama;
-    private int _llmTimeoutSeconds = 60;
     private LlmConnectionStatus? _llmConnectionStatus;
+    private LlmSettingsFromConfig? _configSettings;
     private bool _isTestingLlm;
-
-    // Ollama
-    private string _ollamaEndpoint = "http://localhost:11434";
-    private string _ollamaModel = "llama3.2";
-
-    // OpenAI
-    private string _openAIApiKey = string.Empty;
-    private string _openAIModel = "gpt-4o";
-    private string _openAIEndpoint = "https://api.openai.com/v1";
-
-    // Azure OpenAI
-    private string _azureEndpoint = string.Empty;
-    private string _azureDeploymentName = string.Empty;
-    private string _azureApiVersion = "2024-02-01";
-    private string _azureApiKey = string.Empty;
-    private bool _useAzureADAuth = false;
-    private string _azureTenantId = string.Empty;
-    private string _azureClientId = string.Empty;
-    private string _azureClientSecret = string.Empty;
-    private string _azureScope = "https://cognitiveservices.azure.com/.default";
-
-    // Anthropic
-    private string _anthropicApiKey = string.Empty;
-    private string _anthropicModel = "claude-3-5-sonnet-20241022";
-    private string _anthropicEndpoint = "https://api.anthropic.com";
 
     protected override async Task OnInitializedAsync()
     {
@@ -624,35 +617,13 @@
 
     private async Task LoadLlmSettings()
     {
+        // Load user preferences (provider selection, enabled state)
         var llmSettings = await LlmService.GetSettingsAsync();
         _llmEnabled = llmSettings.IsEnabled;
         _llmProvider = llmSettings.Provider;
-        _llmTimeoutSeconds = llmSettings.TimeoutSeconds;
 
-        // Ollama
-        _ollamaEndpoint = llmSettings.OllamaEndpoint;
-        _ollamaModel = llmSettings.OllamaModel;
-
-        // OpenAI
-        _openAIApiKey = llmSettings.OpenAIApiKey;
-        _openAIModel = llmSettings.OpenAIModel;
-        _openAIEndpoint = llmSettings.OpenAIEndpoint;
-
-        // Azure OpenAI
-        _azureEndpoint = llmSettings.AzureEndpoint;
-        _azureDeploymentName = llmSettings.AzureDeploymentName;
-        _azureApiVersion = llmSettings.AzureApiVersion;
-        _azureApiKey = llmSettings.AzureApiKey;
-        _useAzureADAuth = llmSettings.UseAzureADAuth;
-        _azureTenantId = llmSettings.AzureTenantId;
-        _azureClientId = llmSettings.AzureClientId;
-        _azureClientSecret = llmSettings.AzureClientSecret;
-        _azureScope = llmSettings.AzureScope;
-
-        // Anthropic
-        _anthropicApiKey = llmSettings.AnthropicApiKey;
-        _anthropicModel = llmSettings.AnthropicModel;
-        _anthropicEndpoint = llmSettings.AnthropicEndpoint;
+        // Load config settings (API keys, endpoints from appsettings.json)
+        _configSettings = LlmService.GetConfigSettings();
     }
 
     private async Task LoadContexts()
@@ -816,36 +787,12 @@
 
     private async Task SaveLlmSettings()
     {
+        // Only save user preferences (provider selection, enabled state)
+        // API keys and other settings come from appsettings.json
         var llmSettings = new LlmSettings
         {
             IsEnabled = _llmEnabled,
-            Provider = _llmProvider,
-            TimeoutSeconds = _llmTimeoutSeconds,
-
-            // Ollama
-            OllamaEndpoint = _ollamaEndpoint,
-            OllamaModel = _ollamaModel,
-
-            // OpenAI
-            OpenAIApiKey = _openAIApiKey,
-            OpenAIModel = _openAIModel,
-            OpenAIEndpoint = _openAIEndpoint,
-
-            // Azure OpenAI
-            AzureEndpoint = _azureEndpoint,
-            AzureDeploymentName = _azureDeploymentName,
-            AzureApiVersion = _azureApiVersion,
-            AzureApiKey = _azureApiKey,
-            UseAzureADAuth = _useAzureADAuth,
-            AzureTenantId = _azureTenantId,
-            AzureClientId = _azureClientId,
-            AzureClientSecret = _azureClientSecret,
-            AzureScope = _azureScope,
-
-            // Anthropic
-            AnthropicApiKey = _anthropicApiKey,
-            AnthropicModel = _anthropicModel,
-            AnthropicEndpoint = _anthropicEndpoint
+            Provider = _llmProvider
         };
 
         await LlmService.SaveSettingsAsync(llmSettings);

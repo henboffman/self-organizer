@@ -11,4 +11,10 @@ public interface ILlmService
     Task<LlmSettings> GetSettingsAsync();
     Task SaveSettingsAsync(LlmSettings settings);
     Task<List<string>> GetAvailableModelsAsync();
+
+    /// <summary>
+    /// Gets LLM settings directly from configuration (appsettings.json).
+    /// Used by Settings UI to show what's configured without exposing actual API keys.
+    /// </summary>
+    LlmSettingsFromConfig GetConfigSettings();
 }
