@@ -23,6 +23,7 @@
       "_comment": "Use EITHER ApiKey OR Azure AD auth (TenantId/ClientId/ClientSecret)",
 
       "ApiKey": "your-azure-openai-api-key-here",
+      "ApimSubscriptionKey": "your-apim-subscription-key-if-using-api-management",
 
       "UseAzureAD": false,
       "TenantId": "your-tenant-id",

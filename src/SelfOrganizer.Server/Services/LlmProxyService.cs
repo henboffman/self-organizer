@@ -85,6 +85,7 @@ public class LlmProxyService : ILlmProxyService
             AzureDeploymentName = section.GetValue<string>("AzureOpenAI:DeploymentName") ?? "",
             AzureApiVersion = section.GetValue<string>("AzureOpenAI:ApiVersion") ?? "2024-02-01",
             HasAzureApiKey = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ApiKey")),
+            HasApimSubscriptionKey = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ApimSubscriptionKey")),
             UseAzureAD = section.GetValue<bool>("AzureOpenAI:UseAzureAD"),
             HasAzureADConfig = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:TenantId")) &&
                                !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ClientId")) &&
@@ -166,6 +167,10 @@ public class LlmProxyService : ILlmProxyService
         var apiVersion = section.GetValue<string>("ApiVersion") ?? "2024-02-01";
         var useAzureAD = section.GetValue<bool>("UseAzureAD");
         var apiKey = section.GetValue<string>("ApiKey");
+        var apimSubscriptionKey = section.GetValue<string>("ApimSubscriptionKey");
+
+        _logger.LogInformation("Azure OpenAI config - Endpoint: {Endpoint}, Deployment: {Deployment}, ApiVersion: {ApiVersion}, UseAzureAD: {UseAzureAD}",
+            endpoint, deploymentName, apiVersion, useAzureAD);
 
         if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(deploymentName))
             return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI endpoint or deployment not configured" };
@@ -180,6 +185,9 @@ public class LlmProxyService : ILlmProxyService
             var clientId = section.GetValue<string>("ClientId");
             var clientSecret = section.GetValue<string>("ClientSecret");
 
+            _logger.LogInformation("Azure AD auth - TenantId: {TenantId}, ClientId: {ClientId}, HasSecret: {HasSecret}",
+                tenantId, clientId, !string.IsNullOrWhiteSpace(clientSecret));
+
             if (string.IsNullOrWhiteSpace(tenantId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
                 return new LlmProxyResponse { Success = false, ErrorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured" };
 
@@ -189,6 +197,7 @@ public class LlmProxyService : ILlmProxyService
                 var tokenResult = await credential.GetTokenAsync(new Azure.Core.TokenRequestContext(new[] { "https://cognitiveservices.azure.com/.default" }));
                 authHeaderValue = tokenResult.Token;
                 useApiKeyAuth = false;
+                _logger.LogInformation("Azure AD token acquired successfully, expires: {ExpiresOn}", tokenResult.ExpiresOn);
             }
             catch (Exception ex)
             {
@@ -203,6 +212,10 @@ public class LlmProxyService : ILlmProxyService
 
             authHeaderValue = apiKey;
             useApiKeyAuth = true;
+            // Log partial key for debugging (first 4 chars only)
+            var keyPreview = apiKey.Length > 4 ? apiKey.Substring(0, 4) + "..." : "****";
+            _logger.LogInformation("Using API key authentication, key length: {KeyLength}, starts with: {KeyPreview}",
+                apiKey.Length, keyPreview);
         }
 
         var messages = new List<OpenAIChatMessage>();
@@ -218,6 +231,7 @@ public class LlmProxyService : ILlmProxyService
         };
 
         var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
+        _logger.LogInformation("Azure OpenAI request URL: {Url}", url);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         if (useApiKeyAuth)
@@ -228,10 +242,34 @@ public class LlmProxyService : ILlmProxyService
         {
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authHeaderValue);
         }
-        httpRequest.Content = new StringContent(JsonSerializer.Serialize(openAiRequest, CamelCaseOptions), Encoding.UTF8, "application/json");
+
+        // Add APIM subscription key if configured (for Azure API Management gateways)
+        if (!string.IsNullOrWhiteSpace(apimSubscriptionKey))
+        {
+            httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", apimSubscriptionKey);
+            _logger.LogInformation("Added APIM subscription key header");
+        }
+
+        // Add User-Agent to match axios behavior (some gateways require this)
+        httpRequest.Headers.Add("User-Agent", "SelfOrganizer/1.0");
+
+        // Use StringContent without charset suffix to match axios Content-Type exactly
+        var jsonContent = JsonSerializer.Serialize(openAiRequest, SnakeCaseOptions);
+        httpRequest.Content = new StringContent(jsonContent, Encoding.UTF8);
+        httpRequest.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
         var response = await _httpClient.SendAsync(httpRequest);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Azure OpenAI request failed with status {StatusCode}: {ErrorContent}", response.StatusCode, errorContent);
+            return new LlmProxyResponse
+            {
+                Success = false,
+                ErrorMessage = $"Azure OpenAI returned {(int)response.StatusCode} {response.StatusCode}: {errorContent}"
+            };
+        }
 
         var result = await response.Content.ReadFromJsonAsync<OpenAIChatResponse>(CamelCaseOptions);
         return new LlmProxyResponse { Success = true, Response = result?.Choices.FirstOrDefault()?.Message.Content ?? "" };
