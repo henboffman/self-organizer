@@ -1,26 +1,594 @@
 @page "/reports"
+@using SelfOrganizer.Core.Interfaces
+@inject IReportService ReportService
 
 <h3 class="mb-4">
     <span class="oi oi-graph me-2"></span>Reports & Statistics
 </h3>
 
-<div class="alert alert-info">
-    Reports and productivity statistics will be available in a future update.
-</div>
-
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">Coming Soon</div>
-            <div class="card-body">
-                <ul class="list-unstyled">
-                    <li class="mb-2"><span class="oi oi-check me-2 text-muted"></span>Tasks completed per week</li>
-                    <li class="mb-2"><span class="oi oi-check me-2 text-muted"></span>Time in meetings vs deep work</li>
-                    <li class="mb-2"><span class="oi oi-check me-2 text-muted"></span>Category time breakdown</li>
-                    <li class="mb-2"><span class="oi oi-check me-2 text-muted"></span>Productivity trends</li>
-                    <li class="mb-2"><span class="oi oi-check me-2 text-muted"></span>Inbox zero streak</li>
-                </ul>
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_loadError != null)
+{
+    <div class="alert alert-danger">
+        <strong>Error loading reports:</strong> @_loadError
+    </div>
+}
+else
+{
+    <!-- Summary Cards Row -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100 border-primary">
+                <div class="card-body text-center">
+                    <div class="display-4 text-primary fw-bold">@_summary?.TasksCompletedThisWeek</div>
+                    <div class="text-muted">Tasks This Week</div>
+                    @if (_summary != null)
+                    {
+                        var diff = _summary.TasksCompletedThisWeek - _summary.TasksCompletedLastWeek;
+                        <small class="@(diff >= 0 ? "text-success" : "text-danger")">
+                            <span class="oi @(diff >= 0 ? "oi-arrow-top" : "oi-arrow-bottom") me-1"></span>
+                            @Math.Abs(diff) vs last week
+                        </small>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100 border-success">
+                <div class="card-body text-center">
+                    <div class="display-4 text-success fw-bold">@_summary?.InboxZeroStreak</div>
+                    <div class="text-muted">Inbox Zero Streak</div>
+                    <small class="text-muted">
+                        Best: @_summary?.LongestInboxZeroStreak days
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100 border-info">
+                <div class="card-body text-center">
+                    <div class="display-4 text-info fw-bold">@FormatHours(_summary?.TotalDeepWorkMinutes ?? 0)</div>
+                    <div class="text-muted">Deep Work (30 days)</div>
+                    <small class="text-muted">
+                        @FormatMinutesPerDay(_summary?.TotalDeepWorkMinutes ?? 0, 30) avg/day
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card h-100 border-warning">
+                <div class="card-body text-center">
+                    <div class="display-4 text-warning fw-bold">@(_summary?.AverageTasksPerDay.ToString("F1"))</div>
+                    <div class="text-muted">Avg Tasks/Day</div>
+                    <small class="text-muted">
+                        @_summary?.TotalTasksCompleted total completed
+                    </small>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <div class="row">
+        <!-- Tasks Completed Per Week -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span class="oi oi-bar-chart me-2"></span>Tasks Completed Per Week
+                </div>
+                <div class="card-body">
+                    @if (_tasksPerWeek != null && _tasksPerWeek.Any())
+                    {
+                        <div class="chart-container">
+                            @{
+                                var maxTasks = _tasksPerWeek.Values.DefaultIfEmpty(1).Max();
+                                maxTasks = maxTasks == 0 ? 1 : maxTasks;
+                            }
+                            <div class="bar-chart">
+                                @foreach (var week in _tasksPerWeek)
+                                {
+                                    var heightPercent = (week.Value * 100) / maxTasks;
+                                    <div class="bar-column">
+                                        <div class="bar-value">@week.Value</div>
+                                        <div class="bar" style="height: @heightPercent%"></div>
+                                        <div class="bar-label">@week.Key.ToString("MM/dd")</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <span class="oi oi-info me-2"></span>No completed tasks yet
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Meeting vs Deep Work -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span class="oi oi-clock me-2"></span>Meeting Time vs Deep Work (30 days)
+                </div>
+                <div class="card-body">
+                    @{
+                        var totalTime = _meetingMinutes + _deepWorkMinutes;
+                        var meetingPercent = totalTime > 0 ? (_meetingMinutes * 100) / totalTime : 50;
+                        var deepWorkPercent = totalTime > 0 ? (_deepWorkMinutes * 100) / totalTime : 50;
+                    }
+                    @if (totalTime > 0)
+                    {
+                        <div class="time-comparison mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span><span class="badge bg-warning me-1">&nbsp;</span> Meetings</span>
+                                <span>@FormatHours(_meetingMinutes) (@meetingPercent%)</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar bg-warning" role="progressbar" style="width: @meetingPercent%"></div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-2">
+                                <span><span class="badge bg-info me-1">&nbsp;</span> Deep Work</span>
+                                <span>@FormatHours(_deepWorkMinutes) (@deepWorkPercent%)</span>
+                            </div>
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: @deepWorkPercent%"></div>
+                            </div>
+                        </div>
+
+                        <div class="ratio-indicator text-center mt-3 pt-3 border-top">
+                            <span class="text-muted">Meeting to Deep Work Ratio: </span>
+                            <strong class="@(_summary?.MeetingToDeepWorkRatio <= 1 ? "text-success" : "text-warning")">
+                                @(_summary?.MeetingToDeepWorkRatio.ToString("F2")):1
+                            </strong>
+                            @if (_summary?.MeetingToDeepWorkRatio <= 0.5)
+                            {
+                                <div class="text-success small"><span class="oi oi-check me-1"></span>Excellent deep work focus!</div>
+                            }
+                            else if (_summary?.MeetingToDeepWorkRatio <= 1)
+                            {
+                                <div class="text-success small"><span class="oi oi-check me-1"></span>Good balance</div>
+                            }
+                            else
+                            {
+                                <div class="text-warning small"><span class="oi oi-warning me-1"></span>Consider reducing meeting time</div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <span class="oi oi-info me-2"></span>No time tracking data yet
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Time Breakdown -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span class="oi oi-pie-chart me-2"></span>Time by Category (30 days)
+                </div>
+                <div class="card-body">
+                    @if (_categoryBreakdown != null && _categoryBreakdown.Any())
+                    {
+                        <div class="category-list">
+                            @{
+                                var totalCategoryMinutes = _categoryBreakdown.Values.Sum();
+                                var colors = new[] { "#0d6efd", "#198754", "#ffc107", "#dc3545", "#0dcaf0", "#6f42c1", "#fd7e14", "#20c997" };
+                                var colorIndex = 0;
+                            }
+                            @foreach (var category in _categoryBreakdown.Take(8))
+                            {
+                                var percent = totalCategoryMinutes > 0 ? (category.Value * 100) / totalCategoryMinutes : 0;
+                                var color = colors[colorIndex % colors.Length];
+                                <div class="category-item mb-2">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>
+                                            <span class="category-dot" style="background-color: @color;"></span>
+                                            @category.Key
+                                        </span>
+                                        <span class="text-muted">@FormatHours(category.Value) (@percent%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar" role="progressbar" style="width: @percent%; background-color: @color;"></div>
+                                    </div>
+                                </div>
+                                colorIndex++;
+                            }
+                        </div>
+                        @if (_categoryBreakdown.Count > 8)
+                        {
+                            <div class="text-muted small mt-2">
+                                + @(_categoryBreakdown.Count - 8) more categories
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <span class="oi oi-info me-2"></span>No category data yet
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Productivity Trends -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <span class="oi oi-graph me-2"></span>Productivity Trends (14 days)
+                </div>
+                <div class="card-body">
+                    @if (_productivityTrends != null && _productivityTrends.Any())
+                    {
+                        <div class="trends-chart">
+                            @{
+                                var recentTrends = _productivityTrends.TakeLast(14).ToList();
+                                var maxTrend = recentTrends.Select(t => t.TasksCompleted).DefaultIfEmpty(1).Max();
+                                maxTrend = maxTrend == 0 ? 1 : maxTrend;
+                            }
+                            <div class="line-chart">
+                                <div class="line-chart-grid">
+                                    @foreach (var trend in recentTrends)
+                                    {
+                                        var heightPercent = (trend.TasksCompleted * 100) / maxTrend;
+                                        <div class="line-point-container">
+                                            <div class="line-point @(trend.InboxCleared ? "inbox-cleared" : "")"
+                                                 style="bottom: @heightPercent%;"
+                                                 title="@trend.Date.ToString("MM/dd"): @trend.TasksCompleted tasks @(trend.InboxCleared ? "(Inbox Zero!)" : "")">
+                                            </div>
+                                            <div class="line-label">@trend.Date.ToString("dd")</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="legend mt-3 small text-muted">
+                                <span class="me-3"><span class="legend-dot"></span> Tasks completed</span>
+                                <span><span class="legend-dot inbox-cleared"></span> Inbox Zero day</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <span class="oi oi-info me-2"></span>No productivity data yet
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Inbox Zero Streak -->
+        <div class="col-lg-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <span class="oi oi-inbox me-2"></span>Inbox Zero Streak Tracker
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 text-center">
+                            <div class="streak-display">
+                                <div class="streak-number display-1 fw-bold @(_summary?.InboxZeroStreak > 0 ? "text-success" : "text-muted")">
+                                    @_summary?.InboxZeroStreak
+                                </div>
+                                <div class="streak-label text-muted">Current Streak (days)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            @if (_productivityTrends != null)
+                            {
+                                <div class="streak-calendar">
+                                    <div class="d-flex flex-wrap justify-content-start">
+                                        @foreach (var day in _productivityTrends.TakeLast(30).Reverse())
+                                        {
+                                            <div class="streak-day @(day.InboxCleared ? "cleared" : "not-cleared")"
+                                                 title="@day.Date.ToString("MM/dd"): @(day.InboxCleared ? "Inbox Zero" : "Items remaining")">
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="small text-muted mt-2">
+                                        Last 30 days - <span class="text-success">Green</span> = Inbox cleared
+                                    </div>
+                                </div>
+                            }
+                            <div class="mt-3">
+                                @if (_summary?.InboxZeroStreak >= 7)
+                                {
+                                    <div class="alert alert-success mb-0">
+                                        <span class="oi oi-star me-2"></span>
+                                        Amazing! You've maintained Inbox Zero for @_summary.InboxZeroStreak days straight!
+                                    </div>
+                                }
+                                else if (_summary?.InboxZeroStreak >= 3)
+                                {
+                                    <div class="alert alert-info mb-0">
+                                        <span class="oi oi-thumb-up me-2"></span>
+                                        Great job! Keep up the @_summary.InboxZeroStreak day streak!
+                                    </div>
+                                }
+                                else if (_summary?.InboxZeroStreak >= 1)
+                                {
+                                    <div class="alert alert-primary mb-0">
+                                        <span class="oi oi-check me-2"></span>
+                                        Good start! You cleared your inbox today.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-secondary mb-0">
+                                        <span class="oi oi-target me-2"></span>
+                                        Clear your inbox to start building your streak!
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* Bar Chart Styles */
+    .chart-container {
+        height: 200px;
+        padding: 10px 0;
+    }
+
+    .bar-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        height: 100%;
+        padding-bottom: 30px;
+        position: relative;
+    }
+
+    .bar-column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        max-width: 60px;
+        height: 100%;
+        position: relative;
+    }
+
+    .bar {
+        width: 70%;
+        background: linear-gradient(180deg, #0d6efd 0%, #0a58ca 100%);
+        border-radius: 4px 4px 0 0;
+        min-height: 4px;
+        transition: height 0.3s ease;
+    }
+
+    .bar-value {
+        font-size: 0.75rem;
+        font-weight: bold;
+        color: var(--bs-primary);
+        margin-bottom: 4px;
+    }
+
+    .bar-label {
+        position: absolute;
+        bottom: -25px;
+        font-size: 0.7rem;
+        color: var(--bs-gray-600);
+        white-space: nowrap;
+    }
+
+    /* Category Styles */
+    .category-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+
+    /* Line Chart Styles */
+    .line-chart {
+        height: 150px;
+        position: relative;
+    }
+
+    .line-chart-grid {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 100%;
+        padding-bottom: 25px;
+        border-bottom: 1px solid var(--bs-gray-300);
+    }
+
+    .line-point-container {
+        flex: 1;
+        height: 100%;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .line-point {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #0d6efd;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 0 0 1px #0d6efd;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .line-point:hover {
+        transform: scale(1.3);
+    }
+
+    .line-point.inbox-cleared {
+        background-color: #198754;
+        box-shadow: 0 0 0 1px #198754;
+    }
+
+    .line-label {
+        position: absolute;
+        bottom: -20px;
+        font-size: 0.65rem;
+        color: var(--bs-gray-600);
+    }
+
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background-color: #0d6efd;
+        border-radius: 50%;
+        margin-right: 4px;
+    }
+
+    .legend-dot.inbox-cleared {
+        background-color: #198754;
+    }
+
+    /* Streak Calendar Styles */
+    .streak-calendar {
+        padding: 10px;
+    }
+
+    .streak-day {
+        width: 20px;
+        height: 20px;
+        margin: 2px;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .streak-day:hover {
+        transform: scale(1.2);
+    }
+
+    .streak-day.cleared {
+        background-color: #198754;
+    }
+
+    .streak-day.not-cleared {
+        background-color: var(--bs-gray-300);
+    }
+
+    .streak-number {
+        line-height: 1;
+    }
+
+    /* Card enhancements */
+    .card {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: box-shadow 0.2s;
+    }
+
+    .card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Dark theme support */
+    [data-theme="dark"] .bar-label,
+    [data-theme="dark"] .line-label {
+        color: var(--bs-gray-400);
+    }
+
+    [data-theme="dark"] .streak-day.not-cleared {
+        background-color: var(--bs-gray-600);
+    }
+
+    [data-theme="dark"] .line-chart-grid {
+        border-bottom-color: var(--bs-gray-600);
+    }
+</style>
+
+@code {
+    private bool _isLoading = true;
+    private string? _loadError;
+
+    private ProductivitySummary? _summary;
+    private Dictionary<DateOnly, int>? _tasksPerWeek;
+    private int _meetingMinutes;
+    private int _deepWorkMinutes;
+    private Dictionary<string, int>? _categoryBreakdown;
+    private List<DailyProductivityMetrics>? _productivityTrends;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReportsAsync();
+    }
+
+    private async Task LoadReportsAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            _loadError = null;
+
+            // Load all report data in parallel
+            var summaryTask = ReportService.GetProductivitySummaryAsync();
+            var tasksPerWeekTask = ReportService.GetTasksCompletedPerWeekAsync(8);
+            var meetingVsDeepWorkTask = ReportService.GetMeetingVsDeepWorkTimeAsync(30);
+            var categoryBreakdownTask = ReportService.GetCategoryTimeBreakdownAsync(30);
+            var trendsTask = ReportService.GetProductivityTrendsAsync(30);
+
+            await Task.WhenAll(summaryTask, tasksPerWeekTask, meetingVsDeepWorkTask, categoryBreakdownTask, trendsTask);
+
+            _summary = await summaryTask;
+            _tasksPerWeek = await tasksPerWeekTask;
+            (_meetingMinutes, _deepWorkMinutes) = await meetingVsDeepWorkTask;
+            _categoryBreakdown = await categoryBreakdownTask;
+            _productivityTrends = (await trendsTask).ToList();
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string FormatHours(int minutes)
+    {
+        if (minutes < 60)
+        {
+            return $"{minutes}m";
+        }
+
+        var hours = minutes / 60;
+        var remainingMinutes = minutes % 60;
+
+        if (remainingMinutes == 0)
+        {
+            return $"{hours}h";
+        }
+
+        return $"{hours}h {remainingMinutes}m";
+    }
+
+    private string FormatMinutesPerDay(int totalMinutes, int days)
+    {
+        var perDay = totalMinutes / Math.Max(1, days);
+        return FormatHours(perDay);
+    }
+}

@@ -389,4 +389,89 @@ public class TaskService : ITaskService
         }
         return nextDay;
     }
+
+    // Batch operations
+    public async Task BatchDeleteAsync(IEnumerable<Guid> taskIds)
+    {
+        foreach (var id in taskIds)
+        {
+            var task = await _repository.GetByIdAsync(id);
+            if (task != null)
+            {
+                task.Status = TodoTaskStatus.Deleted;
+                await _repository.UpdateAsync(task);
+            }
+        }
+    }
+
+    public async Task BatchCompleteAsync(IEnumerable<Guid> taskIds)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var id in taskIds)
+        {
+            var task = await _repository.GetByIdAsync(id);
+            if (task != null)
+            {
+                // Handle recurring tasks
+                if (task.IsRecurring)
+                {
+                    await CompleteRecurringTaskAsync(id);
+                }
+                else
+                {
+                    task.Status = TodoTaskStatus.Completed;
+                    task.CompletedAt = now;
+                    await _repository.UpdateAsync(task);
+                }
+            }
+        }
+    }
+
+    public async Task BatchChangeStatusAsync(IEnumerable<Guid> taskIds, TodoTaskStatus newStatus)
+    {
+        foreach (var id in taskIds)
+        {
+            var task = await _repository.GetByIdAsync(id);
+            if (task != null)
+            {
+                task.Status = newStatus;
+
+                // Clear scheduling info when moving away from scheduled status
+                if (newStatus != TodoTaskStatus.Scheduled)
+                {
+                    task.ScheduledDate = null;
+                    task.ScheduledStartTime = null;
+                }
+
+                // Clear waiting info when moving away from waiting status
+                if (newStatus != TodoTaskStatus.WaitingFor)
+                {
+                    task.WaitingForNote = null;
+                    task.WaitingForSince = null;
+                    task.WaitingForContactId = null;
+                }
+
+                // Set completion time if marking as completed
+                if (newStatus == TodoTaskStatus.Completed && !task.CompletedAt.HasValue)
+                {
+                    task.CompletedAt = DateTime.UtcNow;
+                }
+
+                await _repository.UpdateAsync(task);
+            }
+        }
+    }
+
+    public async Task BatchChangePriorityAsync(IEnumerable<Guid> taskIds, int priority)
+    {
+        foreach (var id in taskIds)
+        {
+            var task = await _repository.GetByIdAsync(id);
+            if (task != null)
+            {
+                task.Priority = priority;
+                await _repository.UpdateAsync(task);
+            }
+        }
+    }
 }

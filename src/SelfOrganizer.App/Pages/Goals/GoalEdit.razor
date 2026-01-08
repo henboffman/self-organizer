@@ -1,0 +1,353 @@
+@page "/goals/new"
+@page "/goals/{GoalId:guid}/edit"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject IGoalService GoalService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+
+<div class="goal-edit-page">
+    <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary" @onclick="GoBack" title="Back to Goals">
+                <span class="oi oi-arrow-left"></span>
+            </button>
+            <h3 class="mb-0">
+                <span class="oi oi-target me-2"></span>
+                @(IsEditMode ? "Edit Goal" : "New Goal")
+            </h3>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="GoBack">Cancel</button>
+            <button class="btn btn-primary" @onclick="SaveGoal" disabled="@(!CanSave)">
+                <span class="oi oi-check me-1"></span>
+                @(IsEditMode ? "Save Changes" : "Create Goal")
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-danger">
+            Goal not found. <a href="/goals">Return to Goals</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Title *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" @bind="_goal.Title"
+                                   placeholder="What do you want to achieve?" />
+                            <small class="text-muted">Be specific about what you want to accomplish</small>
+                        </div>
+
+                        @* Description *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" @bind="_goal.Description" rows="3"
+                                      placeholder="Provide more context about this goal..."></textarea>
+                        </div>
+
+                        @* Desired Outcome *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <span class="oi oi-target me-1"></span> Desired Outcome
+                            </label>
+                            <textarea class="form-control" @bind="_goal.DesiredOutcome" rows="4"
+                                      placeholder="What does success look like? Describe the end state vividly..."></textarea>
+                            <small class="text-muted">Visualize your end state clearly - this helps with motivation and clarity</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Success Criteria & Planning</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Success Criteria *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <span class="oi oi-check me-1"></span> Success Criteria
+                            </label>
+                            <textarea class="form-control font-monospace" @bind="_goal.SuccessCriteria" rows="6"
+                                      placeholder="How will you know when you've achieved this goal?&#10;&#10;• Criterion 1&#10;• Criterion 2&#10;• Criterion 3"></textarea>
+                            <small class="text-muted">Define measurable outcomes - use bullet points for multiple criteria</small>
+                        </div>
+
+                        @* Obstacles *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <span class="oi oi-warning me-1"></span> Obstacles
+                            </label>
+                            <textarea class="form-control font-monospace" @bind="_goal.Obstacles" rows="6"
+                                      placeholder="What might get in the way?&#10;&#10;• Obstacle 1&#10;• Obstacle 2&#10;• Obstacle 3"></textarea>
+                            <small class="text-muted">Anticipate challenges to prepare for them</small>
+                        </div>
+
+                        @* Resources *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <span class="oi oi-box me-1"></span> Resources Needed
+                            </label>
+                            <textarea class="form-control font-monospace" @bind="_goal.Resources" rows="6"
+                                      placeholder="What do you need to succeed?&#10;&#10;• Time: ...&#10;• Tools: ...&#10;• Skills: ...&#10;• People: ..."></textarea>
+                            <small class="text-muted">List resources you'll need or already have</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control" @bind="_goal.Notes" rows="6"
+                                  placeholder="Additional thoughts, ideas, research, or context..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Category *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Category</label>
+                            <select class="form-select" @bind="_goal.Category">
+                                @foreach (var cat in Enum.GetValues<GoalCategory>())
+                                {
+                                    <option value="@cat">@cat</option>
+                                }
+                            </select>
+                        </div>
+
+                        @* Timeframe *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Timeframe</label>
+                            <select class="form-select" @bind="_goal.Timeframe">
+                                @foreach (var tf in Enum.GetValues<GoalTimeframe>())
+                                {
+                                    <option value="@tf">@GetTimeframeLabel(tf)</option>
+                                }
+                            </select>
+                        </div>
+
+                        @* Priority *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Priority</label>
+                            <select class="form-select" @bind="_goal.Priority">
+                                <option value="1">High</option>
+                                <option value="2">Normal</option>
+                                <option value="3">Low</option>
+                            </select>
+                        </div>
+
+                        @* Status *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" @bind="_goal.Status">
+                                <option value="@GoalStatus.Active">Active</option>
+                                <option value="@GoalStatus.OnHold">On Hold</option>
+                                <option value="@GoalStatus.Completed">Completed</option>
+                            </select>
+                        </div>
+
+                        @* Target Date *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Target Date</label>
+                            <input type="date" class="form-control" @bind="_goal.TargetDate" />
+                            <small class="text-muted">When do you want to achieve this?</small>
+                        </div>
+
+                        @* Start Date *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Start Date</label>
+                            <input type="date" class="form-control" @bind="_goal.StartDate" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tags</h5>
+                    </div>
+                    <div class="card-body">
+                        <input type="text" class="form-control" @bind="_tagsInput" @bind:event="oninput"
+                               placeholder="#tag1 #tag2 #tag3" />
+                        <small class="text-muted">Use #hashtags separated by spaces</small>
+
+                        @if (_goal.Tags.Any())
+                        {
+                            <div class="mt-2">
+                                @foreach (var tag in _goal.Tags)
+                                {
+                                    <span class="badge bg-primary me-1">#@tag</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (IsEditMode)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Progress</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Progress</span>
+                                <span class="fw-bold">@_goal.ProgressPercent%</span>
+                            </div>
+                            <input type="range" class="form-range" min="0" max="100" step="5" @bind="_goal.ProgressPercent" />
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Bottom action bar for mobile *@
+        <div class="d-lg-none fixed-bottom bg-body border-top p-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary flex-fill" @onclick="GoBack">Cancel</button>
+                <button class="btn btn-primary flex-fill" @onclick="SaveGoal" disabled="@(!CanSave)">
+                    <span class="oi oi-check me-1"></span>
+                    @(IsEditMode ? "Save" : "Create")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? GoalId { get; set; }
+
+    private Goal _goal = new();
+    private string _tagsInput = "";
+    private bool _isLoading = true;
+    private bool _notFound = false;
+
+    private bool IsEditMode => GoalId.HasValue;
+    private bool CanSave => !string.IsNullOrWhiteSpace(_goal.Title) && _goal.Title.Length >= 3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode)
+        {
+            var existingGoal = await GoalService.GetByIdAsync(GoalId!.Value);
+            if (existingGoal == null)
+            {
+                _notFound = true;
+            }
+            else
+            {
+                _goal = new Goal
+                {
+                    Id = existingGoal.Id,
+                    Title = existingGoal.Title,
+                    Description = existingGoal.Description,
+                    DesiredOutcome = existingGoal.DesiredOutcome,
+                    SuccessCriteria = existingGoal.SuccessCriteria,
+                    Obstacles = existingGoal.Obstacles,
+                    Resources = existingGoal.Resources,
+                    Status = existingGoal.Status,
+                    Category = existingGoal.Category,
+                    Timeframe = existingGoal.Timeframe,
+                    TargetDate = existingGoal.TargetDate,
+                    StartDate = existingGoal.StartDate,
+                    Priority = existingGoal.Priority,
+                    ProgressPercent = existingGoal.ProgressPercent,
+                    LinkedProjectIds = new List<Guid>(existingGoal.LinkedProjectIds),
+                    LinkedTaskIds = new List<Guid>(existingGoal.LinkedTaskIds),
+                    Tags = new List<string>(existingGoal.Tags),
+                    AiGeneratedPlan = existingGoal.AiGeneratedPlan,
+                    Notes = existingGoal.Notes,
+                    CreatedAt = existingGoal.CreatedAt,
+                    ModifiedAt = existingGoal.ModifiedAt
+                };
+                _tagsInput = string.Join(" ", _goal.Tags.Select(t => $"#{t}"));
+            }
+        }
+        else
+        {
+            _goal = new Goal
+            {
+                Status = GoalStatus.Active,
+                Category = GoalCategory.Personal,
+                Timeframe = GoalTimeframe.Quarter,
+                Priority = 2
+            };
+        }
+        _isLoading = false;
+    }
+
+    private async Task SaveGoal()
+    {
+        if (!CanSave) return;
+
+        // Parse tags
+        _goal.Tags = ParseTags(_tagsInput);
+        _goal.ModifiedAt = DateTime.UtcNow;
+
+        if (IsEditMode)
+        {
+            await GoalService.UpdateAsync(_goal);
+        }
+        else
+        {
+            _goal.CreatedAt = DateTime.UtcNow;
+            await GoalService.CreateAsync(_goal);
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        NavigationManager.NavigateTo("/goals");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/goals");
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string GetTimeframeLabel(GoalTimeframe timeframe) => timeframe switch
+    {
+        GoalTimeframe.Week => "This Week",
+        GoalTimeframe.Month => "This Month",
+        GoalTimeframe.Quarter => "This Quarter",
+        GoalTimeframe.Year => "This Year",
+        GoalTimeframe.MultiYear => "Multi-Year",
+        _ => timeframe.ToString()
+    };
+}

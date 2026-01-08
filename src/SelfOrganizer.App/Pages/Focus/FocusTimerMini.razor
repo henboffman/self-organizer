@@ -1,0 +1,434 @@
+@page "/focus-timer-mini"
+@layout EmptyLayout
+@using SelfOrganizer.App.Services
+@inject IJSRuntime JS
+@implements IDisposable
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focus Timer</title>
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary, #ffffff);
+            color: var(--text-primary, #1f2937);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .mini-timer {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 12px;
+        }
+
+        .mini-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: move;
+            padding: 4px 0;
+        }
+
+        .task-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted, #6b7280);
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: var(--color-danger, #ef4444);
+        }
+
+        .timer-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer-display {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-bg {
+            fill: none;
+            stroke: var(--border-default, #e5e7eb);
+            stroke-width: 6;
+        }
+
+        .progress-ring-fill {
+            fill: none;
+            stroke: var(--color-primary, #6366f1);
+            stroke-width: 6;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .progress-ring-fill.break {
+            stroke: var(--color-success, #22c55e);
+        }
+
+        .time-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .time-text.break {
+            color: var(--color-success, #22c55e);
+        }
+
+        .status-text {
+            font-size: 0.7rem;
+            color: var(--text-muted, #6b7280);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-text.running {
+            color: var(--color-primary, #6366f1);
+        }
+
+        .status-text.break {
+            color: var(--color-success, #22c55e);
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--border-default, #e5e7eb);
+            background: var(--bg-tertiary, #f9fafb);
+            color: var(--text-primary, #1f2937);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: var(--bg-secondary, #f3f4f6);
+        }
+
+        .control-btn.play {
+            background: var(--color-success, #22c55e);
+            border-color: var(--color-success, #22c55e);
+            color: white;
+        }
+
+        .control-btn.play:hover {
+            background: #16a34a;
+        }
+
+        .control-btn.pause {
+            background: var(--color-warning, #f59e0b);
+            border-color: var(--color-warning, #f59e0b);
+            color: white;
+        }
+
+        .control-btn.pause:hover {
+            background: #d97706;
+        }
+
+        .sessions-count {
+            margin-top: 8px;
+            font-size: 0.65rem;
+            color: var(--text-muted, #6b7280);
+        }
+
+        .oi {
+            font-size: 0.875rem;
+        }
+
+        /* No task state */
+        .no-task {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .no-task p {
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+        }
+
+        .no-task .oi-clock {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            display: block;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="mini-timer">
+        <div class="mini-header">
+            <span class="task-title">
+                @if (_state.TaskTitle != null)
+                {
+                    @(_state.IsBreak ? "Break Time" : _state.TaskTitle)
+                }
+                else
+                {
+                    <span>Focus Timer</span>
+                }
+            </span>
+            <button class="close-btn" @onclick="CloseWindow" title="Close">
+                <span class="oi oi-x"></span>
+            </button>
+        </div>
+
+        <div class="timer-body">
+            @if (_state.TaskTitle != null)
+            {
+                <div class="timer-display">
+                    <svg class="progress-ring" viewBox="0 0 100 100" width="100" height="100">
+                        <circle class="progress-ring-bg" cx="50" cy="50" r="44" />
+                        <circle class="progress-ring-fill @(_state.IsBreak ? "break" : "")"
+                                cx="50" cy="50" r="44"
+                                stroke-dasharray="@(2 * Math.PI * 44)"
+                                stroke-dashoffset="@GetProgressOffset()" />
+                    </svg>
+                    <span class="time-text @(_state.IsBreak ? "break" : "")">
+                        @FormatTime(_state.RemainingSeconds)
+                    </span>
+                </div>
+
+                <div class="status-text @(_state.IsRunning ? "running" : "") @(_state.IsBreak ? "break" : "")">
+                    @if (_state.IsBreak)
+                    {
+                        <span>Take a break</span>
+                    }
+                    else if (_state.IsRunning)
+                    {
+                        <span>Focusing</span>
+                    }
+                    else if (_state.RemainingSeconds == _state.FocusMinutes * 60)
+                    {
+                        <span>Ready</span>
+                    }
+                    else
+                    {
+                        <span>Paused</span>
+                    }
+                </div>
+
+                <div class="controls">
+                    @if (!_state.IsRunning)
+                    {
+                        <button class="control-btn play" @onclick="PlayTimer" title="Start">
+                            <span class="oi oi-media-play"></span>
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="control-btn pause" @onclick="PauseTimer" title="Pause">
+                            <span class="oi oi-media-pause"></span>
+                        </button>
+                    }
+                    <button class="control-btn" @onclick="ResetTimer" title="Reset">
+                        <span class="oi oi-reload"></span>
+                    </button>
+                </div>
+
+                @if (_state.SessionsCompleted > 0)
+                {
+                    <div class="sessions-count">
+                        @_state.SessionsCompleted session@(_state.SessionsCompleted == 1 ? "" : "s") completed
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="no-task">
+                    <span class="oi oi-clock"></span>
+                    <p>No active focus session</p>
+                    <p>Start a session from the main app</p>
+                </div>
+            }
+        </div>
+    </div>
+</body>
+</html>
+
+@code {
+    private FocusTimerStateData _state = new();
+    private DotNetObjectReference<FocusTimerMini>? _dotNetRef;
+    private System.Threading.Timer? _localTimer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("focusTimerMini.initialize", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnStateReceived(FocusTimerStateData newState)
+    {
+        var wasRunning = _state.IsRunning;
+        _state = newState;
+
+        // Manage local timer for UI updates
+        if (newState.IsRunning && !wasRunning)
+        {
+            StartLocalTimer();
+        }
+        else if (!newState.IsRunning && wasRunning)
+        {
+            StopLocalTimer();
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void StartLocalTimer()
+    {
+        _localTimer?.Dispose();
+        _localTimer = new System.Threading.Timer(_ =>
+        {
+            if (_state.IsRunning && _state.RemainingSeconds > 0)
+            {
+                _state.RemainingSeconds--;
+                InvokeAsync(StateHasChanged);
+            }
+        }, null, 1000, 1000);
+    }
+
+    private void StopLocalTimer()
+    {
+        _localTimer?.Dispose();
+        _localTimer = null;
+    }
+
+    private async Task PlayTimer()
+    {
+        _state.IsRunning = true;
+        _state.LastUpdated = DateTime.UtcNow;
+        StartLocalTimer();
+        await BroadcastStateAsync();
+        StateHasChanged();
+    }
+
+    private async Task PauseTimer()
+    {
+        _state.IsRunning = false;
+        _state.LastUpdated = DateTime.UtcNow;
+        StopLocalTimer();
+        await BroadcastStateAsync();
+        StateHasChanged();
+    }
+
+    private async Task ResetTimer()
+    {
+        _state.IsRunning = false;
+        _state.IsBreak = false;
+        _state.RemainingSeconds = _state.FocusMinutes * 60;
+        _state.TotalSeconds = _state.RemainingSeconds;
+        _state.LastUpdated = DateTime.UtcNow;
+        StopLocalTimer();
+        await BroadcastStateAsync();
+        StateHasChanged();
+    }
+
+    private async Task BroadcastStateAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("focusTimerMini.broadcastState", _state);
+        }
+        catch
+        {
+            // Ignore broadcast errors
+        }
+    }
+
+    private async Task CloseWindow()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("focusTimerMini.closeWindow");
+        }
+        catch
+        {
+            // Ignore close errors
+        }
+    }
+
+    private static string FormatTime(int totalSeconds)
+    {
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes:D2}:{seconds:D2}";
+    }
+
+    private double GetProgressOffset()
+    {
+        var circumference = 2 * Math.PI * 44;
+        var progress = _state.TotalSeconds > 0
+            ? (double)_state.RemainingSeconds / _state.TotalSeconds
+            : 1;
+        return circumference * (1 - progress);
+    }
+
+    public void Dispose()
+    {
+        _localTimer?.Dispose();
+        _dotNetRef?.Dispose();
+        try
+        {
+            _ = JS.InvokeVoidAsync("focusTimerMini.dispose");
+        }
+        catch
+        {
+            // Ignore disposal errors
+        }
+    }
+}

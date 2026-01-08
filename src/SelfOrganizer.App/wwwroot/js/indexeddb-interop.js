@@ -1,6 +1,6 @@
 // IndexedDB Interop for Blazor WebAssembly
 const DB_NAME = "SelfOrganizerDb";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented to add goals store
 
 let db = null;
 
@@ -15,7 +15,8 @@ const stores = {
     contexts: { keyPath: "id", indexes: ["name"] },
     categories: { keyPath: "id", indexes: ["name"] },
     preferences: { keyPath: "id" },
-    dailySnapshots: { keyPath: "id", indexes: ["date"] }
+    dailySnapshots: { keyPath: "id", indexes: ["date"] },
+    goals: { keyPath: "id", indexes: ["status", "category", "targetDate"] }
 };
 
 window.indexedDbInterop = {

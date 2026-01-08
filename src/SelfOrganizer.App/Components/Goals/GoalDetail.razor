@@ -1,0 +1,952 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services.Intelligence
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject IGoalService GoalService
+@inject IProjectService ProjectService
+@inject ITaskService TaskService
+@inject IGoalAiService GoalAiService
+@inject IJSRuntime JSRuntime
+
+<div class="goal-detail">
+    @* Header Section *@
+    <div class="detail-header d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="category-badge @GetCategoryClass()">@Goal.Category</span>
+                <span class="badge @GetStatusBadgeClass()">@Goal.Status</span>
+                @if (Goal.Priority == 1)
+                {
+                    <span class="badge bg-danger">High Priority</span>
+                }
+                <span class="badge bg-light text-dark">@Goal.Timeframe</span>
+            </div>
+            <h4 class="goal-title mb-0">@Goal.Title</h4>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="CopyGoalAsJson" title="Copy as JSON">
+                @if (_isCopying)
+                {
+                    <span class="oi oi-check text-success"></span>
+                }
+                else
+                {
+                    <span class="oi oi-clipboard"></span>
+                }
+            </button>
+            <button class="btn btn-outline-primary" @onclick="HandleEdit">
+                <span class="oi oi-pencil me-1"></span> Edit
+            </button>
+        </div>
+    </div>
+
+    @* AI Actions Section *@
+    <div class="ai-actions-section card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><span class="oi oi-lightbulb me-1"></span> AI Assistant</span>
+            @if (_isAiAvailable.HasValue)
+            {
+                <span class="badge @(_isAiAvailable.Value ? "bg-success" : "bg-secondary")">
+                    @(_isAiAvailable.Value ? "Connected" : "Offline")
+                </span>
+            }
+        </div>
+        <div class="card-body">
+            @if (_isCheckingAi)
+            {
+                <div class="text-center py-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Checking AI...</span>
+                    </div>
+                    <span class="ms-2 text-muted">Checking AI availability...</span>
+                </div>
+            }
+            else if (_isAiAvailable == true)
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary" @onclick="ImproveWithAi" disabled="@_isProcessing">
+                        @if (_isImproving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Improving...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-star me-1"></span>
+                            <span>Improve Goal</span>
+                        }
+                    </button>
+                    <button class="btn btn-outline-success" @onclick="DecomposeWithAi" disabled="@_isProcessing">
+                        @if (_isDecomposing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Decomposing...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-list me-1"></span>
+                            <span>Generate Tasks</span>
+                        }
+                    </button>
+                </div>
+                <p class="text-muted small mt-2 mb-0">
+                    Use AI to clarify your goal or break it down into actionable tasks.
+                </p>
+            }
+            else
+            {
+                <div class="text-muted">
+                    <span class="oi oi-warning me-1"></span>
+                    AI features require Ollama to be running locally.
+                    <a href="/settings" class="text-primary">Configure in Settings</a>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* AI Improvement Suggestions *@
+    @if (_clarificationResult != null)
+    {
+        <div class="ai-suggestion-section card mb-4 border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-lightbulb me-1"></span> AI Suggestions</span>
+                <button class="btn btn-sm btn-light" @onclick="DismissClarification">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(_clarificationResult.ClarifiedGoal))
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Improved Goal Title</h6>
+                        <p class="mb-1">@_clarificationResult.ClarifiedGoal</p>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@(() => ApplySuggestion("title", _clarificationResult.ClarifiedGoal))">
+                            Apply Title
+                        </button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_clarificationResult.DesiredOutcome))
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Suggested Desired Outcome</h6>
+                        <p class="mb-1">@_clarificationResult.DesiredOutcome</p>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@(() => ApplySuggestion("desiredOutcome", _clarificationResult.DesiredOutcome))">
+                            Apply Outcome
+                        </button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_clarificationResult.SuccessCriteria))
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Suggested Success Criteria</h6>
+                        <p class="mb-1">@_clarificationResult.SuccessCriteria</p>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@(() => ApplySuggestion("successCriteria", _clarificationResult.SuccessCriteria))">
+                            Apply Criteria
+                        </button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_clarificationResult.Obstacles))
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Potential Obstacles</h6>
+                        <p class="mb-1">@_clarificationResult.Obstacles</p>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@(() => ApplySuggestion("obstacles", _clarificationResult.Obstacles))">
+                            Apply Obstacles
+                        </button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(_clarificationResult.Resources))
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Resources Needed</h6>
+                        <p class="mb-1">@_clarificationResult.Resources</p>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="@(() => ApplySuggestion("resources", _clarificationResult.Resources))">
+                            Apply Resources
+                        </button>
+                    </div>
+                }
+
+                @if (_clarificationResult.ClarifyingQuestions.Any())
+                {
+                    <div class="mb-3">
+                        <h6 class="text-primary">Questions to Consider</h6>
+                        <ul class="mb-0">
+                            @foreach (var question in _clarificationResult.ClarifyingQuestions)
+                            {
+                                <li>@question</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <div class="mt-3 pt-3 border-top">
+                    <button class="btn btn-primary me-2" @onclick="ApplyAllSuggestions">
+                        <span class="oi oi-check me-1"></span> Apply All Suggestions
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="DismissClarification">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* AI Generated Tasks *@
+    @if (_generatedTasks.Any())
+    {
+        <div class="ai-tasks-section card mb-4 border-success">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-list me-1"></span> Generated Tasks (@_generatedTasks.Count)</span>
+                <button class="btn btn-sm btn-light" @onclick="DismissGeneratedTasks">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+            <div class="card-body">
+                @if (_decompositionResult != null)
+                {
+                    <p class="text-muted mb-3">@_decompositionResult.DesiredOutcome</p>
+                }
+
+                <div class="generated-tasks-list">
+                    @foreach (var task in _generatedTasks)
+                    {
+                        <div class="generated-task-item d-flex align-items-start gap-2 mb-2 p-2 border rounded">
+                            <input type="checkbox" class="form-check-input mt-1" @bind="task.IsSelected" />
+                            <div class="flex-grow-1">
+                                <div class="fw-medium">@task.Task.Title</div>
+                                @if (!string.IsNullOrEmpty(task.Task.Description))
+                                {
+                                    <div class="text-muted small">@task.Task.Description</div>
+                                }
+                                <div class="d-flex gap-2 mt-1">
+                                    <span class="badge bg-light text-dark">@task.Task.EstimatedMinutes min</span>
+                                    @foreach (var context in task.Task.Contexts.Take(2))
+                                    {
+                                        <span class="badge bg-secondary">@context</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2" @onclick="SelectAllTasks">Select All</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="DeselectAllTasks">Deselect All</button>
+                    </div>
+                    <div>
+                        <button class="btn btn-success" @onclick="CreateSelectedTasks" disabled="@(!_generatedTasks.Any(t => t.IsSelected))">
+                            <span class="oi oi-plus me-1"></span> Create @_generatedTasks.Count(t => t.IsSelected) Tasks
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Error Message *@
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+            <span class="oi oi-warning me-1"></span> @_errorMessage
+            <button type="button" class="btn-close" @onclick="@(() => _errorMessage = null)"></button>
+        </div>
+    }
+
+    @* Progress Section *@
+    <div class="progress-section card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Progress</h6>
+                <span class="fs-5 fw-bold @GetProgressTextClass()">@Goal.ProgressPercent%</span>
+            </div>
+            <div class="progress" style="height: 12px;">
+                <div class="progress-bar @GetProgressBarClass()"
+                     role="progressbar"
+                     style="width: @Goal.ProgressPercent%"
+                     aria-valuenow="@Goal.ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+            @if (Goal.TargetDate.HasValue)
+            {
+                <div class="mt-2 small">
+                    <span class="oi oi-calendar me-1"></span>
+                    <span class="@GetTargetDateClass()">
+                        Target: @Goal.TargetDate.Value.ToString("MMMM d, yyyy") (@GetTargetDateDisplay())
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row">
+        @* Left Column - Main Content *@
+        <div class="col-lg-8">
+            @* Description *@
+            @if (!string.IsNullOrEmpty(Goal.Description))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">Description</h6>
+                    <p class="section-content">@Goal.Description</p>
+                </div>
+            }
+
+            @* Desired Outcome *@
+            @if (!string.IsNullOrEmpty(Goal.DesiredOutcome))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">
+                        <span class="oi oi-target me-1"></span> Desired Outcome
+                    </h6>
+                    <p class="section-content">@Goal.DesiredOutcome</p>
+                </div>
+            }
+
+            @* Success Criteria *@
+            @if (!string.IsNullOrEmpty(Goal.SuccessCriteria))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">
+                        <span class="oi oi-check me-1"></span> Success Criteria
+                    </h6>
+                    <p class="section-content">@Goal.SuccessCriteria</p>
+                </div>
+            }
+
+            @* Obstacles *@
+            @if (!string.IsNullOrEmpty(Goal.Obstacles))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">
+                        <span class="oi oi-warning me-1"></span> Obstacles
+                    </h6>
+                    <p class="section-content">@Goal.Obstacles</p>
+                </div>
+            }
+
+            @* Resources *@
+            @if (!string.IsNullOrEmpty(Goal.Resources))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">
+                        <span class="oi oi-box me-1"></span> Resources Needed
+                    </h6>
+                    <p class="section-content">@Goal.Resources</p>
+                </div>
+            }
+
+            @* AI Decomposition Plan *@
+            @if (!string.IsNullOrEmpty(Goal.AiGeneratedPlan))
+            {
+                <div class="detail-section mb-4 ai-section">
+                    <h6 class="section-title">
+                        <span class="oi oi-lightbulb me-1"></span> AI-Generated Action Plan
+                    </h6>
+                    <div class="section-content ai-content">
+                        @((MarkupString)FormatPlan(Goal.AiGeneratedPlan))
+                    </div>
+                </div>
+            }
+
+            @* Notes *@
+            @if (!string.IsNullOrEmpty(Goal.Notes))
+            {
+                <div class="detail-section mb-4">
+                    <h6 class="section-title">
+                        <span class="oi oi-document me-1"></span> Notes
+                    </h6>
+                    <p class="section-content">@Goal.Notes</p>
+                </div>
+            }
+        </div>
+
+        @* Right Column - Linked Items *@
+        <div class="col-lg-4">
+            @* Linked Projects *@
+            <div class="linked-section card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><span class="oi oi-folder me-1"></span> Linked Projects</span>
+                    <span class="badge bg-primary">@_linkedProjects.Count</span>
+                </div>
+                <div class="card-body">
+                    @if (_linkedProjects.Any())
+                    {
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var project in _linkedProjects)
+                            {
+                                <li class="linked-item">
+                                    <a href="/projects/@project.Id" class="text-decoration-none">
+                                        <span class="oi oi-folder me-1"></span>
+                                        @project.Name
+                                    </a>
+                                    <span class="badge @GetProjectStatusClass(project.Status)">@project.Status</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No linked projects yet.</p>
+                    }
+                </div>
+            </div>
+
+            @* Linked Tasks *@
+            <div class="linked-section card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><span class="oi oi-task me-1"></span> Linked Tasks</span>
+                    <span class="badge bg-success">@_linkedTasks.Count</span>
+                </div>
+                <div class="card-body">
+                    @if (_linkedTasks.Any())
+                    {
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var task in _linkedTasks.Take(10))
+                            {
+                                <li class="linked-item">
+                                    <a href="/tasks/@task.Id" class="text-decoration-none @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                        <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-task") me-1"></span>
+                                        @task.Title
+                                    </a>
+                                </li>
+                            }
+                            @if (_linkedTasks.Count > 10)
+                            {
+                                <li class="text-muted small">+@(_linkedTasks.Count - 10) more tasks</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No linked tasks yet.</p>
+                    }
+                </div>
+            </div>
+
+            @* Tags *@
+            @if (Goal.Tags.Any())
+            {
+                <div class="linked-section card mb-4">
+                    <div class="card-header">
+                        <span class="oi oi-tags me-1"></span> Tags
+                    </div>
+                    <div class="card-body">
+                        <div class="tags-list">
+                            @foreach (var tag in Goal.Tags)
+                            {
+                                <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1 mb-1">#@tag</a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* Metadata *@
+            <div class="linked-section card">
+                <div class="card-header">
+                    <span class="oi oi-info me-1"></span> Details
+                </div>
+                <div class="card-body small">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Created</span>
+                        <span>@Goal.CreatedAt.ToString("MMM d, yyyy")</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Last Updated</span>
+                        <span>@Goal.ModifiedAt.ToString("MMM d, yyyy")</span>
+                    </div>
+                    @if (Goal.StartDate.HasValue)
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Started</span>
+                            <span>@Goal.StartDate.Value.ToString("MMM d, yyyy")</span>
+                        </div>
+                    }
+                    @if (Goal.CompletedAt.HasValue)
+                    {
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Completed</span>
+                            <span class="text-success">@Goal.CompletedAt.Value.ToString("MMM d, yyyy")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Goal Goal { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnGoalUpdated { get; set; }
+
+    private List<Project> _linkedProjects = new();
+    private List<TodoTask> _linkedTasks = new();
+
+    // Copy state
+    private bool _isCopying;
+
+    // AI State
+    private bool? _isAiAvailable;
+    private bool _isCheckingAi = true;
+    private bool _isImproving;
+    private bool _isDecomposing;
+    private bool _isProcessing => _isImproving || _isDecomposing;
+    private string? _errorMessage;
+
+    private GoalClarificationResult? _clarificationResult;
+    private GoalDecompositionResult? _decompositionResult;
+    private List<SelectableTask> _generatedTasks = new();
+
+    private class SelectableTask
+    {
+        public TodoTask Task { get; set; } = new();
+        public bool IsSelected { get; set; } = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadLinkedItems();
+        await CheckAiAvailability();
+    }
+
+    private async Task CheckAiAvailability()
+    {
+        _isCheckingAi = true;
+        try
+        {
+            _isAiAvailable = await GoalAiService.IsAvailableAsync();
+        }
+        catch
+        {
+            _isAiAvailable = false;
+        }
+        finally
+        {
+            _isCheckingAi = false;
+        }
+    }
+
+    private async Task LoadLinkedItems()
+    {
+        try
+        {
+            _linkedProjects = (await GoalService.GetLinkedProjectsAsync(Goal.Id)).ToList();
+            _linkedTasks = (await GoalService.GetLinkedTasksAsync(Goal.Id)).ToList();
+        }
+        catch
+        {
+            _linkedProjects = new();
+            _linkedTasks = new();
+        }
+    }
+
+    private async Task ImproveWithAi()
+    {
+        _isImproving = true;
+        _errorMessage = null;
+        _clarificationResult = null;
+
+        try
+        {
+            _clarificationResult = await GoalAiService.ClarifyGoalAsync(Goal);
+            if (_clarificationResult == null)
+            {
+                _errorMessage = "AI could not generate suggestions. Please try again.";
+            }
+        }
+        catch (TimeoutException)
+        {
+            _errorMessage = "AI request timed out. The model may still be loading - please try again in a moment.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isImproving = false;
+        }
+    }
+
+    private async Task DecomposeWithAi()
+    {
+        _isDecomposing = true;
+        _errorMessage = null;
+        _generatedTasks.Clear();
+
+        try
+        {
+            _decompositionResult = await GoalAiService.DecomposeGoalAsync(Goal);
+            if (_decompositionResult != null)
+            {
+                var tasks = new List<SelectableTask>();
+                foreach (var phase in _decompositionResult.Phases)
+                {
+                    foreach (var generatedTask in phase.Tasks)
+                    {
+                        tasks.Add(new SelectableTask
+                        {
+                            IsSelected = true,
+                            Task = new TodoTask
+                            {
+                                Id = Guid.NewGuid(),
+                                Title = generatedTask.Title,
+                                Description = generatedTask.Description,
+                                EstimatedMinutes = generatedTask.EstimatedMinutes,
+                                Contexts = generatedTask.Contexts,
+                                EnergyLevel = generatedTask.EnergyLevel,
+                                RequiresDeepWork = generatedTask.RequiresDeepWork,
+                                Status = TodoTaskStatus.NextAction,
+                                Priority = 2,
+                                GoalIds = new List<Guid> { Goal.Id },
+                                Tags = new List<string> { phase.Name.ToLowerInvariant().Replace(" ", "-") },
+                                CreatedAt = DateTime.UtcNow,
+                                ModifiedAt = DateTime.UtcNow
+                            }
+                        });
+                    }
+                }
+                _generatedTasks = tasks;
+            }
+            else
+            {
+                _errorMessage = "AI could not decompose the goal. Please try again.";
+            }
+        }
+        catch (TimeoutException)
+        {
+            _errorMessage = "AI request timed out. The model may still be loading - please try again in a moment.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isDecomposing = false;
+        }
+    }
+
+    private async Task ApplySuggestion(string field, string value)
+    {
+        switch (field)
+        {
+            case "title":
+                Goal.Title = value;
+                break;
+            case "desiredOutcome":
+                Goal.DesiredOutcome = value;
+                break;
+            case "successCriteria":
+                Goal.SuccessCriteria = value;
+                break;
+            case "obstacles":
+                Goal.Obstacles = value;
+                break;
+            case "resources":
+                Goal.Resources = value;
+                break;
+        }
+
+        Goal.ModifiedAt = DateTime.UtcNow;
+        await GoalService.UpdateAsync(Goal);
+        await OnGoalUpdated.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private async Task ApplyAllSuggestions()
+    {
+        if (_clarificationResult == null) return;
+
+        if (!string.IsNullOrEmpty(_clarificationResult.ClarifiedGoal))
+            Goal.Title = _clarificationResult.ClarifiedGoal;
+        if (!string.IsNullOrEmpty(_clarificationResult.DesiredOutcome))
+            Goal.DesiredOutcome = _clarificationResult.DesiredOutcome;
+        if (!string.IsNullOrEmpty(_clarificationResult.SuccessCriteria))
+            Goal.SuccessCriteria = _clarificationResult.SuccessCriteria;
+        if (!string.IsNullOrEmpty(_clarificationResult.Obstacles))
+            Goal.Obstacles = _clarificationResult.Obstacles;
+        if (!string.IsNullOrEmpty(_clarificationResult.Resources))
+            Goal.Resources = _clarificationResult.Resources;
+
+        Goal.ModifiedAt = DateTime.UtcNow;
+        await GoalService.UpdateAsync(Goal);
+        await OnGoalUpdated.InvokeAsync();
+
+        _clarificationResult = null;
+        StateHasChanged();
+    }
+
+    private void DismissClarification()
+    {
+        _clarificationResult = null;
+    }
+
+    private void DismissGeneratedTasks()
+    {
+        _generatedTasks.Clear();
+        _decompositionResult = null;
+    }
+
+    private void SelectAllTasks()
+    {
+        foreach (var task in _generatedTasks)
+            task.IsSelected = true;
+    }
+
+    private void DeselectAllTasks()
+    {
+        foreach (var task in _generatedTasks)
+            task.IsSelected = false;
+    }
+
+    private async Task CreateSelectedTasks()
+    {
+        var selectedTasks = _generatedTasks.Where(t => t.IsSelected).Select(t => t.Task).ToList();
+
+        foreach (var task in selectedTasks)
+        {
+            // Create the task
+            var createdTask = await TaskService.CreateAsync(task);
+
+            // Link the task to the goal (bidirectional link)
+            await GoalService.LinkTaskAsync(Goal.Id, createdTask.Id);
+        }
+
+        // Refresh the Goal from database to get the updated LinkedTaskIds
+        var refreshedGoal = await GoalService.GetByIdAsync(Goal.Id);
+        if (refreshedGoal != null)
+        {
+            // Update the local Goal reference with the refreshed data
+            Goal.LinkedTaskIds = refreshedGoal.LinkedTaskIds;
+        }
+
+        // Store the decomposition result in the goal
+        if (_decompositionResult != null)
+        {
+            Goal.AiGeneratedPlan = FormatDecompositionAsText(_decompositionResult);
+            Goal.ModifiedAt = DateTime.UtcNow;
+            await GoalService.UpdateAsync(Goal);
+        }
+
+        await OnGoalUpdated.InvokeAsync();
+        await LoadLinkedItems();
+
+        _generatedTasks.Clear();
+        _decompositionResult = null;
+        StateHasChanged();
+    }
+
+    private string FormatDecompositionAsText(GoalDecompositionResult result)
+    {
+        var lines = new List<string>();
+        lines.Add($"Project: {result.ProjectName}");
+        lines.Add($"Outcome: {result.DesiredOutcome}");
+        lines.Add("");
+
+        foreach (var phase in result.Phases)
+        {
+            lines.Add($"## {phase.Name}");
+            lines.Add(phase.Description);
+            foreach (var task in phase.Tasks)
+            {
+                lines.Add($"- {task.Title} ({task.EstimatedMinutes} min)");
+            }
+            lines.Add("");
+        }
+
+        if (result.Dependencies.Any())
+        {
+            lines.Add("## Dependencies");
+            foreach (var dep in result.Dependencies)
+                lines.Add($"- {dep}");
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    private async Task HandleEdit()
+    {
+        await OnEdit.InvokeAsync();
+    }
+
+    private async Task CopyGoalAsJson()
+    {
+        _isCopying = true;
+        StateHasChanged();
+
+        try
+        {
+            // Create a comprehensive export object
+            var exportData = new
+            {
+                goal = new
+                {
+                    Goal.Id,
+                    Goal.Title,
+                    Goal.Description,
+                    Goal.DesiredOutcome,
+                    Goal.SuccessCriteria,
+                    Goal.Obstacles,
+                    Goal.Resources,
+                    Status = Goal.Status.ToString(),
+                    Category = Goal.Category.ToString(),
+                    Timeframe = Goal.Timeframe.ToString(),
+                    Goal.TargetDate,
+                    Goal.StartDate,
+                    Goal.Priority,
+                    Goal.ProgressPercent,
+                    Goal.Tags,
+                    Goal.Notes,
+                    Goal.AiGeneratedPlan,
+                    Goal.CreatedAt,
+                    Goal.ModifiedAt,
+                    Goal.CompletedAt
+                },
+                linkedTasks = _linkedTasks.Select(t => new
+                {
+                    t.Id,
+                    t.Title,
+                    t.Description,
+                    Status = t.Status.ToString(),
+                    t.Priority,
+                    t.EstimatedMinutes,
+                    t.Contexts,
+                    t.Tags,
+                    t.EnergyLevel,
+                    t.RequiresDeepWork,
+                    t.DueDate,
+                    t.CreatedAt,
+                    t.CompletedAt
+                }).ToList(),
+                linkedProjects = _linkedProjects.Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    p.Description,
+                    Status = p.Status.ToString()
+                }).ToList(),
+                exportedAt = DateTime.UtcNow
+            };
+
+            var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", json);
+
+            // Show success state briefly
+            await Task.Delay(1500);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to copy: {ex.Message}";
+        }
+        finally
+        {
+            _isCopying = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryClass() => Goal.Category switch
+    {
+        GoalCategory.Career => "category-career",
+        GoalCategory.Health => "category-health",
+        GoalCategory.Financial => "category-financial",
+        GoalCategory.Personal => "category-personal",
+        GoalCategory.Learning => "category-learning",
+        GoalCategory.Relationships => "category-relationships",
+        GoalCategory.Creative => "category-creative",
+        _ => "category-other"
+    };
+
+    private string GetStatusBadgeClass() => Goal.Status switch
+    {
+        GoalStatus.Active => "bg-success",
+        GoalStatus.OnHold => "bg-warning text-dark",
+        GoalStatus.Completed => "bg-info",
+        GoalStatus.Archived => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetProgressBarClass()
+    {
+        if (Goal.ProgressPercent >= 100) return "bg-success";
+        if (Goal.ProgressPercent >= 75) return "bg-info";
+        if (Goal.ProgressPercent >= 50) return "bg-primary";
+        if (Goal.ProgressPercent >= 25) return "bg-warning";
+        return "bg-secondary";
+    }
+
+    private string GetProgressTextClass()
+    {
+        if (Goal.ProgressPercent >= 100) return "text-success";
+        if (Goal.ProgressPercent >= 75) return "text-info";
+        if (Goal.ProgressPercent >= 50) return "text-primary";
+        return "text-secondary";
+    }
+
+    private string GetTargetDateClass()
+    {
+        if (!Goal.TargetDate.HasValue) return "text-muted";
+
+        var daysLeft = (Goal.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0) return "text-danger fw-bold";
+        if (daysLeft <= 7) return "text-warning";
+        return "text-muted";
+    }
+
+    private string GetTargetDateDisplay()
+    {
+        if (!Goal.TargetDate.HasValue) return "";
+
+        var daysLeft = (Goal.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0)
+            return $"Overdue by {Math.Abs(daysLeft)} day{(Math.Abs(daysLeft) != 1 ? "s" : "")}";
+        if (daysLeft == 0)
+            return "Due today";
+        if (daysLeft == 1)
+            return "Due tomorrow";
+
+        return $"{daysLeft} days left";
+    }
+
+    private string GetProjectStatusClass(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Active => "bg-success",
+        ProjectStatus.OnHold => "bg-warning text-dark",
+        ProjectStatus.Completed => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string FormatPlan(string plan)
+    {
+        return plan
+            .Replace("\n\n", "</p><p>")
+            .Replace("\n", "<br>")
+            .Replace("- ", "<span class='bullet'>•</span> ")
+            .Replace("## ", "<strong>")
+            .Replace("<br><strong>", "</strong><br><strong>");
+    }
+}

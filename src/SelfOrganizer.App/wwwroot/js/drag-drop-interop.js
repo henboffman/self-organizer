@@ -20,8 +20,33 @@ window.dragDropInterop = {
      * Called on mousedown - starts the hold timer
      * @param {string} itemType - 'task' or 'event'
      * @param {string} itemId - The ID of the item being dragged
+     * @param {number} clientY - Optional Y coordinate of mouse for edge detection
      */
-    initHoldToDrag: function (itemType, itemId, startHour, hourHeightPx, gutterWidthPx, daysInView) {
+    initHoldToDrag: function (itemType, itemId, startHour, hourHeightPx, gutterWidthPx, daysInView, clientY) {
+        // Find the element by data attributes first
+        const selector = `[data-item-type="${itemType}"][data-item-id="${itemId}"]`;
+        const element = document.querySelector(selector);
+
+        // Check if resize interop is handling this event (resize takes priority)
+        // First check: use the resize interop's tracked state
+        if (window.resizeInterop && window.resizeInterop.isOnResizeEdge()) {
+            this._dragReady = false;
+            return false;
+        }
+
+        // Second check: If clientY is provided, directly check edge proximity on the element
+        if (element && clientY !== undefined && clientY !== null) {
+            const rect = element.getBoundingClientRect();
+            const relativeY = clientY - rect.top;
+            const edgeThreshold = 18; // Match resize interop's threshold
+
+            if (relativeY <= edgeThreshold || relativeY >= rect.height - edgeThreshold) {
+                // We're on an edge - don't allow drag, let resize handle it
+                this._dragReady = false;
+                return false;
+            }
+        }
+
         // Clear any existing timer
         if (this._holdTimer) {
             clearTimeout(this._holdTimer);
@@ -29,10 +54,6 @@ window.dragDropInterop = {
         }
 
         this._config = { startHour, hourHeightPx, gutterWidthPx, daysInView };
-
-        // Find the element by data attributes
-        const selector = `[data-item-type="${itemType}"][data-item-id="${itemId}"]`;
-        const element = document.querySelector(selector);
         this._currentDragElement = element;
 
         // CRITICAL: Prevent text selection during drag
@@ -700,10 +721,12 @@ window.resizeInterop = {
     _config: null,
     _dotNetRef: null,
     _existingEvents: [], // For overlap detection
-    _edgeThreshold: 12, // Pixels from edge to trigger resize cursor
+    _edgeThreshold: 18, // Pixels from edge to trigger resize cursor (increased for easier targeting)
     _hoveredElement: null,
     _hoveredEdge: null,
     _preventDrag: false, // Flag to prevent drag when resizing
+    _resizeStarted: false, // Flag to indicate resize has started
+    _lastMouseEvent: null, // Store last mouse event for edge detection
 
     /**
      * Initialize resize interop
@@ -751,10 +774,37 @@ window.resizeInterop = {
      * Prevent drag start when we're doing a resize operation
      */
     _handlePreventDragStart: function (e) {
+        // First check: flags are set
         if (this._preventDrag || this._isResizing) {
             e.preventDefault();
             e.stopPropagation();
             return false;
+        }
+
+        // Second check: if we're hovering on an edge, prevent drag
+        if (this._hoveredEdge) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+
+        // Third check: dynamically check if the drag target is on a resize edge
+        const eventEl = e.target.closest('.timeline-event');
+        if (eventEl && (eventEl.classList.contains('resizable') || eventEl.classList.contains('draggable-item'))) {
+            const rect = eventEl.getBoundingClientRect();
+            // Use the dragstart event's clientY directly (most accurate)
+            // Fall back to lastMouseEvent if dragstart doesn't have coordinates
+            const clientY = e.clientY || (this._lastMouseEvent ? this._lastMouseEvent.clientY : null);
+
+            if (clientY !== null) {
+                const relativeY = clientY - rect.top;
+
+                if (relativeY <= this._edgeThreshold || relativeY >= rect.height - this._edgeThreshold) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }
         }
     },
 
@@ -762,6 +812,9 @@ window.resizeInterop = {
      * Handle mouse move over events to detect edge proximity
      */
     _handleEventMouseMove: function (e) {
+        // Always store the last mouse event for edge detection
+        this._lastMouseEvent = e;
+
         if (this._isResizing) return;
 
         // Find event element under cursor
@@ -809,14 +862,49 @@ window.resizeInterop = {
     },
 
     /**
+     * Check if currently on a resize edge (called by drag interop)
+     * This is the key function that prevents drag when we should resize instead
+     */
+    isOnResizeEdge: function () {
+        // If we're already in a resize operation, definitely on edge
+        if (this._preventDrag || this._isResizing || this._resizeStarted) {
+            return true;
+        }
+
+        // Check if hoveredEdge is set from the last mouse move
+        if (this._hoveredEdge) {
+            return true;
+        }
+
+        // Fallback: Use last mouse event to check edge proximity dynamically
+        if (this._lastMouseEvent && this._hoveredElement) {
+            const rect = this._hoveredElement.getBoundingClientRect();
+            const relativeY = this._lastMouseEvent.clientY - rect.top;
+
+            if (relativeY <= this._edgeThreshold || relativeY >= rect.height - this._edgeThreshold) {
+                return true;
+            }
+        }
+
+        return false;
+    },
+
+    /**
      * Handle mouse down to potentially start resize
      */
     _handleEventMouseDown: function (e) {
         if (this._isResizing) return;
 
+        // Only handle left click
+        if (e.button !== 0) return;
+
         // Find event element and check edge on mousedown directly
         const eventEl = e.target.closest('.timeline-event');
-        if (!eventEl || !eventEl.classList.contains('draggable-item')) return;
+        if (!eventEl) return;
+
+        // Check if this event is resizable (has resizable class)
+        const isResizable = eventEl.classList.contains('resizable') || eventEl.classList.contains('draggable-item');
+        if (!isResizable) return;
 
         // Check edge proximity
         const rect = eventEl.getBoundingClientRect();
@@ -832,21 +920,33 @@ window.resizeInterop = {
         if (!edge) {
             // Not on an edge, let normal drag handling proceed
             this._preventDrag = false;
+            this._resizeStarted = false;
             return;
         }
 
         // We're on an edge - prevent the drag from starting
         this._preventDrag = true;
+        this._resizeStarted = true;
 
         // Get item info from data attributes
         const itemType = eventEl.dataset.itemType;
         const itemId = eventEl.dataset.itemId;
 
-        if (!itemType || !itemId) return;
+        if (!itemType || !itemId) {
+            this._preventDrag = false;
+            this._resizeStarted = false;
+            return;
+        }
 
         // Parse time from the element's style and data
         const topPx = parseFloat(eventEl.style.top);
         const heightPx = parseFloat(eventEl.style.height);
+
+        if (isNaN(topPx) || isNaN(heightPx) || !this._config) {
+            this._preventDrag = false;
+            this._resizeStarted = false;
+            return;
+        }
 
         // Calculate times from pixel positions
         const startMinutesFromTop = (topPx / this._config.hourHeightPx) * 60;
@@ -873,6 +973,7 @@ window.resizeInterop = {
         // Prevent default to stop drag from starting
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
 
         // Start resize
         this.startResize(eventEl, edge, itemType, itemId, startHour, startMinute, endHour, endMinute, dayIndex);
@@ -1178,6 +1279,7 @@ window.resizeInterop = {
         this._itemId = null;
         this._dayIndex = null;
         this._preventDrag = false;
+        this._resizeStarted = false;
     },
 
     /**
@@ -1219,5 +1321,6 @@ window.resizeInterop = {
         this._dotNetRef = null;
         this._existingEvents = [];
         this._preventDrag = false;
+        this._lastMouseEvent = null;
     }
 };

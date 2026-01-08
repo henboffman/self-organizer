@@ -6,6 +6,7 @@
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
 @inject IDataChangeNotificationService DataChangeNotification
 @inject NavigationManager NavigationManager
+@inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
 @implements IDisposable
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -81,8 +82,31 @@ else if (!_filteredTasks.Any())
 }
 else
 {
+    @* Batch Selection Toolbar *@
+    <BatchSelectionToolbar
+        SelectedCount="@_selectedTaskIds.Count"
+        TotalCount="@_filteredTasks.Count"
+        OnSelectAll="SelectAllTasks"
+        OnDeselectAll="DeselectAllTasks"
+        OnDelete="ShowBatchDeleteConfirm"
+        OnMarkComplete="BatchMarkComplete"
+        OnChangeStatus="BatchChangeStatus"
+        OnChangePriority="BatchChangePriority" />
+
     @* Filter bar *@
     <div class="d-flex flex-wrap gap-3 mb-3 align-items-center">
+        @* Master checkbox for selecting all visible tasks *@
+        <div class="form-check">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="selectAllCheckbox"
+                   checked="@(_selectedTaskIds.Count > 0 && _selectedTaskIds.Count == _filteredTasks.Count)"
+                   @onchange="ToggleSelectAll" />
+            <label class="form-check-label" for="selectAllCheckbox">
+                <span class="text-muted small">Select</span>
+            </label>
+        </div>
+
         <div class="input-group" style="max-width: 300px;">
             <span class="input-group-text"><span class="oi oi-magnifying-glass"></span></span>
             <input type="text" class="form-control" placeholder="Search tasks..." @bind="_searchTerm" @bind:event="oninput" />
@@ -103,62 +127,83 @@ else
     <div class="list-group">
         @foreach (var task in GetDisplayTasks())
         {
-            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="d-flex align-items-start gap-2">
-                        <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-secondary")"
-                                @onclick="() => ToggleComplete(task)"
-                                @onclick:stopPropagation="true"
-                                @onclick:preventDefault="true">
-                            <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
-                        </button>
-                        <div>
-                            <div class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
-                                @task.Title
+            <div class="list-group-item list-group-item-action d-flex align-items-start @(_selectedTaskIds.Contains(task.Id) ? "list-group-item-info" : "")">
+                @* Selection Checkbox *@
+                <div class="form-check me-2 mt-1">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           checked="@_selectedTaskIds.Contains(task.Id)"
+                           @onchange="() => ToggleTaskSelection(task.Id)"
+                           @onclick:stopPropagation="true" />
+                </div>
+
+                <a href="/tasks/@task.Id" class="flex-grow-1 text-decoration-none text-reset">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="d-flex align-items-start gap-2">
+                            <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-secondary")"
+                                    @onclick="() => ToggleComplete(task)"
+                                    @onclick:stopPropagation="true"
+                                    @onclick:preventDefault="true">
+                                <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
+                            </button>
+                            <div>
+                                <div class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                    @task.Title
+                                </div>
+                                @if (!string.IsNullOrEmpty(task.Description))
+                                {
+                                    <div class="small text-muted text-truncate" style="max-width: 400px;">
+                                        <TagDisplay Text="@task.Description" />
+                                    </div>
+                                }
+                                @if (task.Tags.Any())
+                                {
+                                    <div class="mt-1">
+                                        @foreach (var tag in task.Tags.Take(3))
+                                        {
+                                            <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1" @onclick:stopPropagation="true">#@tag</a>
+                                        }
+                                        @if (task.Tags.Count > 3)
+                                        {
+                                            <span class="badge bg-secondary">+@(task.Tags.Count - 3)</span>
+                                        }
+                                    </div>
+                                }
                             </div>
-                            @if (!string.IsNullOrEmpty(task.Description))
+                        </div>
+                        <div class="text-end">
+                            @if (task.Priority == 1)
                             {
-                                <div class="small text-muted text-truncate" style="max-width: 400px;">
-                                    <TagDisplay Text="@task.Description" />
+                                <span class="badge bg-danger">High</span>
+                            }
+                            @if (task.DueDate.HasValue)
+                            {
+                                var isOverdue = task.DueDate.Value.Date < DateTime.Today;
+                                <div class="small @(isOverdue ? "text-danger" : "text-muted")">
+                                    <span class="oi oi-calendar me-1"></span>@task.DueDate.Value.ToString("MMM d")
                                 </div>
                             }
-                            @if (task.Tags.Any())
+                            @if (!string.IsNullOrEmpty(task.Category))
                             {
-                                <div class="mt-1">
-                                    @foreach (var tag in task.Tags.Take(3))
-                                    {
-                                        <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1" @onclick:stopPropagation="true">#@tag</a>
-                                    }
-                                    @if (task.Tags.Count > 3)
-                                    {
-                                        <span class="badge bg-secondary">+@(task.Tags.Count - 3)</span>
-                                    }
-                                </div>
+                                <div class="small text-muted">@@@task.Category</div>
                             }
                         </div>
                     </div>
-                    <div class="text-end">
-                        @if (task.Priority == 1)
-                        {
-                            <span class="badge bg-danger">High</span>
-                        }
-                        @if (task.DueDate.HasValue)
-                        {
-                            var isOverdue = task.DueDate.Value.Date < DateTime.Today;
-                            <div class="small @(isOverdue ? "text-danger" : "text-muted")">
-                                <span class="oi oi-calendar me-1"></span>@task.DueDate.Value.ToString("MMM d")
-                            </div>
-                        }
-                        @if (!string.IsNullOrEmpty(task.Category))
-                        {
-                            <div class="small text-muted">@@@task.Category</div>
-                        }
-                    </div>
-                </div>
-            </a>
+                </a>
+            </div>
         }
     </div>
 }
+
+@* Batch Delete Confirmation Dialog *@
+<ConfirmDialog
+    Title="Delete Selected Tasks"
+    Message="@GetBatchDeleteMessage()"
+    IsVisible="@_showBatchDeleteConfirm"
+    OnConfirm="ConfirmBatchDelete"
+    OnCancel="() => _showBatchDeleteConfirm = false"
+    ConfirmText="Delete"
+    ConfirmButtonClass="btn-danger" />
 
 @* Add Task Modal *@
 <SelfOrganizer.App.Components.Shared.Modal Title="New Task" IsVisible="@_showAddModal" OnClose="CloseAddModal">
@@ -223,6 +268,10 @@ else
     private bool _showAddModal = false;
     private TodoTask _newTask = new();
 
+    // Batch selection state
+    private HashSet<Guid> _selectedTaskIds = new();
+    private bool _showBatchDeleteConfirm = false;
+
     protected override async Task OnInitializedAsync()
     {
         DataChangeNotification.OnDataChanged += HandleDataChanged;
@@ -231,6 +280,8 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        // Clear selection when changing tabs/status
+        _selectedTaskIds.Clear();
         await LoadTasks();
     }
 
@@ -371,6 +422,100 @@ else
         await TaskService.CreateAsync(_newTask);
         DataChangeNotification.NotifyDataChanged();
         CloseAddModal();
+    }
+
+    // Batch selection methods
+    private void ToggleTaskSelection(Guid taskId)
+    {
+        if (_selectedTaskIds.Contains(taskId))
+        {
+            _selectedTaskIds.Remove(taskId);
+        }
+        else
+        {
+            _selectedTaskIds.Add(taskId);
+        }
+    }
+
+    private void ToggleSelectAll()
+    {
+        if (_selectedTaskIds.Count == _filteredTasks.Count)
+        {
+            _selectedTaskIds.Clear();
+        }
+        else
+        {
+            _selectedTaskIds = _filteredTasks.Select(t => t.Id).ToHashSet();
+        }
+    }
+
+    private void SelectAllTasks()
+    {
+        _selectedTaskIds = _filteredTasks.Select(t => t.Id).ToHashSet();
+    }
+
+    private void DeselectAllTasks()
+    {
+        _selectedTaskIds.Clear();
+    }
+
+    private void ShowBatchDeleteConfirm()
+    {
+        if (_selectedTaskIds.Any())
+        {
+            _showBatchDeleteConfirm = true;
+        }
+    }
+
+    private string GetBatchDeleteMessage()
+    {
+        var count = _selectedTaskIds.Count;
+        return $"Are you sure you want to delete {count} task{(count != 1 ? "s" : "")}? This action cannot be undone.";
+    }
+
+    private async Task ConfirmBatchDelete()
+    {
+        if (_selectedTaskIds.Any())
+        {
+            await TaskService.BatchDeleteAsync(_selectedTaskIds);
+            _selectedTaskIds.Clear();
+            _showBatchDeleteConfirm = false;
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+    }
+
+    private async Task BatchMarkComplete()
+    {
+        if (_selectedTaskIds.Any())
+        {
+            await TaskService.BatchCompleteAsync(_selectedTaskIds);
+            _selectedTaskIds.Clear();
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+    }
+
+    private async Task BatchChangeStatus(TodoTaskStatus newStatus)
+    {
+        if (_selectedTaskIds.Any())
+        {
+            await TaskService.BatchChangeStatusAsync(_selectedTaskIds, newStatus);
+            _selectedTaskIds.Clear();
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+    }
+
+    private async Task BatchChangePriority(int priority)
+    {
+        if (_selectedTaskIds.Any())
+        {
+            await TaskService.BatchChangePriorityAsync(_selectedTaskIds, priority);
+            _selectedTaskIds.Clear();
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
     }
 
     public void Dispose()

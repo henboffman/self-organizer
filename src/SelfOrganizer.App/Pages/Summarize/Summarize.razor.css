@@ -1,0 +1,135 @@
+.report-period-banner {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+}
+
+.report-period-banner h4 {
+    color: white;
+}
+
+.summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transition: transform 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+}
+
+.summary-card.highlight {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.summary-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.summary-label {
+    font-size: 0.8rem;
+    opacity: 0.9;
+    margin-top: 4px;
+}
+
+.goal-progress-card {
+    background-color: var(--bs-light);
+    border-left: 4px solid var(--bs-primary);
+    transition: background-color 0.2s ease;
+}
+
+.goal-progress-card:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.goal-progress-card.completed {
+    border-left-color: var(--bs-success);
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+}
+
+.project-summary-card {
+    background-color: var(--bs-light);
+    border: 1px solid var(--bs-border-color);
+    transition: all 0.2s ease;
+}
+
+.project-summary-card:hover {
+    border-color: var(--bs-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.project-summary-card.completed {
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+    border-color: var(--bs-success);
+}
+
+.project-stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--bs-dark);
+}
+
+.project-stat-label {
+    font-size: 0.75rem;
+    color: var(--bs-secondary);
+}
+
+.capture-item {
+    background-color: var(--bs-light);
+    transition: background-color 0.2s ease;
+}
+
+.capture-item:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.capture-item.processed {
+    opacity: 0.7;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Dark mode adjustments */
+::deep .table {
+    --bs-table-bg: transparent;
+}
+
+@media (max-width: 768px) {
+    .summary-value {
+        font-size: 1.5rem;
+    }
+
+    .summary-label {
+        font-size: 0.7rem;
+    }
+
+    .report-period-banner h4 {
+        font-size: 1rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .btn {
+        display: none !important;
+    }
+
+    .card {
+        break-inside: avoid;
+    }
+
+    .summary-card {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

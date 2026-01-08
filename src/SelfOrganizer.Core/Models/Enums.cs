@@ -85,3 +85,7 @@ public enum RecurrencePattern
     /// <summary>Custom interval specified in RecurrenceIntervalDays</summary>
     Custom
 }
+
+public enum GoalStatus { Active, OnHold, Completed, Archived }
+public enum GoalCategory { Career, Health, Financial, Personal, Learning, Relationships, Creative, Other }
+public enum GoalTimeframe { Week, Month, Quarter, Year, MultiYear }

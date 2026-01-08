@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.Core.Interfaces
 @inject IRepository<UserPreferences> PreferencesRepository
@@ -10,7 +11,13 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="/capture" class="btn btn-outline-primary btn-sm me-3">
+            <div class="me-auto">
+                <SelfOrganizer.App.Components.FocusTimer.FocusTimerIndicator />
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="OpenGlobalSearch" title="Search (Cmd+Shift+Space)">
+                <span class="oi oi-magnifying-glass"></span>
+            </button>
+            <a href="/capture" class="btn btn-outline-primary btn-sm">
                 <span class="oi oi-plus"></span> Quick Capture
             </a>
             <a href="/settings" class="settings-link">Settings</a>
@@ -27,26 +34,6 @@
     IsVisible="_showOnboarding"
     OnCompleted="OnOnboardingCompleted" />
 
-@code {
-    private bool _showOnboarding = false;
-    private bool _checkedOnboarding = false;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && !_checkedOnboarding)
-        {
-            _checkedOnboarding = true;
-            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
-            if (prefs == null || !prefs.OnboardingCompleted)
-            {
-                _showOnboarding = true;
-                StateHasChanged();
-            }
-        }
-    }
-
-    private void OnOnboardingCompleted()
-    {
-        _showOnboarding = false;
-    }
-}
+<SelfOrganizer.App.Components.Shared.GlobalSearch
+    @bind-IsVisible="_showGlobalSearch"
+    OnClose="OnGlobalSearchClosed" />

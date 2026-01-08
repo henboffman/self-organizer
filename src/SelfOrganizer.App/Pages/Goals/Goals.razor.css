@@ -1,0 +1,83 @@
+/* ===========================================
+   Goals Page - Scoped Styles
+   =========================================== */
+
+/* Filter tabs styling */
+.nav-tabs .nav-link {
+    color: var(--text-secondary);
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    padding: var(--space-sm) var(--space-md);
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary-subtle);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    background: transparent;
+}
+
+/* Goal grid layout */
+.row {
+    margin: 0 calc(var(--space-sm) * -1);
+}
+
+.row > [class*="col"] {
+    padding: 0 var(--space-sm);
+}
+
+/* Empty state styling */
+.text-center.py-5 {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--border-default);
+    margin: var(--space-lg) 0;
+    padding: var(--space-2xl) !important;
+}
+
+/* Page header */
+h3 {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+h3 .bi {
+    color: var(--color-primary);
+}
+
+/* Badge count styling in tabs */
+.badge {
+    font-weight: 500;
+    padding: 0.25em 0.5em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .row > [class*="col"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: var(--space-sm);
+    }
+}
+
+/* Loading spinner container */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}

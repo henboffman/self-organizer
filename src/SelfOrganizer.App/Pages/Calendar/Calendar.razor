@@ -354,24 +354,30 @@ else
                         <div class="timeline-hours">
                             @for (int hour = _startHour; hour <= _endHour; hour++)
                             {
-                                <div class="timeline-hour-row">
+                                var currentHour = hour;
+                                <div class="timeline-hour-row" style="height: @(HourHeightPx)px;">
                                     <div class="timeline-gutter">
                                         <span class="hour-label">@(new TimeOnly(hour, 0).ToString("h tt"))</span>
                                     </div>
                                     @if (_viewMode == ViewMode.Day)
                                     {
-                                        <div class="timeline-hour-cell">
+                                        <div class="timeline-hour-cell"
+                                             @ondblclick="(e) => OnTimeSlotDoubleClick(e, currentHour, 0)">
                                             <div class="half-hour-line"></div>
                                         </div>
                                     }
                                     else
                                     {
+                                        var dayIdx = 0;
                                         @foreach (var date in GetDisplayDates())
                                         {
                                             var isToday = date == DateOnly.FromDateTime(DateTime.Today);
-                                            <div class="timeline-hour-cell @(isToday ? "today-column" : "")">
+                                            var capturedDayIdx = dayIdx;
+                                            <div class="timeline-hour-cell @(isToday ? "today-column" : "")"
+                                                 @ondblclick="(e) => OnTimeSlotDoubleClick(e, currentHour, capturedDayIdx)">
                                                 <div class="half-hour-line"></div>
                                             </div>
+                                            dayIdx++;
                                         }
                                     }
                                 </div>
@@ -407,65 +413,70 @@ else
 @* Add/Edit Event Modal *@
 <SelfOrganizer.App.Components.Shared.Modal Title="@(_editingEvent == null ? "New Event" : "Edit Event")" IsVisible="@_showModal" OnClose="CloseModal" Size="modal-lg">
     <ChildContent>
-        <div class="mb-3">
-            <label class="form-label">Title</label>
-            <input type="text" class="form-control" @bind="_eventTitle" />
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label class="form-label">Start Date & Time</label>
-                <input type="datetime-local" class="form-control"
-                       value="@_eventStart.ToString("yyyy-MM-ddTHH:mm")"
-                       @onchange="OnEventStartChanged" />
+        <div @onkeydown="OnModalKeyDown">
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="_eventTitle" @bind:event="oninput" @ref="_titleInputRef" />
             </div>
-            <div class="col-md-6">
-                <label class="form-label">End Date & Time</label>
-                <input type="datetime-local" class="form-control"
-                       value="@_eventEnd.ToString("yyyy-MM-ddTHH:mm")"
-                       @onchange="OnEventEndChanged" />
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Date & Time</label>
+                    <input type="datetime-local" class="form-control"
+                           value="@_eventStart.ToString("yyyy-MM-ddTHH:mm")"
+                           step="300"
+                           @onchange="OnEventStartChanged" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">End Date & Time</label>
+                    <input type="datetime-local" class="form-control"
+                           value="@_eventEnd.ToString("yyyy-MM-ddTHH:mm")"
+                           step="300"
+                           @onchange="OnEventEndChanged" />
+                </div>
             </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Location</label>
-            <input type="text" class="form-control" @bind="_eventLocation" />
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Description</label>
-            <textarea class="form-control" @bind="_eventDescription" rows="2"></textarea>
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label class="form-label">Category</label>
-                <select class="form-select" @bind="_eventCategory">
-                    @foreach (var cat in Enum.GetValues<MeetingCategory>())
-                    {
-                        <option value="@cat">@cat</option>
-                    }
-                </select>
+            <div class="mb-3">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-control" @bind="_eventLocation" />
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Prep Time (min)</label>
-                <input type="number" class="form-control" @bind="_eventPrepTime" min="0" />
-                <small class="text-muted">Block before event</small>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" @bind="_eventDescription" rows="2"></textarea>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Wind-down (min)</label>
-                <input type="number" class="form-control" @bind="_eventDecompressTime" min="0" />
-                <small class="text-muted">Block after event</small>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" @bind="_eventCategory">
+                        @foreach (var cat in Enum.GetValues<MeetingCategory>())
+                        {
+                            <option value="@cat">@cat</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Prep Time (min)</label>
+                    <input type="number" class="form-control" @bind="_eventPrepTime" min="0" />
+                    <small class="text-muted">Block before event</small>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Wind-down (min)</label>
+                    <input type="number" class="form-control" @bind="_eventDecompressTime" min="0" />
+                    <small class="text-muted">Block after event</small>
+                </div>
             </div>
-        </div>
-        <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" @bind="_eventRequiresFollowUp" id="requiresFollowUp" />
-            <label class="form-check-label" for="requiresFollowUp">
-                <strong>Requires Follow-up</strong>
-                <small class="text-muted d-block">Shows a reminder on calendar. Click it to create a follow-up task.</small>
-            </label>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" @bind="_eventRequiresFollowUp" id="requiresFollowUp" />
+                <label class="form-check-label" for="requiresFollowUp">
+                    <strong>Requires Follow-up</strong>
+                    <small class="text-muted d-block">Shows a reminder on calendar. Click it to create a follow-up task.</small>
+                </label>
+            </div>
         </div>
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-        <button class="btn btn-primary" @onclick="SaveEvent" disabled="@string.IsNullOrWhiteSpace(_eventTitle)">
-            @(_editingEvent == null ? "Create" : "Save")
+        <button class="btn btn-primary" @onclick="SaveEvent" disabled="@(!CanCreateEvent)">
+            @(_editingEvent == null ? "Create" : "Update")
+            <small class="ms-2 opacity-75">⌘↵</small>
         </button>
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
@@ -597,6 +608,21 @@ else
     private int _eventDecompressTime = 5;
     private bool _eventRequiresFollowUp = false;
 
+    // Modal focus management
+    private ElementReference _titleInputRef;
+    private bool _shouldFocusTitle = false;
+
+    // Remember last prep/wind-down times
+    private int _lastPrepTime = 5;
+    private int _lastDecompressTime = 5;
+
+    // Computed property for form validation
+    private bool CanCreateEvent => !string.IsNullOrWhiteSpace(_eventTitle) && _eventTitle.Length >= 3;
+
+    // Track last event settings for defaults
+    private TimeSpan _lastEventDuration = TimeSpan.FromHours(1);
+    private DateTime? _lastScheduledEventEnd = null;
+
     // Task scheduling state
     private bool _showAdvancedSettings = false;
     private bool _isScheduling = false;
@@ -649,6 +675,13 @@ else
             await InitializeResizeInterop();
 
             StateHasChanged();
+        }
+
+        // Focus title input when modal opens
+        if (_showModal && _shouldFocusTitle)
+        {
+            await _titleInputRef.FocusAsync();
+            _shouldFocusTitle = false;
         }
     }
 
@@ -855,9 +888,16 @@ else
     {
         // Start the hold-to-drag timer in JS
         // After 200ms, drag will be allowed and the element will become draggable
+        // Pass clientY so JS can check if we're on a resize edge
         _dragAllowed = false;
-        await JSRuntime.InvokeVoidAsync("dragDropInterop.initHoldToDrag",
-            itemType, itemId, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView());
+        var result = await JSRuntime.InvokeAsync<bool>("dragDropInterop.initHoldToDrag",
+            itemType, itemId, _startHour, HourHeightPx, GutterWidthPx, GetDaysInView(), e.ClientY);
+
+        // If initHoldToDrag returned false, we're on a resize edge - don't set up drag
+        if (!result)
+        {
+            _dragAllowed = false;
+        }
     }
 
     private async Task OnMouseUpItem(MouseEventArgs e)
@@ -1308,20 +1348,92 @@ else
         await LoadEvents();
     }
 
+    private void OnTimeSlotDoubleClick(MouseEventArgs e, int hour, int dayIndex)
+    {
+        // Calculate the date based on day index
+        var date = _currentDate.AddDays(dayIndex);
+
+        // Calculate minutes within the hour based on click position
+        // For simplicity, we'll round to 15-minute increments
+        // The click position within the cell tells us where in the hour they clicked
+        var minute = 0; // Default to top of the hour
+
+        // Create start time and use the preserved duration
+        var startTime = date.ToDateTime(new TimeOnly(hour, minute));
+        var endTime = startTime + _lastEventDuration;
+
+        ShowAddModalAtTime(startTime, endTime);
+    }
+
     private void ShowAddModal()
+    {
+        ShowAddModalAtTime(null, null);
+    }
+
+    private void ShowAddModalAtTime(DateTime? startTime, DateTime? endTime)
     {
         _editingEvent = null;
         _eventTitle = string.Empty;
-        _eventStart = _currentDate.ToDateTime(new TimeOnly(9, 0));
-        _eventEnd = _currentDate.ToDateTime(new TimeOnly(10, 0));
-        _eventDuration = _eventEnd - _eventStart;
+
+        // Determine the start time:
+        // 1. If startTime is provided (from double-click), use it
+        // 2. Otherwise, if there's a last scheduled event, start after it
+        // 3. Otherwise, default to 9 AM on the next calendar day
+        if (startTime.HasValue)
+        {
+            _eventStart = startTime.Value;
+        }
+        else if (_lastScheduledEventEnd.HasValue && _lastScheduledEventEnd.Value > DateTime.Now)
+        {
+            // Round up to next 5-minute mark after the last event
+            var minutes = _lastScheduledEventEnd.Value.Minute;
+            var roundedMinutes = ((minutes / 5) + 1) * 5;
+            if (roundedMinutes >= 60)
+            {
+                _eventStart = new DateTime(
+                    _lastScheduledEventEnd.Value.Year,
+                    _lastScheduledEventEnd.Value.Month,
+                    _lastScheduledEventEnd.Value.Day,
+                    _lastScheduledEventEnd.Value.Hour + 1,
+                    0, 0);
+            }
+            else
+            {
+                _eventStart = new DateTime(
+                    _lastScheduledEventEnd.Value.Year,
+                    _lastScheduledEventEnd.Value.Month,
+                    _lastScheduledEventEnd.Value.Day,
+                    _lastScheduledEventEnd.Value.Hour,
+                    roundedMinutes, 0);
+            }
+        }
+        else
+        {
+            // Default to 9 AM tomorrow
+            var tomorrow = DateTime.Today.AddDays(1);
+            _eventStart = tomorrow.AddHours(9);
+        }
+
+        // Use the provided end time or preserve last duration
+        if (endTime.HasValue)
+        {
+            _eventEnd = endTime.Value;
+            _eventDuration = _eventEnd - _eventStart;
+        }
+        else
+        {
+            _eventDuration = _lastEventDuration;
+            _eventEnd = _eventStart + _eventDuration;
+        }
+
         _eventLocation = string.Empty;
         _eventDescription = string.Empty;
         _eventCategory = MeetingCategory.Other;
-        _eventPrepTime = 5;
-        _eventDecompressTime = 5;
+        _eventPrepTime = _lastPrepTime;
+        _eventDecompressTime = _lastDecompressTime;
         _eventRequiresFollowUp = false;
         _showModal = true;
+        _shouldFocusTitle = true;
     }
 
     private void EditEvent(CalendarEvent evt)
@@ -1346,6 +1458,18 @@ else
         _editingEvent = null;
         _viewingTask = null;
         _showTaskModal = false;
+    }
+
+    private async Task OnModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && (e.MetaKey || e.CtrlKey) && CanCreateEvent)
+        {
+            await SaveEvent();
+        }
+        else if (e.Key == "Escape")
+        {
+            CloseModal();
+        }
     }
 
     // Task details modal
@@ -1416,6 +1540,12 @@ else
                 Tags = allTags
             };
             await CalendarService.CreateAsync(evt);
+
+            // Track this as the last scheduled event for future defaults
+            _lastScheduledEventEnd = _eventEnd;
+            _lastEventDuration = _eventEnd - _eventStart;
+            _lastPrepTime = _eventPrepTime;
+            _lastDecompressTime = _eventDecompressTime;
         }
         else
         {
@@ -1432,6 +1562,12 @@ else
             // Merge existing tags with newly extracted tags
             _editingEvent.Tags = TagParsingService.MergeTags(_editingEvent.Tags, allTags);
             await CalendarService.UpdateAsync(_editingEvent);
+
+            // Also update last scheduled event tracking
+            _lastScheduledEventEnd = _eventEnd;
+            _lastEventDuration = _eventEnd - _eventStart;
+            _lastPrepTime = _eventPrepTime;
+            _lastDecompressTime = _eventDecompressTime;
         }
 
         CloseModal();
@@ -2078,6 +2214,7 @@ else
         try
         {
             await JSRuntime.InvokeVoidAsync("quickBlockInterop.dispose");
+            await JSRuntime.InvokeVoidAsync("resizeInterop.dispose");
         }
         catch
         {

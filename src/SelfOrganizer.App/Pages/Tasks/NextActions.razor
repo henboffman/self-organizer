@@ -6,6 +6,8 @@
 @inject IExportService ExportService
 @inject IDataChangeNotificationService DataChangeNotification
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject IFocusTimerState FocusTimer
+@inject NavigationManager Navigation
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>
@@ -92,6 +94,7 @@ else
                 OnEdit="EditTask"
                 OnDelete="DeleteTask"
                 OnDeactivate="DeactivateTask"
+                OnFocus="FocusOnTask"
                 ShowDeactivate="true" />
         }
     }
@@ -118,6 +121,7 @@ else
                         OnEdit="EditTask"
                         OnDelete="DeleteTask"
                         OnDeactivate="DeactivateTask"
+                        OnFocus="FocusOnTask"
                         ShowDeactivate="true" />
                 }
             }
@@ -141,6 +145,7 @@ else
                         OnEdit="EditTask"
                         OnDelete="DeleteTask"
                         OnDeactivate="DeactivateTask"
+                        OnFocus="FocusOnTask"
                         ShowDeactivate="true" />
                 }
             }
@@ -373,6 +378,12 @@ else
         {
             _isLoading = false;
         }
+    }
+
+    private async Task FocusOnTask(TodoTask task)
+    {
+        await FocusTimer.StartFocusAsync(task);
+        Navigation.NavigateTo("/focus");
     }
 
     private void ShowAddModal()

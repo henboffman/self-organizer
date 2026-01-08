@@ -1,0 +1,99 @@
+/* Goal Edit Page Styles */
+
+.goal-edit-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 100px; /* Space for mobile bottom bar */
+}
+
+.page-header {
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-primary);
+    padding: var(--space-md) 0;
+    z-index: 10;
+    border-bottom: 1px solid var(--border-default);
+    margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-lg);
+    padding: var(--space-md);
+}
+
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+}
+
+.card-header {
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.card-header h5 {
+    color: var(--text-primary);
+}
+
+.form-control,
+.form-select {
+    background-color: var(--input-bg);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+
+.form-control:focus,
+.form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--color-primary);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--color-primary-rgb), 0.25);
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
+}
+
+.form-label {
+    color: var(--text-primary);
+}
+
+/* Larger textareas for better editing */
+textarea.form-control {
+    min-height: 120px;
+    line-height: 1.6;
+}
+
+textarea.font-monospace {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
+    font-size: 0.9rem;
+}
+
+/* Mobile bottom bar */
+.fixed-bottom {
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Form range styling */
+.form-range::-webkit-slider-thumb {
+    background-color: var(--color-primary);
+}
+
+.form-range::-moz-range-thumb {
+    background-color: var(--color-primary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+    .page-header .d-flex.gap-2 {
+        display: none !important;
+    }
+
+    .goal-edit-page {
+        padding-bottom: 120px;
+    }
+}
+
+@media (min-width: 992px) {
+    .page-header {
+        margin: 0 0 var(--space-lg);
+        padding: var(--space-md) 0;
+        border-bottom: none;
+    }
+}

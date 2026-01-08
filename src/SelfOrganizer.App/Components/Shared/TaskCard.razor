@@ -6,8 +6,10 @@
     [Parameter] public EventCallback<TodoTask> OnEdit { get; set; }
     [Parameter] public EventCallback<TodoTask> OnDelete { get; set; }
     [Parameter] public EventCallback<TodoTask> OnDeactivate { get; set; }
+    [Parameter] public EventCallback<TodoTask> OnFocus { get; set; }
     [Parameter] public bool ShowProject { get; set; } = true;
     [Parameter] public bool ShowDeactivate { get; set; } = false;
+    [Parameter] public bool ShowFocus { get; set; } = true;
 }
 
 <div class="card task-card mb-2">
@@ -47,6 +49,12 @@
                 </div>
             </div>
             <div class="task-actions">
+                @if (ShowFocus && OnFocus.HasDelegate)
+                {
+                    <button class="btn btn-sm btn-link text-primary" @onclick="() => OnFocus.InvokeAsync(Task)" title="Focus on this task">
+                        <span class="oi oi-target"></span>
+                    </button>
+                }
                 @if (ShowDeactivate)
                 {
                     <button class="btn btn-sm btn-link text-warning" @onclick="() => OnDeactivate.InvokeAsync(Task)" title="Move back to Inbox">

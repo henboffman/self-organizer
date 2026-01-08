@@ -1,0 +1,138 @@
+@using SelfOrganizer.Core.Models
+
+@code {
+    [Parameter] public int SelectedCount { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public EventCallback OnSelectAll { get; set; }
+    [Parameter] public EventCallback OnDeselectAll { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public EventCallback OnMarkComplete { get; set; }
+    [Parameter] public EventCallback<TodoTaskStatus> OnChangeStatus { get; set; }
+    [Parameter] public EventCallback<int> OnChangePriority { get; set; }
+    [Parameter] public bool ShowStatusActions { get; set; } = true;
+    [Parameter] public bool ShowPriorityActions { get; set; } = true;
+
+    private bool _showStatusDropdown = false;
+    private bool _showPriorityDropdown = false;
+
+    private void ToggleStatusDropdown()
+    {
+        _showStatusDropdown = !_showStatusDropdown;
+        _showPriorityDropdown = false;
+    }
+
+    private void TogglePriorityDropdown()
+    {
+        _showPriorityDropdown = !_showPriorityDropdown;
+        _showStatusDropdown = false;
+    }
+
+    private async Task HandleStatusChange(TodoTaskStatus status)
+    {
+        _showStatusDropdown = false;
+        await OnChangeStatus.InvokeAsync(status);
+    }
+
+    private async Task HandlePriorityChange(int priority)
+    {
+        _showPriorityDropdown = false;
+        await OnChangePriority.InvokeAsync(priority);
+    }
+}
+
+@if (SelectedCount > 0)
+{
+    <div class="batch-selection-toolbar alert alert-info mb-3 py-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold">
+                    @SelectedCount of @TotalCount selected
+                </span>
+                <div class="btn-group btn-group-sm">
+                    @if (SelectedCount < TotalCount)
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="OnSelectAll" title="Select all">
+                            Select All
+                        </button>
+                    }
+                    <button class="btn btn-outline-secondary" @onclick="OnDeselectAll" title="Deselect all">
+                        Deselect All
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                @* Mark Complete Button *@
+                <button class="btn btn-sm btn-success" @onclick="OnMarkComplete" title="Mark selected as complete">
+                    <span class="oi oi-check me-1"></span> Complete
+                </button>
+
+                @* Change Status Dropdown *@
+                @if (ShowStatusActions)
+                {
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle"
+                                type="button"
+                                @onclick="ToggleStatusDropdown"
+                                @onclick:stopPropagation="true">
+                            <span class="oi oi-transfer me-1"></span> Status
+                        </button>
+                        @if (_showStatusDropdown)
+                        {
+                            <div class="dropdown-menu show" @onclick:stopPropagation="true">
+                                <button class="dropdown-item" @onclick="() => HandleStatusChange(TodoTaskStatus.NextAction)">
+                                    <span class="oi oi-task me-2"></span> Next Action
+                                </button>
+                                <button class="dropdown-item" @onclick="() => HandleStatusChange(TodoTaskStatus.WaitingFor)">
+                                    <span class="oi oi-clock me-2"></span> Waiting For
+                                </button>
+                                <button class="dropdown-item" @onclick="() => HandleStatusChange(TodoTaskStatus.Scheduled)">
+                                    <span class="oi oi-calendar me-2"></span> Scheduled
+                                </button>
+                                <button class="dropdown-item" @onclick="() => HandleStatusChange(TodoTaskStatus.SomedayMaybe)">
+                                    <span class="oi oi-star me-2"></span> Someday/Maybe
+                                </button>
+                                <div class="dropdown-divider"></div>
+                                <button class="dropdown-item" @onclick="() => HandleStatusChange(TodoTaskStatus.Inbox)">
+                                    <span class="oi oi-inbox me-2"></span> Back to Inbox
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* Change Priority Dropdown *@
+                @if (ShowPriorityActions)
+                {
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-warning dropdown-toggle"
+                                type="button"
+                                @onclick="TogglePriorityDropdown"
+                                @onclick:stopPropagation="true">
+                            <span class="oi oi-flag me-1"></span> Priority
+                        </button>
+                        @if (_showPriorityDropdown)
+                        {
+                            <div class="dropdown-menu show" @onclick:stopPropagation="true">
+                                <button class="dropdown-item" @onclick="() => HandlePriorityChange(1)">
+                                    <span class="badge bg-danger me-2">High</span> High Priority
+                                </button>
+                                <button class="dropdown-item" @onclick="() => HandlePriorityChange(2)">
+                                    <span class="badge bg-secondary me-2">Normal</span> Normal Priority
+                                </button>
+                                <button class="dropdown-item" @onclick="() => HandlePriorityChange(3)">
+                                    <span class="badge bg-light text-dark me-2">Low</span> Low Priority
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* Delete Button *@
+                <button class="btn btn-sm btn-outline-danger" @onclick="OnDelete" title="Delete selected">
+                    <span class="oi oi-trash me-1"></span> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+}

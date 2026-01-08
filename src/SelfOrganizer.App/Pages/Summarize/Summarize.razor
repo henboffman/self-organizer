@@ -1,0 +1,548 @@
+@page "/summarize"
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject ISummaryService SummaryService
+@inject IExportService ExportService
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-document me-2"></span>Summary Report
+    </h3>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <span class="oi oi-calendar me-2"></span>Select Time Period
+    </div>
+    <div class="card-body">
+        <div class="row align-items-end">
+            <div class="col-md-4 mb-3 mb-md-0">
+                <label class="form-label">Quick Select</label>
+                <select class="form-select" @onchange="OnTimeFrameChanged">
+                    <option value="week">Past Week</option>
+                    <option value="month" selected>Past Month</option>
+                    <option value="quarter">Past Quarter</option>
+                    <option value="year">Past Year</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+            @if (_selectedTimeFrame == "custom")
+            {
+                <div class="col-md-3 mb-3 mb-md-0">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" @bind="_customStartDate" />
+                </div>
+                <div class="col-md-3 mb-3 mb-md-0">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" @bind="_customEndDate" />
+                </div>
+            }
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="GenerateReport" disabled="@_isGenerating">
+                    @if (_isGenerating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        <span>Generating...</span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-flash me-1"></span>
+                        <span>Generate</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_report != null)
+{
+    <div class="d-flex justify-content-end mb-3 gap-2">
+        <button class="btn btn-outline-secondary" @onclick="ExportMarkdown" disabled="@_isExporting">
+            <span class="oi oi-document me-1"></span> Export Markdown
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="ExportHtml" disabled="@_isExporting">
+            <span class="oi oi-browser me-1"></span> Export HTML
+        </button>
+    </div>
+
+    @if (_exportMessage != null)
+    {
+        <div class="alert @(_exportSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show mb-3">
+            @_exportMessage
+            <button type="button" class="btn-close" @onclick="@(() => _exportMessage = null)"></button>
+        </div>
+    }
+
+    <div class="report-period-banner mb-4">
+        <div class="text-center py-3">
+            <h4 class="mb-1">@_report.StartDate.ToString("MMMM d, yyyy") - @_report.EndDate.ToString("MMMM d, yyyy")</h4>
+            <small class="text-muted">Generated @_report.GeneratedAt.ToString("MMMM d, yyyy h:mm tt")</small>
+        </div>
+    </div>
+
+    @* Executive Summary Cards *@
+    <div class="row mb-4">
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card text-center p-3 rounded">
+                <div class="summary-value">@_report.TotalTasksCompleted</div>
+                <div class="summary-label">Tasks Completed</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card text-center p-3 rounded">
+                <div class="summary-value">@_report.ProjectsWorkedOn</div>
+                <div class="summary-label">Projects</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card text-center p-3 rounded">
+                <div class="summary-value">@FormatMinutes(_report.TotalActualMinutes)</div>
+                <div class="summary-label">Time Tracked</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card text-center p-3 rounded">
+                <div class="summary-value">@_report.TotalCaptureItems</div>
+                <div class="summary-label">Ideas Captured</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card highlight text-center p-3 rounded">
+                <div class="summary-value">@_report.DeepWorkTasksCompleted</div>
+                <div class="summary-label">Deep Work Tasks</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2 mb-3">
+            <div class="summary-card highlight text-center p-3 rounded">
+                <div class="summary-value">@_report.HighPriorityTasksCompleted</div>
+                <div class="summary-label">High Priority</div>
+            </div>
+        </div>
+    </div>
+
+    @* Goals Progress Section *@
+    @if (_report.GoalProgress.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="bi bi-bullseye me-2"></span>Goals Progress
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var goal in _report.GoalProgress)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="goal-progress-card p-3 rounded @(goal.WasCompletedInPeriod ? "completed" : "")">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="mb-0">@goal.Title</h6>
+                                    <span class="badge @GetGoalStatusBadgeClass(goal.Status)">@goal.Status</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar" role="progressbar" style="width: @goal.EndProgressPercent%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>@goal.EndProgressPercent% complete</span>
+                                    <span>@goal.Category</span>
+                                </div>
+                                @if (goal.LinkedTasksCompleted > 0 || goal.LinkedProjectsWorkedOn > 0)
+                                {
+                                    <div class="mt-2 small">
+                                        @if (goal.LinkedTasksCompleted > 0)
+                                        {
+                                            <span class="me-2"><span class="oi oi-check text-success"></span> @goal.LinkedTasksCompleted tasks</span>
+                                        }
+                                        @if (goal.LinkedProjectsWorkedOn > 0)
+                                        {
+                                            <span><span class="oi oi-folder text-primary"></span> @goal.LinkedProjectsWorkedOn projects</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Time Allocation Section *@
+    @if (_report.TimeByContext.Any() || _report.TimeByCategory.Any())
+    {
+        <div class="row mb-4">
+            @if (_report.TimeByContext.Any())
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <span class="oi oi-location me-2"></span>Time by Context
+                        </div>
+                        <div class="card-body">
+                            @foreach (var (context, minutes) in _report.TimeByContext)
+                            {
+                                var percentage = _report.TotalActualMinutes > 0 ? (double)minutes / _report.TotalActualMinutes * 100 : 0;
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>@context</span>
+                                        <span class="text-muted">@FormatMinutes(minutes) (@percentage.ToString("F0")%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-primary" style="width: @percentage%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            @if (_report.TimeByCategory.Any())
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <span class="oi oi-tags me-2"></span>Time by Category
+                        </div>
+                        <div class="card-body">
+                            @foreach (var (category, minutes) in _report.TimeByCategory)
+                            {
+                                var percentage = _report.TotalActualMinutes > 0 ? (double)minutes / _report.TotalActualMinutes * 100 : 0;
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>@category</span>
+                                        <span class="text-muted">@FormatMinutes(minutes) (@percentage.ToString("F0")%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-success" style="width: @percentage%"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @* Projects Section *@
+    @if (_report.Projects.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-folder me-2"></span>Projects Worked On
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var project in _report.Projects)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="project-summary-card p-3 rounded @(project.WasCompletedInPeriod ? "completed" : "")">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="mb-0">@project.Name</h6>
+                                    @if (project.WasCompletedInPeriod)
+                                    {
+                                        <span class="badge bg-success">Completed</span>
+                                    }
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col-4">
+                                        <div class="project-stat-value">@project.TasksCompleted</div>
+                                        <div class="project-stat-label">Done</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="project-stat-value">@project.TasksRemaining</div>
+                                        <div class="project-stat-label">Left</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="project-stat-value">@FormatMinutes(project.TotalMinutesSpent)</div>
+                                        <div class="project-stat-label">Time</div>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(project.Category))
+                                {
+                                    <div class="mt-2 small text-muted">@project.Category</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Completed Tasks Section *@
+    @if (_report.CompletedTasks.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-check me-2"></span>Completed Tasks</span>
+                <span class="badge bg-secondary">@_report.CompletedTasks.Count total</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Project</th>
+                                <th>Completed</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var task in _report.CompletedTasks.Take(_showAllTasks ? int.MaxValue : 20))
+                            {
+                                <tr class="@(task.Priority == 1 ? "table-warning" : "")">
+                                    <td>
+                                        @task.Title
+                                        @if (task.RequiresDeepWork)
+                                        {
+                                            <span class="badge bg-primary ms-1">Deep Work</span>
+                                        }
+                                    </td>
+                                    <td>@(task.ProjectName ?? "-")</td>
+                                    <td>@task.CompletedAt.ToString("MMM d")</td>
+                                    <td>@FormatMinutes(task.ActualMinutes ?? task.EstimatedMinutes)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (_report.CompletedTasks.Count > 20)
+                {
+                    <div class="text-center py-3 border-top">
+                        <button class="btn btn-link" @onclick="@(() => _showAllTasks = !_showAllTasks)">
+                            @if (_showAllTasks)
+                            {
+                                <span>Show Less</span>
+                            }
+                            else
+                            {
+                                <span>Show All @_report.CompletedTasks.Count Tasks</span>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* Ideas & Captures Section *@
+    @if (_report.CaptureItems.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-lightbulb me-2"></span>Ideas & Captures</span>
+                <span class="badge bg-secondary">@_report.CaptureItems.Count total</span>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    @foreach (var item in _report.CaptureItems.Take(_showAllCaptures ? int.MaxValue : 10))
+                    {
+                        <li class="capture-item p-2 rounded mb-2 @(item.IsProcessed ? "processed" : "")">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span>@item.Text</span>
+                                <div class="ms-2 text-nowrap">
+                                    <small class="text-muted me-2">@item.CapturedAt.ToString("MMM d")</small>
+                                    @if (item.IsProcessed)
+                                    {
+                                        <span class="badge bg-success">Processed</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (item.Tags.Any())
+                            {
+                                <div class="mt-1">
+                                    @foreach (var tag in item.Tags)
+                                    {
+                                        <span class="badge bg-secondary me-1">#@tag</span>
+                                    }
+                                </div>
+                            }
+                        </li>
+                    }
+                </ul>
+                @if (_report.CaptureItems.Count > 10)
+                {
+                    <div class="text-center pt-2">
+                        <button class="btn btn-link" @onclick="@(() => _showAllCaptures = !_showAllCaptures)">
+                            @if (_showAllCaptures)
+                            {
+                                <span>Show Less</span>
+                            }
+                            else
+                            {
+                                <span>Show All @_report.CaptureItems.Count Items</span>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @* Top Tags Section *@
+    @if (_report.TopTags.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-tags me-2"></span>Top Tags
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var tag in _report.TopTags)
+                    {
+                        <span class="tag-badge">#@tag</span>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+else if (!_isGenerating)
+{
+    <div class="text-center py-5">
+        <div class="mb-3">
+            <span class="oi oi-document" style="font-size: 4rem; color: var(--bs-secondary);"></span>
+        </div>
+        <h5 class="text-muted">No Report Generated</h5>
+        <p class="text-muted">Select a time period and click Generate to create your summary report.</p>
+        <p class="text-muted small">Use this report in your 1:1 meetings to share your accomplishments with your leader.</p>
+    </div>
+}
+
+@code {
+    private string _selectedTimeFrame = "month";
+    private DateTime _customStartDate = DateTime.Now.AddMonths(-1).Date;
+    private DateTime _customEndDate = DateTime.Now.Date;
+    private SummaryReport? _report;
+    private bool _isGenerating = false;
+    private bool _isExporting = false;
+    private bool _showAllTasks = false;
+    private bool _showAllCaptures = false;
+    private string? _exportMessage;
+    private bool _exportSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Auto-generate report for past month on load
+        await GenerateReport();
+    }
+
+    private void OnTimeFrameChanged(ChangeEventArgs e)
+    {
+        _selectedTimeFrame = e.Value?.ToString() ?? "month";
+    }
+
+    private async Task GenerateReport()
+    {
+        _isGenerating = true;
+        _showAllTasks = false;
+        _showAllCaptures = false;
+        _exportMessage = null;
+
+        try
+        {
+            var (startDate, endDate) = GetDateRange();
+            _report = await SummaryService.GenerateSummaryAsync(startDate, endDate);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private (DateTime start, DateTime end) GetDateRange()
+    {
+        var endDate = DateTime.Now.Date.AddDays(1).AddSeconds(-1); // End of today
+        var startDate = _selectedTimeFrame switch
+        {
+            "week" => DateTime.Now.Date.AddDays(-7),
+            "month" => DateTime.Now.Date.AddMonths(-1),
+            "quarter" => DateTime.Now.Date.AddMonths(-3),
+            "year" => DateTime.Now.Date.AddYears(-1),
+            "custom" => _customStartDate.Date,
+            _ => DateTime.Now.Date.AddMonths(-1)
+        };
+
+        if (_selectedTimeFrame == "custom")
+        {
+            endDate = _customEndDate.Date.AddDays(1).AddSeconds(-1);
+        }
+
+        return (startDate, endDate);
+    }
+
+    private async Task ExportMarkdown()
+    {
+        if (_report == null) return;
+
+        _isExporting = true;
+        try
+        {
+            var markdown = SummaryService.ExportToMarkdown(_report);
+            var filename = $"summary-report-{_report.StartDate:yyyy-MM-dd}-to-{_report.EndDate:yyyy-MM-dd}.md";
+            var result = await ExportService.DownloadFileAsync(filename, markdown, "text/markdown");
+
+            if (result.Success)
+            {
+                _exportMessage = $"Report exported successfully as {filename}";
+                _exportSuccess = true;
+            }
+            else
+            {
+                _exportMessage = result.ErrorMessage ?? "Export failed";
+                _exportSuccess = false;
+            }
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private async Task ExportHtml()
+    {
+        if (_report == null) return;
+
+        _isExporting = true;
+        try
+        {
+            var html = SummaryService.ExportToHtml(_report);
+            var filename = $"summary-report-{_report.StartDate:yyyy-MM-dd}-to-{_report.EndDate:yyyy-MM-dd}.html";
+            var result = await ExportService.DownloadFileAsync(filename, html, "text/html");
+
+            if (result.Success)
+            {
+                _exportMessage = $"Report exported successfully as {filename}. Open in browser and print to PDF for a formatted document.";
+                _exportSuccess = true;
+            }
+            else
+            {
+                _exportMessage = result.ErrorMessage ?? "Export failed";
+                _exportSuccess = false;
+            }
+        }
+        finally
+        {
+            _isExporting = false;
+        }
+    }
+
+    private string FormatMinutes(int minutes)
+    {
+        if (minutes < 60)
+            return $"{minutes}m";
+        var hours = minutes / 60;
+        var mins = minutes % 60;
+        return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
+    }
+
+    private string GetGoalStatusBadgeClass(GoalStatus status) => status switch
+    {
+        GoalStatus.Completed => "bg-success",
+        GoalStatus.Active => "bg-primary",
+        GoalStatus.OnHold => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}

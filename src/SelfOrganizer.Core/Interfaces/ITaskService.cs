@@ -90,4 +90,25 @@ public interface ITaskService
     /// Calculates the next occurrence date based on recurrence pattern
     /// </summary>
     DateTime CalculateNextOccurrence(TodoTask task);
+
+    // Batch operations
+    /// <summary>
+    /// Deletes multiple tasks at once
+    /// </summary>
+    Task BatchDeleteAsync(IEnumerable<Guid> taskIds);
+
+    /// <summary>
+    /// Marks multiple tasks as completed
+    /// </summary>
+    Task BatchCompleteAsync(IEnumerable<Guid> taskIds);
+
+    /// <summary>
+    /// Changes the status of multiple tasks
+    /// </summary>
+    Task BatchChangeStatusAsync(IEnumerable<Guid> taskIds, TodoTaskStatus newStatus);
+
+    /// <summary>
+    /// Changes the priority of multiple tasks
+    /// </summary>
+    Task BatchChangePriorityAsync(IEnumerable<Guid> taskIds, int priority);
 }

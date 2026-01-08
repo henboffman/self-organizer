@@ -1,0 +1,103 @@
+@if (IsVisible)
+{
+    <div class="global-search-backdrop" @onclick="Close" @onkeydown="HandleKeyDown" tabindex="-1">
+        <div class="global-search-container" @onclick:stopPropagation="true">
+            <div class="search-input-wrapper">
+                <span class="oi oi-magnifying-glass search-icon"></span>
+                <input type="text"
+                       class="search-input"
+                       placeholder="Search tasks, projects, events..."
+                       @bind="SearchQuery"
+                       @bind:event="oninput"
+                       @ref="_searchInput"
+                       @onkeydown="HandleInputKeyDown"
+                       autofocus />
+                @if (!string.IsNullOrEmpty(SearchQuery))
+                {
+                    <button class="clear-button" @onclick="ClearSearch" type="button">
+                        <span class="oi oi-x"></span>
+                    </button>
+                }
+                <span class="search-shortcut">ESC to close</span>
+            </div>
+
+            <div class="search-content">
+                @if (_isSearching)
+                {
+                    <div class="search-loading">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Searching...</span>
+                        </div>
+                        <span>Searching...</span>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(SearchQuery) && _searchResults?.Results.Count > 0)
+                {
+                    <div class="search-results">
+                        @foreach (var group in _searchResults.Results.GroupBy(r => r.Type))
+                        {
+                            <div class="result-group">
+                                <div class="result-group-header">
+                                    <span class="result-group-title">@GetTypeDisplayName(group.Key)</span>
+                                    <span class="result-group-count">@group.Count()</span>
+                                </div>
+                                @foreach (var result in group)
+                                {
+                                    var resultIndex = _searchResults.Results.IndexOf(result);
+                                    <div class="result-item @(resultIndex == _selectedIndex ? "selected" : "")"
+                                         @onclick="() => SelectResult(result)"
+                                         @onmouseenter="() => _selectedIndex = resultIndex">
+                                        <span class="oi @result.Icon result-icon"></span>
+                                        <div class="result-content">
+                                            <span class="result-title">@result.Title</span>
+                                            @if (!string.IsNullOrEmpty(result.Subtitle))
+                                            {
+                                                <span class="result-subtitle">@result.Subtitle</span>
+                                            }
+                                        </div>
+                                        <span class="result-type-badge">@result.Type</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    <div class="no-results">
+                        <span class="oi oi-magnifying-glass no-results-icon"></span>
+                        <span>No results found for "@SearchQuery"</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="quick-actions">
+                        <div class="quick-actions-header">Quick Actions</div>
+                        @foreach (var action in _quickActions)
+                        {
+                            var actionIndex = _quickActions.ToList().IndexOf(action);
+                            <div class="quick-action-item @(actionIndex == _selectedIndex ? "selected" : "")"
+                                 @onclick="() => ExecuteQuickAction(action)"
+                                 @onmouseenter="() => _selectedIndex = actionIndex">
+                                <span class="oi @action.Icon quick-action-icon"></span>
+                                <span class="quick-action-title">@action.Title</span>
+                                @if (!string.IsNullOrEmpty(action.Shortcut))
+                                {
+                                    <span class="quick-action-shortcut">@action.Shortcut</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="search-footer">
+                <div class="footer-hints">
+                    <span class="hint"><kbd>↑↓</kbd> Navigate</span>
+                    <span class="hint"><kbd>Enter</kbd> Select</span>
+                    <span class="hint"><kbd>Esc</kbd> Close</span>
+                </div>
+            </div>
+        </div>
+    </div>
+}

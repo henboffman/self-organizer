@@ -1,0 +1,120 @@
+/* ===========================================
+   GoalForm Component - Scoped Styles
+   =========================================== */
+
+/* Form labels */
+.form-label {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.375rem;
+}
+
+/* Required field indicator */
+.form-label .text-danger {
+    font-size: 0.875rem;
+}
+
+/* Form inputs */
+.form-control,
+.form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+    background-color: var(--input-bg);
+}
+
+.form-control::placeholder {
+    color: var(--input-placeholder);
+}
+
+/* Textarea specific styling */
+textarea.form-control {
+    resize: vertical;
+    min-height: 60px;
+}
+
+/* Help text */
+small.text-muted {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Form row spacing */
+.row.mb-3 {
+    margin-bottom: var(--space-md) !important;
+}
+
+/* Select dropdown styling */
+.form-select option {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Border top for actions */
+.border-top {
+    border-color: var(--border-default) !important;
+}
+
+/* Form actions */
+.d-flex.justify-content-end.gap-2 {
+    background-color: var(--bg-tertiary);
+    margin: 0 calc(var(--space-md) * -1);
+    margin-bottom: calc(var(--space-md) * -1);
+    padding: var(--space-md);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: transparent;
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+/* Validation messages */
+.validation-message {
+    color: var(--color-danger);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .row > [class*="col-md"] {
+        margin-bottom: var(--space-md);
+    }
+
+    .row > [class*="col-md"]:last-child {
+        margin-bottom: 0;
+    }
+}

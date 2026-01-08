@@ -61,6 +61,16 @@
             </NavLink>
         </div>
 
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="goals">
+                <span class="bi bi-bullseye me-2" aria-hidden="true"></span> Goals
+                @if (_goalsCount > 0)
+                {
+                    <span class="badge bg-secondary ms-1">@_goalsCount</span>
+                }
+            </NavLink>
+        </div>
+
         @* Organization *@
         <div class="nav-section-label px-3 pt-3 text-uppercase small text-muted">Organize</div>
 
@@ -109,6 +119,12 @@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="reports">
                 <span class="oi oi-graph" aria-hidden="true"></span> Reports
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="summarize">
+                <span class="oi oi-document" aria-hidden="true"></span> Summarize
             </NavLink>
         </div>
     </nav>

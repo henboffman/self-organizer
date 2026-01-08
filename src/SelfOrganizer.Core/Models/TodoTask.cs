@@ -78,6 +78,12 @@ public class TodoTask : BaseEntity
     /// </summary>
     public string? WhoFor { get; set; }
 
+    // Goal linkage
+    /// <summary>
+    /// Goal IDs this task contributes to
+    /// </summary>
+    public List<Guid> GoalIds { get; set; } = new();
+
     // Computed properties for optimizer
     /// <summary>
     /// Returns true if this task is blocked by incomplete tasks

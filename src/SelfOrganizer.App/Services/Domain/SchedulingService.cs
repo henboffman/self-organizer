@@ -11,19 +11,25 @@ public class SchedulingService : ISchedulingService
     private readonly IRepository<UserPreferences> _preferencesRepository;
     private readonly IRepository<CategoryDefinition> _categoryRepository;
     private readonly ITaskOptimizerService _taskOptimizer;
+    private readonly IGoalService _goalService;
+    private readonly IRepository<TodoTask> _taskRepository;
 
     public SchedulingService(
         IRepository<TimeBlock> repository,
         ICalendarService calendarService,
         IRepository<UserPreferences> preferencesRepository,
         IRepository<CategoryDefinition> categoryRepository,
-        ITaskOptimizerService taskOptimizer)
+        ITaskOptimizerService taskOptimizer,
+        IGoalService goalService,
+        IRepository<TodoTask> taskRepository)
     {
         _repository = repository;
         _calendarService = calendarService;
         _preferencesRepository = preferencesRepository;
         _categoryRepository = categoryRepository;
         _taskOptimizer = taskOptimizer;
+        _goalService = goalService;
+        _taskRepository = taskRepository;
     }
 
     public async Task<IEnumerable<TimeBlock>> GenerateTimeBlocksAsync(DateOnly date)
@@ -479,4 +485,174 @@ public class SchedulingService : ISchedulingService
             await _repository.DeleteAsync(block.Id);
         }
     }
+
+    #region Goal-Aware Scheduling
+
+    /// <summary>
+    /// Get progress reports for all active goals
+    /// </summary>
+    public async Task<IEnumerable<GoalProgressReport>> GetGoalProgressReportsAsync()
+    {
+        var reports = new List<GoalProgressReport>();
+        var activeGoals = await _goalService.GetActiveGoalsAsync();
+        var allTasks = (await _taskRepository.GetAllAsync()).ToList();
+
+        foreach (var goal in activeGoals)
+        {
+            var linkedTasks = allTasks
+                .Where(t => t.GoalIds.Contains(goal.Id) || goal.LinkedTaskIds.Contains(t.Id))
+                .ToList();
+
+            var completedTasks = linkedTasks.Where(t => t.Status == TodoTaskStatus.Completed).ToList();
+            var overdueTasks = linkedTasks
+                .Where(t => t.DueDate.HasValue && t.DueDate < DateTime.Today && t.Status != TodoTaskStatus.Completed)
+                .ToList();
+            var upcomingTasks = linkedTasks
+                .Where(t => t.Status == TodoTaskStatus.NextAction && t.DueDate.HasValue && t.DueDate >= DateTime.Today)
+                .OrderBy(t => t.DueDate)
+                .Take(5)
+                .ToList();
+
+            var daysRemaining = goal.TargetDate.HasValue
+                ? (goal.TargetDate.Value.Date - DateTime.Today).Days
+                : 0;
+
+            // Calculate progress based on task completion
+            var taskBasedProgress = linkedTasks.Any()
+                ? (completedTasks.Count * 100.0 / linkedTasks.Count)
+                : goal.ProgressPercent;
+
+            // Use the higher of task-based progress or manual progress
+            var progressPercent = Math.Max(taskBasedProgress, goal.ProgressPercent);
+
+            // Calculate required daily progress to stay on track
+            var remainingProgress = 100 - progressPercent;
+            var requiredDailyProgress = daysRemaining > 0
+                ? remainingProgress / daysRemaining
+                : remainingProgress;
+
+            // Determine if on track
+            var isOnTrack = true;
+            string? recommendation = null;
+
+            if (goal.TargetDate.HasValue && goal.StartDate.HasValue)
+            {
+                var totalDays = (goal.TargetDate.Value - goal.StartDate.Value).TotalDays;
+                var elapsedDays = (DateTime.Today - goal.StartDate.Value).TotalDays;
+                var expectedProgress = totalDays > 0 ? (elapsedDays / totalDays) * 100 : 0;
+
+                isOnTrack = progressPercent >= expectedProgress - 10; // 10% buffer
+
+                if (!isOnTrack)
+                {
+                    var behindBy = expectedProgress - progressPercent;
+                    recommendation = behindBy > 25
+                        ? $"Goal is significantly behind schedule ({behindBy:F0}%). Consider prioritizing goal-related tasks."
+                        : $"Goal is slightly behind schedule ({behindBy:F0}%). Focus on completing overdue tasks.";
+                }
+            }
+
+            if (overdueTasks.Any())
+            {
+                recommendation = recommendation != null
+                    ? $"{recommendation} {overdueTasks.Count} task(s) overdue."
+                    : $"You have {overdueTasks.Count} overdue task(s) for this goal.";
+            }
+
+            reports.Add(new GoalProgressReport
+            {
+                Goal = goal,
+                ProgressPercent = progressPercent,
+                DaysRemaining = daysRemaining,
+                RequiredDailyProgress = requiredDailyProgress,
+                IsOnTrack = isOnTrack,
+                Recommendation = recommendation,
+                OverdueTasks = overdueTasks,
+                UpcomingTasks = upcomingTasks,
+                AllLinkedTasks = linkedTasks,
+                TotalTaskCount = linkedTasks.Count,
+                CompletedTaskCount = completedTasks.Count
+            });
+        }
+
+        return reports.OrderByDescending(r => r.RiskLevel).ThenBy(r => r.DaysRemaining);
+    }
+
+    /// <summary>
+    /// Get tasks linked to a specific goal that are ready for scheduling
+    /// </summary>
+    public async Task<IEnumerable<TodoTask>> GetGoalSubtasksForSchedulingAsync(Guid goalId)
+    {
+        var goal = await _goalService.GetByIdAsync(goalId);
+        if (goal == null)
+            return Enumerable.Empty<TodoTask>();
+
+        var allTasks = await _taskRepository.GetAllAsync();
+
+        return allTasks.Where(t =>
+            (t.GoalIds.Contains(goalId) || goal.LinkedTaskIds.Contains(t.Id)) &&
+            t.Status == TodoTaskStatus.NextAction &&
+            !t.IsBlocked);
+    }
+
+    /// <summary>
+    /// Auto-schedule tasks with goal awareness - prioritizes tasks linked to at-risk goals
+    /// </summary>
+    public async Task<IEnumerable<TimeBlock>> AutoScheduleWithGoalAwarenessAsync(
+        DateOnly date,
+        IEnumerable<TodoTask> tasks,
+        IEnumerable<Goal> goals)
+    {
+        var taskList = tasks.ToList();
+        var goalList = goals.ToList();
+
+        // Get goal progress reports to identify at-risk goals
+        var goalReports = (await GetGoalProgressReportsAsync()).ToList();
+        var atRiskGoalIds = goalReports
+            .Where(r => r.RiskLevel >= GoalRiskLevel.Medium || r.OverdueTasks.Any())
+            .Select(r => r.Goal.Id)
+            .ToHashSet();
+
+        // Boost priority of tasks linked to at-risk goals
+        foreach (var task in taskList)
+        {
+            var isLinkedToAtRiskGoal = task.GoalIds.Any(gid => atRiskGoalIds.Contains(gid));
+
+            if (isLinkedToAtRiskGoal)
+            {
+                // Temporarily boost priority for scheduling (1 = highest)
+                task.Priority = Math.Max(1, task.Priority - 1);
+            }
+        }
+
+        // Also include tasks directly linked to goals from goal.LinkedTaskIds
+        var goalLinkedTaskIds = goalList
+            .SelectMany(g => g.LinkedTaskIds)
+            .ToHashSet();
+
+        var allTasks = await _taskRepository.GetAllAsync();
+        var additionalGoalTasks = allTasks
+            .Where(t =>
+                goalLinkedTaskIds.Contains(t.Id) &&
+                !taskList.Any(existing => existing.Id == t.Id) &&
+                t.Status == TodoTaskStatus.NextAction)
+            .ToList();
+
+        // Boost priority for at-risk goal tasks
+        foreach (var task in additionalGoalTasks)
+        {
+            var linkedGoal = goalList.FirstOrDefault(g => g.LinkedTaskIds.Contains(task.Id));
+            if (linkedGoal != null && atRiskGoalIds.Contains(linkedGoal.Id))
+            {
+                task.Priority = Math.Max(1, task.Priority - 1);
+            }
+        }
+
+        taskList.AddRange(additionalGoalTasks);
+
+        // Use existing auto-schedule with the boosted priorities
+        return await AutoScheduleTasksAsync(date, taskList);
+    }
+
+    #endregion
 }

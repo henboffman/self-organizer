@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SelfOrganizer.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+af9b6ab203e8c8df51889a37d392c5d02339cf6c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c8e35364edd05e1af50f2576f465bee9ea19c344")]
 [assembly: System.Reflection.AssemblyProductAttribute("SelfOrganizer.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SelfOrganizer.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

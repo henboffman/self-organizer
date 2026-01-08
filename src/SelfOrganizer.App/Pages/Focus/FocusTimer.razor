@@ -1,15 +1,18 @@
 @page "/focus"
+@page "/focus/{TaskId:guid}"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
 @using SelfOrganizer.App.Components.Shared
+@inject IFocusTimerState FocusTimerService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
 @inject IDataChangeNotificationService DataChangeNotification
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <div class="focus-container">
-    @if (_selectedTask == null)
+    @if (_state.TaskTitle == null)
     {
         <div class="text-center py-5">
             <h2 class="mb-4">
@@ -47,26 +50,26 @@
         <div class="text-center">
             @* Current Task *@
             <div class="mb-4">
-                <span class="badge bg-primary fs-6 px-3 py-2">
-                    @(_selectedTask.Title == "Free Focus" ? "Free Focus Session" : _selectedTask.Title)
+                <span class="badge @(_state.IsBreak ? "bg-success" : "bg-primary") fs-6 px-3 py-2">
+                    @(_state.IsBreak ? "Break Time" : _state.TaskTitle)
                 </span>
             </div>
 
             @* Timer Display *@
             <div class="timer-display mb-4">
-                <div class="timer-digits @(_isBreak ? "text-success" : "")">
-                    @FormatTime(_remainingSeconds)
+                <div class="timer-digits @(_state.IsBreak ? "text-success" : "")">
+                    @FormatTime(_state.RemainingSeconds)
                 </div>
                 <div class="timer-label text-muted">
-                    @if (_isBreak)
+                    @if (_state.IsBreak)
                     {
                         <span class="text-success">Break Time!</span>
                     }
-                    else if (_isRunning)
+                    else if (_state.IsRunning)
                     {
                         <span>Focus...</span>
                     }
-                    else if (_remainingSeconds == _focusMinutes * 60)
+                    else if (_state.RemainingSeconds == _state.FocusMinutes * 60)
                     {
                         <span>Ready to start</span>
                     }
@@ -81,7 +84,7 @@
             <div class="progress-container mb-4">
                 <svg class="progress-ring" viewBox="0 0 120 120">
                     <circle class="progress-ring-bg" cx="60" cy="60" r="54" />
-                    <circle class="progress-ring-fill @(_isBreak ? "break" : "")"
+                    <circle class="progress-ring-fill @(_state.IsBreak ? "break" : "")"
                             cx="60" cy="60" r="54"
                             stroke-dasharray="@(2 * Math.PI * 54)"
                             stroke-dashoffset="@GetProgressOffset()" />
@@ -90,7 +93,7 @@
 
             @* Controls *@
             <div class="d-flex justify-content-center gap-3 mb-4">
-                @if (!_isRunning)
+                @if (!_state.IsRunning)
                 {
                     <button class="btn btn-success btn-lg" @onclick="StartTimer">
                         <span class="oi oi-media-play me-1"></span> Start
@@ -105,25 +108,28 @@
                 <button class="btn btn-outline-secondary btn-lg" @onclick="ResetTimer">
                     <span class="oi oi-reload me-1"></span> Reset
                 </button>
+                <button class="btn btn-outline-info btn-lg" @onclick="OpenMiniWindow" title="Open mini window">
+                    <span class="oi oi-external-link me-1"></span> Mini
+                </button>
             </div>
 
             @* Session Settings *@
             <div class="mb-4">
                 <div class="btn-group" role="group">
-                    <button class="btn btn-sm @(_focusMinutes == 15 ? "btn-primary" : "btn-outline-primary")"
-                            @onclick="() => SetDuration(15)" disabled="@_isRunning">15 min</button>
-                    <button class="btn btn-sm @(_focusMinutes == 25 ? "btn-primary" : "btn-outline-primary")"
-                            @onclick="() => SetDuration(25)" disabled="@_isRunning">25 min</button>
-                    <button class="btn btn-sm @(_focusMinutes == 45 ? "btn-primary" : "btn-outline-primary")"
-                            @onclick="() => SetDuration(45)" disabled="@_isRunning">45 min</button>
-                    <button class="btn btn-sm @(_focusMinutes == 60 ? "btn-primary" : "btn-outline-primary")"
-                            @onclick="() => SetDuration(60)" disabled="@_isRunning">60 min</button>
+                    <button class="btn btn-sm @(_state.FocusMinutes == 15 ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetDuration(15)" disabled="@_state.IsRunning">15 min</button>
+                    <button class="btn btn-sm @(_state.FocusMinutes == 25 ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetDuration(25)" disabled="@_state.IsRunning">25 min</button>
+                    <button class="btn btn-sm @(_state.FocusMinutes == 45 ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetDuration(45)" disabled="@_state.IsRunning">45 min</button>
+                    <button class="btn btn-sm @(_state.FocusMinutes == 60 ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="() => SetDuration(60)" disabled="@_state.IsRunning">60 min</button>
                 </div>
             </div>
 
             @* Quick Actions *@
             <div class="d-flex justify-content-center gap-2">
-                @if (_selectedTask.Title != "Free Focus")
+                @if (_state.TaskId.HasValue)
                 {
                     <button class="btn btn-outline-success btn-sm" @onclick="CompleteTask">
                         <span class="oi oi-check me-1"></span> Mark Complete
@@ -135,12 +141,12 @@
             </div>
 
             @* Sessions completed today *@
-            @if (_sessionsToday > 0)
+            @if (_state.SessionsCompleted > 0)
             {
                 <div class="mt-4 text-muted">
                     <small>
                         <span class="oi oi-star me-1"></span>
-                        @_sessionsToday focus session@(_sessionsToday == 1 ? "" : "s") today
+                        @_state.SessionsCompleted focus session@(_state.SessionsCompleted == 1 ? "" : "s") today
                     </small>
                 </div>
             }
@@ -150,164 +156,165 @@
 
 <CelebrationEffect @ref="_celebrationEffect" />
 
+<style>
+    .focus-container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .timer-display {
+        margin-bottom: 2rem;
+    }
+
+    .timer-digits {
+        font-size: 4rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        color: var(--text-primary);
+    }
+
+    .timer-label {
+        font-size: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .progress-container {
+        display: flex;
+        justify-content: center;
+    }
+
+    .progress-ring {
+        width: 180px;
+        height: 180px;
+        transform: rotate(-90deg);
+    }
+
+    .progress-ring-bg {
+        fill: none;
+        stroke: var(--border-default, #e5e7eb);
+        stroke-width: 8;
+    }
+
+    .progress-ring-fill {
+        fill: none;
+        stroke: var(--color-primary, #6366f1);
+        stroke-width: 8;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .progress-ring-fill.break {
+        stroke: var(--color-success, #22c55e);
+    }
+</style>
+
 @code {
+    [Parameter] public Guid? TaskId { get; set; }
+
+    private FocusTimerStateData _state = new();
     private List<TodoTask> _availableTasks = new();
-    private TodoTask? _selectedTask;
-    private bool _isRunning;
-    private bool _isBreak;
-    private int _focusMinutes = 25;
-    private int _breakMinutes = 5;
-    private int _remainingSeconds;
-    private int _totalSeconds;
-    private int _sessionsToday;
-    private System.Threading.Timer? _timer;
     private CelebrationEffect? _celebrationEffect;
     private bool _enableCelebrations = true;
 
     protected override async Task OnInitializedAsync()
     {
+        await FocusTimerService.InitializeAsync();
+        _state = FocusTimerService.State;
+        FocusTimerService.OnStateChanged += OnTimerStateChanged;
+
         _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
-        _remainingSeconds = _focusMinutes * 60;
-        _totalSeconds = _remainingSeconds;
 
         var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
         if (prefs != null)
         {
             _enableCelebrations = prefs.EnableCelebrationEffects;
         }
-    }
 
-    private void SelectTask(TodoTask task)
-    {
-        _selectedTask = task;
-        if (task.EstimatedMinutes > 0 && task.EstimatedMinutes <= 60)
+        // If a task ID was passed via route parameter, start focus on that task
+        if (TaskId.HasValue)
         {
-            SetDuration(task.EstimatedMinutes);
-        }
-    }
-
-    private void StartFreeSession()
-    {
-        _selectedTask = new TodoTask { Title = "Free Focus" };
-    }
-
-    private void SetDuration(int minutes)
-    {
-        _focusMinutes = minutes;
-        _remainingSeconds = minutes * 60;
-        _totalSeconds = _remainingSeconds;
-    }
-
-    private void StartTimer()
-    {
-        _isRunning = true;
-        _timer = new System.Threading.Timer(TimerTick, null, 1000, 1000);
-    }
-
-    private void PauseTimer()
-    {
-        _isRunning = false;
-        _timer?.Dispose();
-        _timer = null;
-    }
-
-    private void ResetTimer()
-    {
-        PauseTimer();
-        _isBreak = false;
-        _remainingSeconds = _focusMinutes * 60;
-        _totalSeconds = _remainingSeconds;
-    }
-
-    private async void TimerTick(object? state)
-    {
-        _remainingSeconds--;
-
-        if (_remainingSeconds <= 0)
-        {
-            _timer?.Dispose();
-            _timer = null;
-            _isRunning = false;
-
-            if (!_isBreak)
+            var task = _availableTasks.FirstOrDefault(t => t.Id == TaskId.Value);
+            if (task != null)
             {
-                // Focus session complete!
-                _sessionsToday++;
-                await InvokeAsync(async () =>
-                {
-                    if (_enableCelebrations && _celebrationEffect != null)
-                    {
-                        _ = _celebrationEffect.ShowAsync("Focus session complete!");
-                    }
-                    await PlayNotificationSound();
-                    StateHasChanged();
-                });
-
-                // Switch to break
-                _isBreak = true;
-                _remainingSeconds = _breakMinutes * 60;
-                _totalSeconds = _remainingSeconds;
-            }
-            else
-            {
-                // Break complete - ready for next session
-                _isBreak = false;
-                _remainingSeconds = _focusMinutes * 60;
-                _totalSeconds = _remainingSeconds;
-                await InvokeAsync(async () =>
-                {
-                    await PlayNotificationSound();
-                    StateHasChanged();
-                });
+                await FocusTimerService.StartFocusAsync(task);
             }
         }
-
-        await InvokeAsync(StateHasChanged);
     }
 
-    private async Task PlayNotificationSound()
+    private void OnTimerStateChanged()
     {
-        try
-        {
-            await JS.InvokeVoidAsync("eval", "new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU' + 'BAAAA=').play().catch(() => {})");
-        }
-        catch
-        {
-            // Ignore audio errors
-        }
+        _state = FocusTimerService.State;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectTask(TodoTask task)
+    {
+        await FocusTimerService.StartFocusAsync(task);
+    }
+
+    private async Task StartFreeSession()
+    {
+        await FocusTimerService.StartFreeFocusAsync();
+    }
+
+    private async Task SetDuration(int minutes)
+    {
+        await FocusTimerService.SetDurationAsync(minutes);
+    }
+
+    private async Task StartTimer()
+    {
+        await FocusTimerService.PlayAsync();
+    }
+
+    private async Task PauseTimer()
+    {
+        await FocusTimerService.PauseAsync();
+    }
+
+    private async Task ResetTimer()
+    {
+        await FocusTimerService.ResetAsync();
+    }
+
+    private async Task OpenMiniWindow()
+    {
+        await FocusTimerService.OpenMiniWindowAsync();
     }
 
     private async Task CompleteTask()
     {
-        if (_selectedTask != null && _selectedTask.Title != "Free Focus")
+        if (_state.TaskId.HasValue)
         {
-            if (_selectedTask.IsRecurring)
+            var task = _availableTasks.FirstOrDefault(t => t.Id == _state.TaskId);
+            if (task != null)
             {
-                await TaskService.CompleteRecurringTaskAsync(_selectedTask.Id);
-            }
-            else
-            {
-                await TaskService.CompleteAsync(_selectedTask.Id);
-            }
+                if (task.IsRecurring)
+                {
+                    await TaskService.CompleteRecurringTaskAsync(task.Id);
+                }
+                else
+                {
+                    await TaskService.CompleteAsync(task.Id);
+                }
 
-            if (_enableCelebrations && _celebrationEffect != null)
-            {
-                _ = _celebrationEffect.ShowAsync($"Completed: {_selectedTask.Title}");
-            }
+                if (_enableCelebrations && _celebrationEffect != null)
+                {
+                    _ = _celebrationEffect.ShowAsync($"Completed: {task.Title}");
+                }
 
-            DataChangeNotification.NotifyDataChanged();
-            _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
-            ChangeTask();
+                DataChangeNotification.NotifyDataChanged();
+                _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
+            }
+            await FocusTimerService.ClearFocusAsync();
         }
     }
 
-    private void ChangeTask()
+    private async Task ChangeTask()
     {
-        PauseTimer();
-        _selectedTask = null;
-        _isBreak = false;
-        _remainingSeconds = _focusMinutes * 60;
-        _totalSeconds = _remainingSeconds;
+        await FocusTimerService.ClearFocusAsync();
     }
 
     private static string FormatTime(int totalSeconds)
@@ -320,12 +327,14 @@
     private double GetProgressOffset()
     {
         var circumference = 2 * Math.PI * 54;
-        var progress = (double)_remainingSeconds / _totalSeconds;
+        var progress = _state.TotalSeconds > 0
+            ? (double)_state.RemainingSeconds / _state.TotalSeconds
+            : 1;
         return circumference * (1 - progress);
     }
 
     public void Dispose()
     {
-        _timer?.Dispose();
+        FocusTimerService.OnStateChanged -= OnTimerStateChanged;
     }
 }

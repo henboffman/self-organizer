@@ -94,7 +94,7 @@
 
 .timeline-hour-row {
     display: flex;
-    height: 60px;
+    /* height is set dynamically via inline style for zoom support */
     border-bottom: 1px solid var(--border-default);
 }
 
@@ -117,10 +117,15 @@
     flex: 1;
     position: relative;
     border-right: 1px solid var(--border-default);
+    cursor: pointer;
 }
 
 .timeline-hour-cell:last-child {
     border-right: none;
+}
+
+.timeline-hour-cell:hover {
+    background-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.03);
 }
 
 .timeline-hour-cell.today-column {
@@ -641,20 +646,21 @@
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    width: 30px;
-    height: 4px;
-    background-color: rgba(255, 255, 255, 0.5);
-    border-radius: 2px;
+    width: 40px;
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.6);
+    border-radius: 3px;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, height 0.2s, background-color 0.2s;
+    z-index: 10;
 }
 
 .timeline-event.resizable::before {
-    top: 2px;
+    top: 3px;
 }
 
 .timeline-event.resizable::after {
-    bottom: 2px;
+    bottom: 3px;
 }
 
 .timeline-event.resizable:hover::before,
@@ -670,9 +676,15 @@
 .timeline-event.resize-edge-hover::before,
 .timeline-event.resize-edge-hover::after {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.9);
-    height: 6px;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+    background-color: rgba(255, 255, 255, 1);
+    height: 8px;
+    width: 50px;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.4), 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+/* Visual indicator that resize is active */
+.timeline-event.resizable:active {
+    cursor: ns-resize !important;
 }
 
 /* Responsive adjustments */

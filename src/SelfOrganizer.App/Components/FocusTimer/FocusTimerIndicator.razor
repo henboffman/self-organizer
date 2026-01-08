@@ -1,0 +1,147 @@
+@using SelfOrganizer.App.Services
+@inject IFocusTimerState FocusTimer
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (_state.TaskTitle != null)
+{
+    <div class="focus-timer-indicator @(_state.IsRunning ? "running" : "") @(_state.IsBreak ? "break" : "")"
+         @onclick="NavigateToFocus" title="Click to view focus timer">
+        <div class="indicator-content">
+            <span class="timer-icon oi @(_state.IsBreak ? "oi-sun" : "oi-target")"></span>
+            <span class="timer-display">@FormatTime(_state.RemainingSeconds)</span>
+            @if (!_state.IsRunning)
+            {
+                <span class="paused-badge">PAUSED</span>
+            }
+        </div>
+        <button class="btn btn-sm mini-btn" @onclick="OpenMiniWindow" @onclick:stopPropagation="true" title="Open mini window">
+            <span class="oi oi-external-link"></span>
+        </button>
+    </div>
+}
+
+<style>
+    .focus-timer-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        background-color: var(--bg-tertiary, #f3f4f6);
+        border-radius: var(--radius-md, 0.5rem);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid var(--border-default, #e5e7eb);
+    }
+
+    .focus-timer-indicator:hover {
+        background-color: var(--bg-secondary, #e5e7eb);
+    }
+
+    .focus-timer-indicator.running {
+        background-color: var(--color-primary-subtle, #eef2ff);
+        border-color: var(--color-primary, #6366f1);
+        animation: pulse-subtle 2s ease-in-out infinite;
+    }
+
+    .focus-timer-indicator.break {
+        background-color: var(--color-success-bg, #dcfce7);
+        border-color: var(--color-success, #22c55e);
+    }
+
+    @@keyframes pulse-subtle {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.8;
+        }
+    }
+
+    .indicator-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .timer-icon {
+        font-size: 0.875rem;
+    }
+
+    .focus-timer-indicator.running .timer-icon {
+        color: var(--color-primary, #6366f1);
+    }
+
+    .focus-timer-indicator.break .timer-icon {
+        color: var(--color-success, #22c55e);
+    }
+
+    .timer-display {
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        font-size: 0.9rem;
+        color: var(--text-primary);
+    }
+
+    .paused-badge {
+        font-size: 0.625rem;
+        font-weight: 600;
+        color: var(--color-warning, #f59e0b);
+        background-color: var(--color-warning-bg, #fef3c7);
+        padding: 0.125rem 0.375rem;
+        border-radius: var(--radius-sm, 0.25rem);
+    }
+
+    .mini-btn {
+        padding: 0.125rem 0.375rem;
+        line-height: 1;
+        font-size: 0.75rem;
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+    }
+
+    .mini-btn:hover {
+        color: var(--color-primary);
+        background-color: var(--bg-tertiary);
+    }
+</style>
+
+@code {
+    private FocusTimerStateData _state = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FocusTimer.InitializeAsync();
+        _state = FocusTimer.State;
+        FocusTimer.OnStateChanged += OnTimerStateChanged;
+    }
+
+    private void OnTimerStateChanged()
+    {
+        _state = FocusTimer.State;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void NavigateToFocus()
+    {
+        Navigation.NavigateTo("/focus");
+    }
+
+    private async Task OpenMiniWindow()
+    {
+        await FocusTimer.OpenMiniWindowAsync();
+    }
+
+    private static string FormatTime(int totalSeconds)
+    {
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes:D2}:{seconds:D2}";
+    }
+
+    public void Dispose()
+    {
+        FocusTimer.OnStateChanged -= OnTimerStateChanged;
+    }
+}

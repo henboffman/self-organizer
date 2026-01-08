@@ -1,0 +1,126 @@
+@page "/goals"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.App.Components.Goals
+@inject IGoalService GoalService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="bi bi-bullseye me-2"></span>Goals
+    </h3>
+    <button class="btn btn-primary" @onclick="NavigateToNewGoal">
+        <span class="oi oi-plus me-1"></span> New Goal
+    </button>
+</div>
+
+@* Filter Tabs *@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "all" ? "active" : "")" @onclick="@(() => FilterByStatus("all"))">
+            All
+            @if (_allCount > 0)
+            {
+                <span class="badge bg-secondary ms-1">@_allCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "active" ? "active" : "")" @onclick="@(() => FilterByStatus("active"))">
+            Active
+            @if (_activeCount > 0)
+            {
+                <span class="badge bg-success ms-1">@_activeCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "onhold" ? "active" : "")" @onclick="@(() => FilterByStatus("onhold"))">
+            On Hold
+            @if (_onHoldCount > 0)
+            {
+                <span class="badge bg-warning text-dark ms-1">@_onHoldCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "completed" ? "active" : "")" @onclick="@(() => FilterByStatus("completed"))">
+            Completed
+            @if (_completedCount > 0)
+            {
+                <span class="badge bg-info ms-1">@_completedCount</span>
+            }
+        </button>
+    </li>
+</ul>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_filteredGoals.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">No @GetStatusLabel() goals</h5>
+        <p class="text-muted">@GetEmptyMessage()</p>
+        @if (_statusFilter == "active" || _statusFilter == "all")
+        {
+            <button class="btn btn-primary mt-2" @onclick="NavigateToNewGoal">
+                <span class="oi oi-plus me-1"></span> Create Your First Goal
+            </button>
+        }
+    </div>
+}
+else
+{
+    @* Goal Cards Grid *@
+    <div class="row">
+        @foreach (var goal in _filteredGoals.OrderBy(g => g.Priority).ThenBy(g => g.TargetDate))
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <GoalCard
+                    Goal="goal"
+                    LinkedTasks="@GetLinkedTasks(goal.Id)"
+                    OnClick="@(() => ShowDetailModal(goal))"
+                    OnEdit="@(() => NavigateToEditGoal(goal.Id))"
+                    OnComplete="@(() => CompleteGoal(goal))"
+                    OnDelete="@(() => DeleteGoal(goal))" />
+            </div>
+        }
+    </div>
+}
+
+@* Goal Detail Modal *@
+<Modal Title="Goal Details" IsVisible="@_showDetailModal" OnClose="CloseDetailModal" Size="modal-xl">
+    <ChildContent>
+        @if (_viewingGoal != null)
+        {
+            <GoalDetail
+                Goal="_viewingGoal"
+                OnEdit="@(() => { CloseDetailModal(); NavigateToEditGoal(_viewingGoal!.Id); })"
+                OnClose="CloseDetailModal"
+                OnGoalUpdated="OnGoalUpdatedFromDetail" />
+        }
+    </ChildContent>
+</Modal>
+
+<ConfirmDialog
+    Title="Delete Goal"
+    Message="Are you sure you want to delete this goal? This action cannot be undone."
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="@(() => _showDeleteConfirm = false)" />
+
+<ConfirmDialog
+    Title="Complete Goal"
+    Message="Mark this goal as completed?"
+    IsVisible="@_showCompleteConfirm"
+    OnConfirm="ConfirmComplete"
+    OnCancel="@(() => _showCompleteConfirm = false)" />

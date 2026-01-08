@@ -1,0 +1,221 @@
+@using SelfOrganizer.Core.Models
+
+<div class="goal-card card h-100 @GetStatusClass()" @onclick="HandleClick">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <span class="category-badge @GetCategoryClass()">@Goal.Category</span>
+            @if (Goal.Priority == 1)
+            {
+                <span class="badge bg-danger">High</span>
+            }
+        </div>
+        <span class="badge @GetStatusBadgeClass()">@Goal.Status</span>
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">@Goal.Title</h5>
+
+        @if (!string.IsNullOrEmpty(Goal.DesiredOutcome))
+        {
+            <p class="card-text small text-muted text-truncate-2">@Goal.DesiredOutcome</p>
+        }
+
+        @* Linked Tasks Preview *@
+        @if (LinkedTasks.Any())
+        {
+            <div class="tasks-preview mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small class="text-muted">
+                        <span class="oi oi-task me-1"></span>Tasks
+                    </small>
+                    <small class="@GetTaskCompletionClass()">
+                        @CompletedTaskCount/@LinkedTasks.Count completed
+                    </small>
+                </div>
+                <div class="task-list">
+                    @foreach (var task in LinkedTasks.Take(3))
+                    {
+                        <div class="task-item d-flex align-items-center gap-2 @(task.Status == TodoTaskStatus.Completed ? "completed" : "")">
+                            <span class="task-check @(task.Status == TodoTaskStatus.Completed ? "oi oi-check text-success" : "oi oi-media-record text-muted")"></span>
+                            <span class="task-title text-truncate @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">@task.Title</span>
+                        </div>
+                    }
+                    @if (LinkedTasks.Count > 3)
+                    {
+                        <div class="text-muted small mt-1">
+                            +@(LinkedTasks.Count - 3) more task@(LinkedTasks.Count - 3 != 1 ? "s" : "")
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Progress Bar *@
+        <div class="progress-section mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small class="text-muted">Progress</small>
+                <small class="fw-bold">@Goal.ProgressPercent%</small>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar @GetProgressBarClass()"
+                     role="progressbar"
+                     style="width: @Goal.ProgressPercent%"
+                     aria-valuenow="@Goal.ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+        </div>
+
+        @* Target Date *@
+        @if (Goal.TargetDate.HasValue)
+        {
+            <div class="target-date mt-3">
+                <span class="oi oi-calendar me-1"></span>
+                <span class="@GetTargetDateClass()">
+                    @GetTargetDateDisplay()
+                </span>
+            </div>
+        }
+
+        @* Timeframe Badge *@
+        <div class="mt-2">
+            <span class="badge bg-light text-dark">@Goal.Timeframe</span>
+        </div>
+
+        @* Tags *@
+        @if (Goal.Tags.Any())
+        {
+            <div class="tags mt-2">
+                @foreach (var tag in Goal.Tags.Take(3))
+                {
+                    <span class="badge bg-primary me-1">#@tag</span>
+                }
+                @if (Goal.Tags.Count > 3)
+                {
+                    <span class="badge bg-secondary">+@(Goal.Tags.Count - 3)</span>
+                }
+            </div>
+        }
+    </div>
+    <div class="card-footer bg-transparent">
+        <div class="d-flex justify-content-end gap-1">
+            <button class="btn btn-sm btn-outline-primary" @onclick="HandleEdit" @onclick:stopPropagation="true" title="Edit">
+                <span class="oi oi-pencil"></span>
+            </button>
+            @if (Goal.Status != GoalStatus.Completed)
+            {
+                <button class="btn btn-sm btn-outline-success" @onclick="HandleComplete" @onclick:stopPropagation="true" title="Mark Complete">
+                    <span class="oi oi-check"></span>
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-danger" @onclick="HandleDelete" @onclick:stopPropagation="true" title="Delete">
+                <span class="oi oi-trash"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Goal Goal { get; set; } = new();
+
+    [Parameter]
+    public List<TodoTask> LinkedTasks { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnComplete { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private int CompletedTaskCount => LinkedTasks.Count(t => t.Status == TodoTaskStatus.Completed);
+
+    private string GetTaskCompletionClass()
+    {
+        if (!LinkedTasks.Any()) return "text-muted";
+        var completionRate = (double)CompletedTaskCount / LinkedTasks.Count;
+        if (completionRate >= 1) return "text-success fw-bold";
+        if (completionRate >= 0.5) return "text-primary";
+        return "text-muted";
+    }
+
+    private async Task HandleClick() => await OnClick.InvokeAsync();
+    private async Task HandleEdit() => await OnEdit.InvokeAsync();
+    private async Task HandleComplete() => await OnComplete.InvokeAsync();
+    private async Task HandleDelete() => await OnDelete.InvokeAsync();
+
+    private string GetStatusClass() => Goal.Status switch
+    {
+        GoalStatus.Active => "goal-active",
+        GoalStatus.OnHold => "goal-onhold",
+        GoalStatus.Completed => "goal-completed",
+        _ => ""
+    };
+
+    private string GetStatusBadgeClass() => Goal.Status switch
+    {
+        GoalStatus.Active => "bg-success",
+        GoalStatus.OnHold => "bg-warning text-dark",
+        GoalStatus.Completed => "bg-info",
+        GoalStatus.Archived => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetCategoryClass() => Goal.Category switch
+    {
+        GoalCategory.Career => "category-career",
+        GoalCategory.Health => "category-health",
+        GoalCategory.Financial => "category-financial",
+        GoalCategory.Personal => "category-personal",
+        GoalCategory.Learning => "category-learning",
+        GoalCategory.Relationships => "category-relationships",
+        GoalCategory.Creative => "category-creative",
+        _ => "category-other"
+    };
+
+    private string GetProgressBarClass()
+    {
+        if (Goal.ProgressPercent >= 100) return "bg-success";
+        if (Goal.ProgressPercent >= 75) return "bg-info";
+        if (Goal.ProgressPercent >= 50) return "bg-primary";
+        if (Goal.ProgressPercent >= 25) return "bg-warning";
+        return "bg-secondary";
+    }
+
+    private string GetTargetDateClass()
+    {
+        if (!Goal.TargetDate.HasValue) return "text-muted";
+
+        var daysLeft = (Goal.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0) return "text-danger fw-bold";
+        if (daysLeft <= 7) return "text-warning";
+        return "text-muted";
+    }
+
+    private string GetTargetDateDisplay()
+    {
+        if (!Goal.TargetDate.HasValue) return "";
+
+        var daysLeft = (Goal.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0)
+            return $"Overdue by {Math.Abs(daysLeft)} day{(Math.Abs(daysLeft) != 1 ? "s" : "")}";
+        if (daysLeft == 0)
+            return "Due today";
+        if (daysLeft == 1)
+            return "Due tomorrow";
+        if (daysLeft <= 7)
+            return $"{daysLeft} days left";
+        if (daysLeft <= 30)
+            return $"{daysLeft} days left";
+
+        return Goal.TargetDate.Value.ToString("MMM d, yyyy");
+    }
+}

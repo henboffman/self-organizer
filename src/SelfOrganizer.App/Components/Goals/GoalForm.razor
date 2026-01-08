@@ -1,0 +1,188 @@
+@using SelfOrganizer.Core.Models
+
+<EditForm Model="Goal" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+
+    @* Title (Required) *@
+    <div class="mb-3">
+        <label class="form-label">Title <span class="text-danger">*</span></label>
+        <InputText class="form-control" @bind-Value="Goal.Title" placeholder="What do you want to achieve?" />
+        <ValidationMessage For="() => Goal.Title" />
+    </div>
+
+    @* Description *@
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.Description" rows="2" placeholder="Provide more context about this goal..." />
+    </div>
+
+    @* Category, Timeframe, Priority Row *@
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Category</label>
+            <InputSelect class="form-select" @bind-Value="Goal.Category">
+                @foreach (var cat in Enum.GetValues<GoalCategory>())
+                {
+                    <option value="@cat">@cat</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Timeframe</label>
+            <InputSelect class="form-select" @bind-Value="Goal.Timeframe">
+                @foreach (var tf in Enum.GetValues<GoalTimeframe>())
+                {
+                    <option value="@tf">@GetTimeframeLabel(tf)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Priority</label>
+            <InputSelect class="form-select" @bind-Value="Goal.Priority">
+                <option value="1">High</option>
+                <option value="2">Normal</option>
+                <option value="3">Low</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    @* Target Date and Status Row *@
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Target Date</label>
+            <InputDate class="form-control" @bind-Value="Goal.TargetDate" />
+            <small class="text-muted">When do you want to achieve this goal?</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Status</label>
+            <InputSelect class="form-select" @bind-Value="Goal.Status">
+                <option value="@GoalStatus.Active">Active</option>
+                <option value="@GoalStatus.OnHold">On Hold</option>
+                <option value="@GoalStatus.Completed">Completed</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    @* Desired Outcome *@
+    <div class="mb-3">
+        <label class="form-label">Desired Outcome</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.DesiredOutcome" rows="2" placeholder="What does success look like? Be specific..." />
+        <small class="text-muted">Visualize your end state clearly.</small>
+    </div>
+
+    @* Success Criteria *@
+    <div class="mb-3">
+        <label class="form-label">Success Criteria</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.SuccessCriteria" rows="2" placeholder="How will you know when you've achieved this goal?" />
+        <small class="text-muted">Define measurable outcomes.</small>
+    </div>
+
+    @* Obstacles *@
+    <div class="mb-3">
+        <label class="form-label">Obstacles</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.Obstacles" rows="2" placeholder="What might get in the way?" />
+        <small class="text-muted">Anticipate challenges to prepare for them.</small>
+    </div>
+
+    @* Resources *@
+    <div class="mb-3">
+        <label class="form-label">Resources</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.Resources" rows="2" placeholder="What do you need to succeed? (time, money, skills, people, tools)" />
+        <small class="text-muted">List resources you'll need or already have.</small>
+    </div>
+
+    @* Notes *@
+    <div class="mb-3">
+        <label class="form-label">Notes</label>
+        <InputTextArea class="form-control" @bind-Value="Goal.Notes" rows="3" placeholder="Additional thoughts, ideas, or context..." />
+    </div>
+
+    @* Tags *@
+    <div class="mb-3">
+        <label class="form-label">Tags</label>
+        <input type="text" class="form-control" @bind="_tagsInput" @bind:event="oninput" placeholder="Use #hashtags separated by spaces (e.g., #2024 #growth #career)" />
+        <small class="text-muted">Tags help organize and find related goals.</small>
+    </div>
+
+    @* Form Actions *@
+    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+        <button type="button" class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@(!CanSave)">
+            @if (Goal.Id == default)
+            {
+                <span class="oi oi-plus me-1"></span>
+                <span>Create Goal</span>
+            }
+            else
+            {
+                <span class="oi oi-check me-1"></span>
+                <span>Save Changes</span>
+            }
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Goal Goal { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<Goal> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string _tagsInput = "";
+
+    private bool CanSave => !string.IsNullOrWhiteSpace(Goal.Title) && Goal.Title.Length >= 3;
+
+    protected override void OnParametersSet()
+    {
+        // Initialize tags input from Goal.Tags
+        if (Goal.Tags.Any())
+        {
+            _tagsInput = string.Join(" ", Goal.Tags.Select(t => $"#{t}"));
+        }
+        else
+        {
+            _tagsInput = "";
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!CanSave) return;
+
+        // Parse tags from input
+        Goal.Tags = ParseTags(_tagsInput);
+
+        await OnSave.InvokeAsync(Goal);
+    }
+
+    private async Task HandleCancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string GetTimeframeLabel(GoalTimeframe timeframe) => timeframe switch
+    {
+        GoalTimeframe.Week => "This Week",
+        GoalTimeframe.Month => "This Month",
+        GoalTimeframe.Quarter => "This Quarter",
+        GoalTimeframe.Year => "This Year",
+        GoalTimeframe.MultiYear => "Multi-Year",
+        _ => timeframe.ToString()
+    };
+}
