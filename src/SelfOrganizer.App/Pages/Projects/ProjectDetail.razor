@@ -1,7 +1,9 @@
 @page "/projects/{Id:guid}"
 @using SelfOrganizer.Core.Models
-@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
-@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@using SelfOrganizer.Core.Interfaces
+@inject IProjectService ProjectService
+@inject ITaskService TaskService
+@inject IGoalService GoalService
 @inject NavigationManager Navigation
 
 @if (_isLoading)
@@ -78,9 +80,14 @@ else
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Tasks (@_tasks.Count)</span>
-                    <button class="btn btn-sm btn-primary" @onclick="ShowAddTaskModal">
-                        <span class="oi oi-plus me-1"></span> Add Task
-                    </button>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-primary" @onclick="ShowAddTaskModal">
+                            <span class="oi oi-plus me-1"></span> New Task
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="() => _showLinkExistingTaskModal = true">
+                            <span class="oi oi-link-intact me-1"></span> Link Existing
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if (!_tasks.Any())
@@ -91,9 +98,10 @@ else
                     {
                         @foreach (var task in _tasks.OrderBy(t => t.Status == TodoTaskStatus.Completed).ThenBy(t => t.Priority))
                         {
-                            <div class="d-flex align-items-center py-2 border-bottom">
+                            <div class="d-flex align-items-center py-2 border-bottom task-row">
                                 <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-secondary" : "btn-outline-success") me-2"
-                                        @onclick="() => ToggleComplete(task)" disabled="@(task.Status == TodoTaskStatus.Completed)">
+                                        @onclick="() => ToggleComplete(task)" disabled="@(task.Status == TodoTaskStatus.Completed)"
+                                        title="@(task.Status == TodoTaskStatus.Completed ? "Already completed" : "Mark complete")">
                                     <span class="oi oi-check"></span>
                                 </button>
                                 <div class="flex-grow-1">
@@ -106,9 +114,38 @@ else
                                         {
                                             <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
                                         }
+                                        @if (task.DueDate.HasValue)
+                                        {
+                                            <span class="@(task.DueDate.Value < DateTime.Today ? "text-danger" : "text-muted")">
+                                                Due @task.DueDate.Value.ToString("MMM d")
+                                            </span>
+                                        }
                                     </div>
                                 </div>
-                                <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
+                                <div class="d-flex align-items-center gap-1">
+                                    <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="dropdown" title="Task actions">
+                                            <span class="oi oi-ellipses"></span>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item" href="/tasks/@task.Id"><span class="oi oi-eye me-2"></span>View Details</a></li>
+                                            <li><button class="dropdown-item" @onclick="() => ShowEditTaskModal(task)"><span class="oi oi-pencil me-2"></span>Quick Edit</button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            @if (task.Status != TodoTaskStatus.NextAction)
+                                            {
+                                                <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.NextAction)"><span class="oi oi-media-play me-2"></span>Set as Next Action</button></li>
+                                            }
+                                            @if (task.Status != TodoTaskStatus.WaitingFor)
+                                            {
+                                                <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.WaitingFor)"><span class="oi oi-clock me-2"></span>Mark Waiting For</button></li>
+                                            }
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button class="dropdown-item" @onclick="() => UnlinkTaskFromProject(task)"><span class="oi oi-link-broken me-2"></span>Remove from Project</button></li>
+                                            <li><button class="dropdown-item text-danger" @onclick="() => ShowDeleteTaskConfirm(task)"><span class="oi oi-trash me-2"></span>Delete Task</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         }
                     }
@@ -190,6 +227,58 @@ else
                         </li>
                     }
                 </ul>
+            </div>
+
+            @* Linked Goals *@
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><span class="oi oi-target me-1"></span>Linked Goals</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary">@_linkedGoals.Count</span>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="ShowLinkGoalModal" title="Link to goal">
+                            <span class="oi oi-plus"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (_linkedGoals.Any())
+                    {
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var goal in _linkedGoals)
+                            {
+                                <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                    <a href="/goals" class="text-decoration-none">
+                                        <span class="oi oi-target me-1"></span>
+                                        @goal.Title
+                                    </a>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge @GetGoalStatusClass(goal.Status)">@goal.Status</span>
+                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => UnlinkGoal(goal.Id)" title="Unlink goal">
+                                            <span class="oi oi-x"></span>
+                                        </button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small mb-0">No linked goals. Link this project to goals to track strategic alignment.</p>
+                    }
+                </div>
+            </div>
+
+            @* Link Existing Task *@
+            <div class="card mt-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><span class="oi oi-link-intact me-1"></span>Link Existing Task</span>
+                    <button class="btn btn-sm btn-outline-success" @onclick="ShowLinkExistingTaskModal" title="Link existing task">
+                        <span class="oi oi-plus"></span>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-0">Link tasks that already exist but aren't part of this project yet.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -282,16 +371,169 @@ else
     OnConfirm="ConfirmDelete"
     OnCancel="() => _showDeleteConfirm = false" />
 
+@* Link Goal Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Link Goal to Project" IsVisible="@_showLinkGoalModal" OnClose="() => _showLinkGoalModal = false">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Search Goals</label>
+            <input type="text" class="form-control" @bind="_goalSearchQuery" @bind:event="oninput" placeholder="Type to search..." />
+        </div>
+        <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+            @foreach (var goal in GetFilteredGoalsForLinking())
+            {
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        @onclick="() => LinkGoal(goal.Id)">
+                    <div>
+                        <span class="oi oi-target me-2"></span>
+                        @goal.Title
+                    </div>
+                    <span class="badge @GetGoalStatusClass(goal.Status)">@goal.Status</span>
+                </button>
+            }
+            @if (!GetFilteredGoalsForLinking().Any())
+            {
+                <div class="text-muted text-center py-3">
+                    @if (string.IsNullOrWhiteSpace(_goalSearchQuery))
+                    {
+                        <span>All goals are already linked to this project.</span>
+                    }
+                    else
+                    {
+                        <span>No matching goals found.</span>
+                    }
+                </div>
+            }
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showLinkGoalModal = false">Close</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@* Edit Task Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Edit Task" IsVisible="@_showEditTaskModal" OnClose="() => _showEditTaskModal = false" Size="modal-lg">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-control" @bind="_editTaskTitle" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="_editTaskDescription" rows="2"></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_editTaskPriority">
+                    <option value="1">High</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Low</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Estimated Minutes</label>
+                <input type="number" class="form-control" @bind="_editTaskMinutes" min="5" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Due Date</label>
+                <input type="date" class="form-control" @bind="_editTaskDueDate" />
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Status</label>
+                <select class="form-select" @bind="_editTaskStatus">
+                    <option value="@TodoTaskStatus.Inbox">Inbox</option>
+                    <option value="@TodoTaskStatus.NextAction">Next Action</option>
+                    <option value="@TodoTaskStatus.Active">Active</option>
+                    <option value="@TodoTaskStatus.WaitingFor">Waiting For</option>
+                    <option value="@TodoTaskStatus.Scheduled">Scheduled</option>
+                    <option value="@TodoTaskStatus.SomedayMaybe">Someday/Maybe</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Energy Level (1-5)</label>
+                <select class="form-select" @bind="_editTaskEnergyLevel">
+                    <option value="">Any</option>
+                    <option value="1">1 - Very Low</option>
+                    <option value="2">2 - Low</option>
+                    <option value="3">3 - Medium</option>
+                    <option value="4">4 - High</option>
+                    <option value="5">5 - Very High</option>
+                </select>
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showEditTaskModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveEditTask">Save</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@* Delete Task Confirm *@
+<SelfOrganizer.App.Components.Shared.ConfirmDialog
+    Title="Delete Task"
+    Message="Are you sure you want to delete this task? This action cannot be undone."
+    IsVisible="@_showDeleteTaskConfirm"
+    OnConfirm="ConfirmDeleteTask"
+    OnCancel="() => _showDeleteTaskConfirm = false" />
+
+@* Link Existing Task Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Link Existing Task to Project" IsVisible="@_showLinkExistingTaskModal" OnClose="() => _showLinkExistingTaskModal = false">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Search Tasks</label>
+            <input type="text" class="form-control" @bind="_taskSearchQuery" @bind:event="oninput" placeholder="Type to search..." />
+        </div>
+        <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+            @foreach (var task in GetFilteredTasksForLinking())
+            {
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        @onclick="() => LinkExistingTask(task.Id)">
+                    <div>
+                        <span class="oi oi-task me-2"></span>
+                        @task.Title
+                    </div>
+                    <span class="badge bg-secondary">@task.Status</span>
+                </button>
+            }
+            @if (!GetFilteredTasksForLinking().Any())
+            {
+                <div class="text-muted text-center py-3">
+                    @if (string.IsNullOrWhiteSpace(_taskSearchQuery))
+                    {
+                        <span>No unassigned tasks available.</span>
+                    }
+                    else
+                    {
+                        <span>No matching tasks found.</span>
+                    }
+                </div>
+            }
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showLinkExistingTaskModal = false">Close</button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
     private Project? _project;
     private List<TodoTask> _tasks = new();
+    private List<Goal> _linkedGoals = new();
+    private List<Goal> _allGoals = new();
+    private List<TodoTask> _allTasks = new();
     private bool _hasNextAction;
     private bool _isLoading = true;
     private bool _isEditing = false;
     private bool _showDeleteConfirm = false;
     private bool _showAddTaskModal = false;
+    private bool _showLinkGoalModal = false;
+    private bool _showLinkExistingTaskModal = false;
+    private string _goalSearchQuery = string.Empty;
+    private string _taskSearchQuery = string.Empty;
 
     // Edit fields
     private string _editName = string.Empty;
@@ -308,6 +550,21 @@ else
     private int _newTaskMinutes = 30;
     private int _newTaskPriority = 2;
 
+    // Edit task fields
+    private bool _showEditTaskModal = false;
+    private TodoTask? _editingTask = null;
+    private string _editTaskTitle = string.Empty;
+    private string _editTaskDescription = string.Empty;
+    private int _editTaskPriority = 2;
+    private int _editTaskMinutes = 30;
+    private DateTime? _editTaskDueDate;
+    private TodoTaskStatus _editTaskStatus = TodoTaskStatus.NextAction;
+    private string _editTaskEnergyLevel = string.Empty;
+
+    // Delete task fields
+    private bool _showDeleteTaskConfirm = false;
+    private TodoTask? _taskToDelete = null;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadProject();
@@ -321,10 +578,24 @@ else
             _project = await ProjectService.GetByIdAsync(Id);
             if (_project != null)
             {
-                _tasks = (await TaskService.GetByProjectAsync(Id))
+                var tasksTask = TaskService.GetByProjectAsync(Id);
+                var hasNextActionTask = ProjectService.HasNextActionAsync(Id);
+                var allGoalsTask = GoalService.GetAllAsync();
+                var allTasksTask = TaskService.GetAllAsync();
+
+                await Task.WhenAll(tasksTask, hasNextActionTask, allGoalsTask, allTasksTask);
+
+                _tasks = (await tasksTask)
                     .Where(t => t.Status != TodoTaskStatus.Deleted)
                     .ToList();
-                _hasNextAction = await ProjectService.HasNextActionAsync(Id);
+                _hasNextAction = await hasNextActionTask;
+                _allGoals = (await allGoalsTask).Where(g => g.Status != GoalStatus.Archived).ToList();
+                _allTasks = (await allTasksTask)
+                    .Where(t => t.Status != TodoTaskStatus.Deleted && t.Status != TodoTaskStatus.Completed && !t.ProjectId.HasValue)
+                    .ToList();
+
+                // Load linked goals (goals that have this project in their LinkedProjectIds)
+                _linkedGoals = _allGoals.Where(g => g.LinkedProjectIds.Contains(Id)).ToList();
 
                 // Initialize edit fields
                 _editName = _project.Name;
@@ -409,6 +680,143 @@ else
         if (task.Status != TodoTaskStatus.Completed)
         {
             await TaskService.CompleteAsync(task.Id);
+            await LoadProject();
+        }
+    }
+
+    // Goal linking methods
+    private void ShowLinkGoalModal()
+    {
+        _goalSearchQuery = string.Empty;
+        _showLinkGoalModal = true;
+    }
+
+    private IEnumerable<Goal> GetFilteredGoalsForLinking()
+    {
+        var linkedGoalIds = _linkedGoals.Select(g => g.Id).ToHashSet();
+        var available = _allGoals.Where(g => !linkedGoalIds.Contains(g.Id) && g.Status == GoalStatus.Active);
+
+        if (string.IsNullOrWhiteSpace(_goalSearchQuery))
+            return available.Take(20);
+
+        return available
+            .Where(g => g.Title.Contains(_goalSearchQuery, StringComparison.OrdinalIgnoreCase))
+            .Take(20);
+    }
+
+    private async Task LinkGoal(Guid goalId)
+    {
+        await GoalService.LinkProjectAsync(goalId, Id);
+        await LoadProject();
+    }
+
+    private async Task UnlinkGoal(Guid goalId)
+    {
+        await GoalService.UnlinkProjectAsync(goalId, Id);
+        await LoadProject();
+    }
+
+    private string GetGoalStatusClass(GoalStatus status) => status switch
+    {
+        GoalStatus.Active => "bg-success",
+        GoalStatus.OnHold => "bg-warning text-dark",
+        GoalStatus.Completed => "bg-info",
+        GoalStatus.Archived => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    // Task linking methods
+    private void ShowLinkExistingTaskModal()
+    {
+        _taskSearchQuery = string.Empty;
+        _showLinkExistingTaskModal = true;
+    }
+
+    private IEnumerable<TodoTask> GetFilteredTasksForLinking()
+    {
+        if (string.IsNullOrWhiteSpace(_taskSearchQuery))
+            return _allTasks.Take(20);
+
+        return _allTasks
+            .Where(t => t.Title.Contains(_taskSearchQuery, StringComparison.OrdinalIgnoreCase))
+            .Take(20);
+    }
+
+    private async Task LinkExistingTask(Guid taskId)
+    {
+        var task = await TaskService.GetByIdAsync(taskId);
+        if (task != null)
+        {
+            task.ProjectId = Id;
+            await TaskService.UpdateAsync(task);
+            _showLinkExistingTaskModal = false;
+            await LoadProject();
+        }
+    }
+
+    // Task CRUD methods
+    private void ShowEditTaskModal(TodoTask task)
+    {
+        _editingTask = task;
+        _editTaskTitle = task.Title;
+        _editTaskDescription = task.Description ?? string.Empty;
+        _editTaskPriority = task.Priority;
+        _editTaskMinutes = task.EstimatedMinutes;
+        _editTaskDueDate = task.DueDate;
+        _editTaskStatus = task.Status;
+        _editTaskEnergyLevel = task.EnergyLevel?.ToString() ?? string.Empty;
+        _showEditTaskModal = true;
+    }
+
+    private async Task SaveEditTask()
+    {
+        if (_editingTask == null) return;
+
+        _editingTask.Title = _editTaskTitle;
+        _editingTask.Description = string.IsNullOrWhiteSpace(_editTaskDescription) ? null : _editTaskDescription;
+        _editingTask.Priority = _editTaskPriority;
+        _editingTask.EstimatedMinutes = _editTaskMinutes;
+        _editingTask.DueDate = _editTaskDueDate;
+        _editingTask.Status = _editTaskStatus;
+        _editingTask.EnergyLevel = string.IsNullOrWhiteSpace(_editTaskEnergyLevel) ? null : int.Parse(_editTaskEnergyLevel);
+
+        await TaskService.UpdateAsync(_editingTask);
+        _showEditTaskModal = false;
+        _editingTask = null;
+        await LoadProject();
+    }
+
+    private async Task SetTaskStatus(TodoTask task, TodoTaskStatus status)
+    {
+        task.Status = status;
+        if (status == TodoTaskStatus.WaitingFor)
+        {
+            task.WaitingForSince = DateTime.UtcNow;
+        }
+        await TaskService.UpdateAsync(task);
+        await LoadProject();
+    }
+
+    private async Task UnlinkTaskFromProject(TodoTask task)
+    {
+        task.ProjectId = null;
+        await TaskService.UpdateAsync(task);
+        await LoadProject();
+    }
+
+    private void ShowDeleteTaskConfirm(TodoTask task)
+    {
+        _taskToDelete = task;
+        _showDeleteTaskConfirm = true;
+    }
+
+    private async Task ConfirmDeleteTask()
+    {
+        if (_taskToDelete != null)
+        {
+            await TaskService.DeleteAsync(_taskToDelete.Id);
+            _showDeleteTaskConfirm = false;
+            _taskToDelete = null;
             await LoadProject();
         }
     }

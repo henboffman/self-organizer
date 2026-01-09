@@ -1,0 +1,564 @@
+@page "/ideas"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@inject IIdeaService IdeaService
+@inject IGoalService GoalService
+@inject IProjectService ProjectService
+@inject ITaskService TaskService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-lightbulb me-2"></span>Ideas
+    </h3>
+    <button class="btn btn-primary" @onclick="ShowAddModal">
+        <span class="oi oi-plus me-1"></span> New Idea
+    </button>
+</div>
+
+@* Filter Tabs *@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "all" ? "active" : "")" @onclick="@(() => FilterByStatus("all"))">
+            All
+            @if (_allCount > 0)
+            {
+                <span class="badge bg-secondary ms-1">@_allCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "active" ? "active" : "")" @onclick="@(() => FilterByStatus("active"))">
+            Active
+            @if (_activeCount > 0)
+            {
+                <span class="badge bg-success ms-1">@_activeCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "actionable" ? "active" : "")" @onclick="@(() => FilterByStatus("actionable"))">
+            Actionable
+            @if (_actionableCount > 0)
+            {
+                <span class="badge bg-primary ms-1">@_actionableCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_statusFilter == "archived" ? "active" : "")" @onclick="@(() => FilterByStatus("archived"))">
+            Archived
+            @if (_archivedCount > 0)
+            {
+                <span class="badge bg-secondary ms-1">@_archivedCount</span>
+            }
+        </button>
+    </li>
+</ul>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_filteredIdeas.Any())
+{
+    <div class="text-center py-5">
+        <div class="mb-3">
+            <span class="oi oi-lightbulb display-4 text-muted"></span>
+        </div>
+        <h5 class="text-muted">No @GetStatusLabel() ideas</h5>
+        <p class="text-muted">@GetEmptyMessage()</p>
+        @if (_statusFilter == "active" || _statusFilter == "all")
+        {
+            <button class="btn btn-primary mt-2" @onclick="ShowAddModal">
+                <span class="oi oi-plus me-1"></span> Capture Your First Idea
+            </button>
+        }
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var idea in _filteredIdeas.OrderBy(i => i.Priority).ThenByDescending(i => i.CreatedAt))
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 idea-card @(idea.HasActionPotential ? "border-primary" : "")">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <PriorityIndicator Priority="@idea.Priority" />
+                                @if (idea.HasActionPotential)
+                                {
+                                    <span class="badge bg-primary" title="Has action potential">
+                                        <span class="oi oi-bolt"></span>
+                                    </span>
+                                }
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown">
+                                    <span class="oi oi-ellipses"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><button class="dropdown-item" @onclick="() => ShowEditModal(idea)"><span class="oi oi-pencil me-2"></span>Edit</button></li>
+                                    <li><button class="dropdown-item" @onclick="() => ShowConvertModal(idea)"><span class="oi oi-task me-2"></span>Convert to Task</button></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    @if (idea.Status == IdeaStatus.Active)
+                                    {
+                                        <li><button class="dropdown-item" @onclick="() => ArchiveIdea(idea)"><span class="oi oi-box me-2"></span>Archive</button></li>
+                                    }
+                                    <li><button class="dropdown-item text-danger" @onclick="() => ShowDeleteConfirm(idea)"><span class="oi oi-trash me-2"></span>Delete</button></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <h5 class="card-title mb-2">@idea.Title</h5>
+                        @if (!string.IsNullOrEmpty(idea.Description))
+                        {
+                            <p class="card-text text-muted small mb-2">
+                                @(idea.Description.Length > 100 ? idea.Description.Substring(0, 100) + "..." : idea.Description)
+                            </p>
+                        }
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            @if (!string.IsNullOrEmpty(idea.Category))
+                            {
+                                <span class="badge bg-secondary">@idea.Category</span>
+                            }
+                            @foreach (var tag in idea.Tags.Take(3))
+                            {
+                                <span class="badge bg-light text-dark">#@tag</span>
+                            }
+                            @if (idea.Tags.Count > 3)
+                            {
+                                <span class="badge bg-light text-dark">+@(idea.Tags.Count - 3)</span>
+                            }
+                        </div>
+                        @if (idea.LinkedGoalId.HasValue || idea.LinkedProjectId.HasValue)
+                        {
+                            <div class="small text-muted">
+                                @if (idea.LinkedGoalId.HasValue)
+                                {
+                                    var goal = _goals.FirstOrDefault(g => g.Id == idea.LinkedGoalId);
+                                    if (goal != null)
+                                    {
+                                        <span class="me-2"><span class="oi oi-target me-1"></span>@goal.Title</span>
+                                    }
+                                }
+                                @if (idea.LinkedProjectId.HasValue)
+                                {
+                                    var project = _projects.FirstOrDefault(p => p.Id == idea.LinkedProjectId);
+                                    if (project != null)
+                                    {
+                                        <span><span class="oi oi-folder me-1"></span>@project.Name</span>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pt-0">
+                        <small class="text-muted">@idea.CreatedAt.ToString("MMM d, yyyy")</small>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@* Add/Edit Modal *@
+<Modal Title="@(_editingIdea == null ? "New Idea" : "Edit Idea")" IsVisible="@_showAddEditModal" OnClose="CloseAddEditModal" Size="modal-lg">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" @bind="_ideaTitle" placeholder="What's on your mind?" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" @bind="_ideaDescription" rows="3" placeholder="Describe your idea..."></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">Priority</label>
+                <select class="form-select" @bind="_ideaPriority">
+                    <option value="1">High</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Low</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Category</label>
+                <input type="text" class="form-control" @bind="_ideaCategory" placeholder="e.g., work, personal" />
+            </div>
+            <div class="col-md-4">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="hasActionPotential" @bind="_ideaHasActionPotential" />
+                    <label class="form-check-label" for="hasActionPotential">
+                        Has action potential
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Tags</label>
+            <input type="text" class="form-control" @bind="_ideaTags" placeholder="#tag1 #tag2 #tag3" />
+            <small class="text-muted">Use #hashtags separated by spaces</small>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Link to Goal</label>
+                <select class="form-select" @bind="_ideaLinkedGoalId">
+                    <option value="">-- None --</option>
+                    @foreach (var goal in _goals.Where(g => g.Status == GoalStatus.Active))
+                    {
+                        <option value="@goal.Id">@goal.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Link to Project</label>
+                <select class="form-select" @bind="_ideaLinkedProjectId">
+                    <option value="">-- None --</option>
+                    @foreach (var project in _projects.Where(p => p.Status == ProjectStatus.Active))
+                    {
+                        <option value="@project.Id">@project.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Source / Inspiration</label>
+            <input type="text" class="form-control" @bind="_ideaSource" placeholder="Where did this idea come from?" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" @bind="_ideaNotes" rows="3" placeholder="Additional thoughts..."></textarea>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseAddEditModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveIdea" disabled="@string.IsNullOrWhiteSpace(_ideaTitle)">
+            @(_editingIdea == null ? "Create Idea" : "Save Changes")
+        </button>
+    </Footer>
+</Modal>
+
+@* Convert to Task Modal *@
+<Modal Title="Convert Idea to Task" IsVisible="@_showConvertModal" OnClose="() => _showConvertModal = false" Size="modal-lg">
+    <ChildContent>
+        @if (_convertingIdea != null)
+        {
+            <div class="alert alert-info">
+                <strong>Idea:</strong> @_convertingIdea.Title
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Task Title</label>
+                <input type="text" class="form-control" @bind="_convertTaskTitle" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" @bind="_convertTaskDescription" rows="2"></textarea>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Estimated Minutes</label>
+                    <input type="number" class="form-control" @bind="_convertTaskMinutes" min="5" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Priority</label>
+                    <select class="form-select" @bind="_convertTaskPriority">
+                        <option value="1">High</option>
+                        <option value="2">Normal</option>
+                        <option value="3">Low</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" @bind="_convertTaskStatus">
+                        <option value="@TodoTaskStatus.Inbox">Inbox</option>
+                        <option value="@TodoTaskStatus.NextAction">Next Action</option>
+                        <option value="@TodoTaskStatus.SomedayMaybe">Someday/Maybe</option>
+                    </select>
+                </div>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="() => _showConvertModal = false">Cancel</button>
+        <button class="btn btn-primary" @onclick="ConvertToTask">
+            <span class="oi oi-task me-1"></span> Create Task
+        </button>
+    </Footer>
+</Modal>
+
+<ConfirmDialog
+    Title="Delete Idea"
+    Message="Are you sure you want to delete this idea? This action cannot be undone."
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="@(() => _showDeleteConfirm = false)" />
+
+@code {
+    private List<Idea> _ideas = new();
+    private List<Idea> _filteredIdeas = new();
+    private List<Goal> _goals = new();
+    private List<Project> _projects = new();
+    private bool _isLoading = true;
+    private string _statusFilter = "active";
+
+    // Counts
+    private int _allCount = 0;
+    private int _activeCount = 0;
+    private int _actionableCount = 0;
+    private int _archivedCount = 0;
+
+    // Add/Edit Modal
+    private bool _showAddEditModal = false;
+    private Idea? _editingIdea = null;
+    private string _ideaTitle = string.Empty;
+    private string _ideaDescription = string.Empty;
+    private int _ideaPriority = 2;
+    private string _ideaCategory = string.Empty;
+    private string _ideaTags = string.Empty;
+    private string _ideaLinkedGoalId = string.Empty;
+    private string _ideaLinkedProjectId = string.Empty;
+    private string _ideaSource = string.Empty;
+    private string _ideaNotes = string.Empty;
+    private bool _ideaHasActionPotential = false;
+
+    // Convert Modal
+    private bool _showConvertModal = false;
+    private Idea? _convertingIdea = null;
+    private string _convertTaskTitle = string.Empty;
+    private string _convertTaskDescription = string.Empty;
+    private int _convertTaskMinutes = 30;
+    private int _convertTaskPriority = 2;
+    private TodoTaskStatus _convertTaskStatus = TodoTaskStatus.NextAction;
+
+    // Delete Confirm
+    private bool _showDeleteConfirm = false;
+    private Idea? _deletingIdea = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataChangeNotification.OnDataChanged += HandleDataChanged;
+        await LoadData();
+    }
+
+    private async void HandleDataChanged()
+    {
+        await LoadData();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var ideasTask = IdeaService.GetAllAsync();
+            var goalsTask = GoalService.GetAllAsync();
+            var projectsTask = ProjectService.GetAllAsync();
+
+            await Task.WhenAll(ideasTask, goalsTask, projectsTask);
+
+            _ideas = (await ideasTask).ToList();
+            _goals = (await goalsTask).ToList();
+            _projects = (await projectsTask).ToList();
+
+            UpdateCounts();
+            ApplyFilter();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void UpdateCounts()
+    {
+        _allCount = _ideas.Count(i => i.Status != IdeaStatus.Dismissed && i.Status != IdeaStatus.ConvertedToTask);
+        _activeCount = _ideas.Count(i => i.Status == IdeaStatus.Active);
+        _actionableCount = _ideas.Count(i => i.Status == IdeaStatus.Active && i.HasActionPotential);
+        _archivedCount = _ideas.Count(i => i.Status == IdeaStatus.Archived);
+    }
+
+    private void ApplyFilter()
+    {
+        _filteredIdeas = _statusFilter switch
+        {
+            "active" => _ideas.Where(i => i.Status == IdeaStatus.Active).ToList(),
+            "actionable" => _ideas.Where(i => i.Status == IdeaStatus.Active && i.HasActionPotential).ToList(),
+            "archived" => _ideas.Where(i => i.Status == IdeaStatus.Archived).ToList(),
+            _ => _ideas.Where(i => i.Status != IdeaStatus.Dismissed && i.Status != IdeaStatus.ConvertedToTask).ToList()
+        };
+    }
+
+    private void FilterByStatus(string status)
+    {
+        _statusFilter = status;
+        ApplyFilter();
+    }
+
+    private string GetStatusLabel() => _statusFilter switch
+    {
+        "active" => "active",
+        "actionable" => "actionable",
+        "archived" => "archived",
+        _ => ""
+    };
+
+    private string GetEmptyMessage() => _statusFilter switch
+    {
+        "active" => "Capture ideas as they come to you. They don't have to be actionable!",
+        "actionable" => "Mark ideas as 'Has action potential' when they're ready to become tasks.",
+        "archived" => "Archived ideas will appear here.",
+        _ => "Start capturing your thoughts and inspirations."
+    };
+
+    private void ShowAddModal()
+    {
+        _editingIdea = null;
+        ResetForm();
+        _showAddEditModal = true;
+    }
+
+    private void ShowEditModal(Idea idea)
+    {
+        _editingIdea = idea;
+        _ideaTitle = idea.Title;
+        _ideaDescription = idea.Description ?? string.Empty;
+        _ideaPriority = idea.Priority;
+        _ideaCategory = idea.Category ?? string.Empty;
+        _ideaTags = string.Join(" ", idea.Tags.Select(t => $"#{t}"));
+        _ideaLinkedGoalId = idea.LinkedGoalId?.ToString() ?? string.Empty;
+        _ideaLinkedProjectId = idea.LinkedProjectId?.ToString() ?? string.Empty;
+        _ideaSource = idea.Source ?? string.Empty;
+        _ideaNotes = idea.Notes ?? string.Empty;
+        _ideaHasActionPotential = idea.HasActionPotential;
+        _showAddEditModal = true;
+    }
+
+    private void CloseAddEditModal()
+    {
+        _showAddEditModal = false;
+        _editingIdea = null;
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        _ideaTitle = string.Empty;
+        _ideaDescription = string.Empty;
+        _ideaPriority = 2;
+        _ideaCategory = string.Empty;
+        _ideaTags = string.Empty;
+        _ideaLinkedGoalId = string.Empty;
+        _ideaLinkedProjectId = string.Empty;
+        _ideaSource = string.Empty;
+        _ideaNotes = string.Empty;
+        _ideaHasActionPotential = false;
+    }
+
+    private async Task SaveIdea()
+    {
+        if (string.IsNullOrWhiteSpace(_ideaTitle)) return;
+
+        var idea = _editingIdea ?? new Idea();
+        idea.Title = _ideaTitle;
+        idea.Description = string.IsNullOrWhiteSpace(_ideaDescription) ? null : _ideaDescription;
+        idea.Priority = _ideaPriority;
+        idea.Category = string.IsNullOrWhiteSpace(_ideaCategory) ? null : _ideaCategory;
+        idea.Tags = ParseTags(_ideaTags);
+        idea.LinkedGoalId = Guid.TryParse(_ideaLinkedGoalId, out var goalId) ? goalId : null;
+        idea.LinkedProjectId = Guid.TryParse(_ideaLinkedProjectId, out var projectId) ? projectId : null;
+        idea.Source = string.IsNullOrWhiteSpace(_ideaSource) ? null : _ideaSource;
+        idea.Notes = string.IsNullOrWhiteSpace(_ideaNotes) ? null : _ideaNotes;
+        idea.HasActionPotential = _ideaHasActionPotential;
+
+        if (_editingIdea == null)
+        {
+            await IdeaService.CreateAsync(idea);
+        }
+        else
+        {
+            await IdeaService.UpdateAsync(idea);
+        }
+
+        CloseAddEditModal();
+        await LoadData();
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private void ShowConvertModal(Idea idea)
+    {
+        _convertingIdea = idea;
+        _convertTaskTitle = idea.Title;
+        _convertTaskDescription = idea.Description ?? string.Empty;
+        _convertTaskMinutes = 30;
+        _convertTaskPriority = idea.Priority;
+        _convertTaskStatus = TodoTaskStatus.NextAction;
+        _showConvertModal = true;
+    }
+
+    private async Task ConvertToTask()
+    {
+        if (_convertingIdea == null) return;
+
+        var taskTemplate = new TodoTask
+        {
+            Title = _convertTaskTitle,
+            Description = _convertTaskDescription,
+            EstimatedMinutes = _convertTaskMinutes,
+            Priority = _convertTaskPriority,
+            Status = _convertTaskStatus
+        };
+
+        await IdeaService.ConvertToTaskAsync(_convertingIdea.Id, taskTemplate);
+        _showConvertModal = false;
+        _convertingIdea = null;
+        await LoadData();
+    }
+
+    private async Task ArchiveIdea(Idea idea)
+    {
+        await IdeaService.ArchiveAsync(idea.Id);
+        await LoadData();
+    }
+
+    private void ShowDeleteConfirm(Idea idea)
+    {
+        _deletingIdea = idea;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingIdea != null)
+        {
+            await IdeaService.DeleteAsync(_deletingIdea.Id);
+            _showDeleteConfirm = false;
+            _deletingIdea = null;
+            await LoadData();
+        }
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotification.OnDataChanged -= HandleDataChanged;
+    }
+}

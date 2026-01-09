@@ -14,10 +14,14 @@ public partial class MainLayout : IDisposable
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = default!;
 
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private bool _showOnboarding = false;
     private bool _checkedOnboarding = false;
     private bool _showGlobalSearch = false;
+    private bool _showKeyboardHelp = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,6 +58,48 @@ public partial class MainLayout : IDisposable
     }
 
     [JSInvokable]
+    public void OnQuickCaptureShortcut()
+    {
+        NavigationManager.NavigateTo("/capture");
+    }
+
+    [JSInvokable]
+    public void OnHelpShortcut()
+    {
+        _showKeyboardHelp = !_showKeyboardHelp;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnEscapeShortcut()
+    {
+        // Close any open overlays
+        if (_showKeyboardHelp)
+        {
+            _showKeyboardHelp = false;
+            StateHasChanged();
+        }
+        else if (_showGlobalSearch)
+        {
+            _showGlobalSearch = false;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void OnNavigateShortcut(string route)
+    {
+        NavigationManager.NavigateTo(route);
+    }
+
+    [JSInvokable]
+    public void OnNewItemShortcut()
+    {
+        // Navigate to quick capture for new items
+        NavigationManager.NavigateTo("/capture");
+    }
+
+    [JSInvokable]
     public void OnUndoShortcut()
     {
         // TODO: Implement undo functionality
@@ -80,6 +126,11 @@ public partial class MainLayout : IDisposable
     private void OnOnboardingCompleted()
     {
         _showOnboarding = false;
+    }
+
+    private void OnKeyboardHelpClosed()
+    {
+        _showKeyboardHelp = false;
     }
 
     public void Dispose()

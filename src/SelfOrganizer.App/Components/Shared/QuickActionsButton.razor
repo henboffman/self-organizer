@@ -1,0 +1,214 @@
+@inject NavigationManager NavigationManager
+
+<div class="fab-container @(_isExpanded ? "expanded" : "")">
+    @if (_isExpanded)
+    {
+        <div class="fab-backdrop" @onclick="ToggleExpanded"></div>
+
+        <div class="fab-menu">
+            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToDailyReview)" title="Daily Review">
+                <span class="oi oi-check"></span>
+                <span class="fab-label">Daily Review</span>
+            </button>
+            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewGoal)" title="New Goal">
+                <span class="oi oi-target"></span>
+                <span class="fab-label">New Goal</span>
+            </button>
+            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewProject)" title="New Project">
+                <span class="oi oi-folder"></span>
+                <span class="fab-label">New Project</span>
+            </button>
+            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewIdea)" title="New Idea">
+                <span class="oi oi-lightbulb"></span>
+                <span class="fab-label">New Idea</span>
+            </button>
+            <button class="fab-item primary" @onclick="() => NavigateToAndClose(NavigateToQuickCapture)" title="Quick Capture">
+                <span class="oi oi-bolt"></span>
+                <span class="fab-label">Quick Capture</span>
+            </button>
+        </div>
+    }
+
+    <button class="fab-main @(_isExpanded ? "active" : "")" @onclick="ToggleExpanded" title="Quick Actions">
+        <span class="fab-icon oi @(_isExpanded ? "oi-x" : "oi-plus")"></span>
+    </button>
+</div>
+
+<style>
+    .fab-container {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .fab-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: -1;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    .fab-main {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--bs-primary);
+        border: none;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        transition: all 0.2s ease;
+        z-index: 10;
+    }
+
+    .fab-main:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .fab-main.active {
+        background: var(--bs-secondary);
+    }
+
+    .fab-icon {
+        font-size: 1.25rem;
+        transition: transform 0.3s ease;
+    }
+
+    .fab-main.active .fab-icon {
+        transform: rotate(45deg);
+    }
+
+    .fab-menu {
+        position: absolute;
+        bottom: 70px;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        animation: slideUp 0.2s ease-out;
+    }
+
+    @@keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .fab-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: var(--bs-body-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 28px;
+        color: var(--bs-body-color);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        white-space: nowrap;
+    }
+
+    .fab-item:hover {
+        background: var(--bs-primary);
+        color: white;
+        border-color: var(--bs-primary);
+        transform: translateX(-4px);
+    }
+
+    .fab-item.primary {
+        background: var(--bs-success);
+        color: white;
+        border-color: var(--bs-success);
+    }
+
+    .fab-item.primary:hover {
+        background: var(--bs-success);
+        filter: brightness(1.1);
+    }
+
+    .fab-item .oi {
+        font-size: 1rem;
+        width: 20px;
+        text-align: center;
+    }
+
+    .fab-label {
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    /* Hide on mobile for now since sidebar is more accessible */
+    @@media (max-width: 768px) {
+        .fab-container {
+            bottom: 80px; /* Account for mobile nav */
+        }
+    }
+
+    /* Dark mode */
+    :root[data-bs-theme="dark"] .fab-item {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+</style>
+
+@code {
+    private bool _isExpanded = false;
+
+    private void ToggleExpanded()
+    {
+        _isExpanded = !_isExpanded;
+    }
+
+    private void NavigateToAndClose(Action navigate)
+    {
+        _isExpanded = false;
+        navigate();
+    }
+
+    private void NavigateToQuickCapture()
+    {
+        NavigationManager.NavigateTo("/capture");
+    }
+
+    private void NavigateToNewIdea()
+    {
+        NavigationManager.NavigateTo("/ideas?new=true");
+    }
+
+    private void NavigateToNewProject()
+    {
+        NavigationManager.NavigateTo("/projects?new=true");
+    }
+
+    private void NavigateToNewGoal()
+    {
+        NavigationManager.NavigateTo("/goals?new=true");
+    }
+
+    private void NavigateToDailyReview()
+    {
+        NavigationManager.NavigateTo("/review/daily");
+    }
+}

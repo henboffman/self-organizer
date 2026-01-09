@@ -237,6 +237,23 @@ else
                     <input type="date" class="form-control" @bind="_editDueDate" />
                 </div>
             </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Energy Level Required</label>
+                    <select class="form-select" @bind="_editEnergyLevel">
+                        <option value="">Any energy level</option>
+                        <option value="1">1 - Very Low (mindless tasks)</option>
+                        <option value="2">2 - Low (routine tasks)</option>
+                        <option value="3">3 - Medium (standard focus)</option>
+                        <option value="4">4 - High (creative work)</option>
+                        <option value="5">5 - Very High (deep focus)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <input type="text" class="form-control" @bind="_editCategory" placeholder="e.g., work, personal" />
+                </div>
+            </div>
             <div class="mb-3">
                 <SelfOrganizer.App.Components.Shared.ContextSelector
                     Label="Contexts"
@@ -309,6 +326,8 @@ else
     private int _editEstimatedMinutes = 30;
     private DateTime? _editDueDate;
     private List<string> _editContexts = new();
+    private string _editEnergyLevel = string.Empty;
+    private string _editCategory = string.Empty;
 
     // Schedule fields
     private DateTime _scheduleDate = DateTime.Today;
@@ -342,6 +361,8 @@ else
                 _editEstimatedMinutes = _task.EstimatedMinutes;
                 _editDueDate = _task.DueDate;
                 _editContexts = new List<string>(_task.Contexts);
+                _editEnergyLevel = _task.EnergyLevel?.ToString() ?? string.Empty;
+                _editCategory = _task.Category ?? string.Empty;
             }
         }
         finally
@@ -370,6 +391,8 @@ else
             _task.EstimatedMinutes = _editEstimatedMinutes;
             _task.DueDate = _editDueDate;
             _task.Contexts = new List<string>(_editContexts);
+            _task.EnergyLevel = string.IsNullOrWhiteSpace(_editEnergyLevel) ? null : int.Parse(_editEnergyLevel);
+            _task.Category = string.IsNullOrWhiteSpace(_editCategory) ? null : _editCategory;
             await TaskService.UpdateAsync(_task);
             _isEditing = false;
             await LoadTask();

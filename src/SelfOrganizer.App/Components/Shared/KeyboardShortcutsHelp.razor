@@ -1,0 +1,213 @@
+@if (IsVisible)
+{
+    <div class="keyboard-shortcuts-overlay" @onclick="OnClose">
+        <div class="keyboard-shortcuts-modal" @onclick:stopPropagation>
+            <div class="shortcuts-header">
+                <h5 class="mb-0">Keyboard Shortcuts</h5>
+                <button class="btn-close" @onclick="OnClose"></button>
+            </div>
+            <div class="shortcuts-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="shortcuts-section-title">Navigation</h6>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>h</kbd></span>
+                            <span class="shortcut-desc">Go to Home</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>i</kbd></span>
+                            <span class="shortcut-desc">Go to Inbox</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>t</kbd></span>
+                            <span class="shortcut-desc">Go to Tasks</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>p</kbd></span>
+                            <span class="shortcut-desc">Go to Projects</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>c</kbd></span>
+                            <span class="shortcut-desc">Go to Calendar</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>g</kbd></span>
+                            <span class="shortcut-desc">Go to Goals</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>d</kbd></span>
+                            <span class="shortcut-desc">Go to Ideas</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>f</kbd></span>
+                            <span class="shortcut-desc">Go to Focus Timer</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>r</kbd></span>
+                            <span class="shortcut-desc">Go to Daily Review</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>g</kbd> <kbd>s</kbd></span>
+                            <span class="shortcut-desc">Go to Settings</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="shortcuts-section-title">Quick Actions</h6>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Cmd/Ctrl</kbd> + <kbd>Enter</kbd></span>
+                            <span class="shortcut-desc">Quick Capture</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Cmd/Ctrl</kbd> + <kbd>K</kbd></span>
+                            <span class="shortcut-desc">Global Search</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>n</kbd></span>
+                            <span class="shortcut-desc">New Item</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                            <span class="shortcut-desc">Close Modal / Cancel</span>
+                        </div>
+
+                        <h6 class="shortcuts-section-title mt-4">Undo / Redo</h6>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Cmd/Ctrl</kbd> + <kbd>Z</kbd></span>
+                            <span class="shortcut-desc">Undo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Cmd/Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></span>
+                            <span class="shortcut-desc">Redo</span>
+                        </div>
+
+                        <h6 class="shortcuts-section-title mt-4">Help</h6>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>?</kbd></span>
+                            <span class="shortcut-desc">Show This Help</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="shortcuts-footer">
+                <span class="text-muted small">Press <kbd>Esc</kbd> or <kbd>?</kbd> to close</span>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .keyboard-shortcuts-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.15s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .keyboard-shortcuts-modal {
+        background: var(--bs-body-bg);
+        border-radius: 12px;
+        max-width: 700px;
+        width: 90%;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        animation: slideIn 0.2s ease-out;
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    .shortcuts-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .shortcuts-body {
+        padding: 1.5rem;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .shortcuts-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--bs-border-color);
+        text-align: center;
+    }
+
+    .shortcuts-section-title {
+        color: var(--bs-primary);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--bs-border-color-translucent);
+    }
+
+    .shortcut-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+    }
+
+    .shortcut-keys {
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+    }
+
+    .shortcut-keys kbd {
+        background: var(--bs-secondary-bg);
+        border: 1px solid var(--bs-border-color);
+        border-radius: 4px;
+        padding: 0.2rem 0.5rem;
+        font-size: 0.8rem;
+        font-family: inherit;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        min-width: 24px;
+        text-align: center;
+    }
+
+    .shortcut-desc {
+        color: var(--bs-secondary-color);
+        font-size: 0.9rem;
+    }
+
+    /* Dark mode adjustments */
+    :root[data-bs-theme="dark"] .shortcut-keys kbd {
+        background: rgba(255,255,255,0.1);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+}

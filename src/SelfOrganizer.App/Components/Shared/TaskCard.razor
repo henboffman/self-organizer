@@ -21,7 +21,9 @@
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center">
                     <PriorityIndicator Priority="@Task.Priority" />
-                    <a href="/tasks/@Task.Id" class="task-title ms-2 text-decoration-none">@Task.Title</a>
+                    <a href="/tasks/@Task.Id" class="task-title ms-2 text-decoration-none">
+                        <TaggedText Text="@Task.Title" />
+                    </a>
                 </div>
                 <div class="task-meta small text-muted">
                     @if (Task.EstimatedMinutes > 0)

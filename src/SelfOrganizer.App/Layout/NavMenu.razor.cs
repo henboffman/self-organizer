@@ -23,6 +23,9 @@ public partial class NavMenu : IDisposable
     private IGoalService GoalService { get; set; } = default!;
 
     [Inject]
+    private IIdeaService IdeaService { get; set; } = default!;
+
+    [Inject]
     private IDataChangeNotificationService DataChangeNotification { get; set; } = default!;
 
     private bool collapseNavMenu = true;
@@ -33,6 +36,7 @@ public partial class NavMenu : IDisposable
     private int _projectsCount = 0;
     private int _todayEventsCount = 0;
     private int _goalsCount = 0;
+    private int _ideasCount = 0;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
@@ -70,8 +74,9 @@ public partial class NavMenu : IDisposable
             var projectsTask = ProjectService.GetActiveAsync();
             var eventsTask = CalendarService.GetEventsForDateAsync(DateOnly.FromDateTime(DateTime.Today));
             var goalsTask = GoalService.GetActiveGoalsAsync();
+            var ideasTask = IdeaService.GetActiveCountAsync();
 
-            await Task.WhenAll(capturesTask, inboxTasksTask, nextActionsTask, waitingForTask, scheduledTask, projectsTask, eventsTask, goalsTask);
+            await Task.WhenAll(capturesTask, inboxTasksTask, nextActionsTask, waitingForTask, scheduledTask, projectsTask, eventsTask, goalsTask, ideasTask);
 
             // Inbox count = unprocessed captures + tasks with Inbox status
             var capturesCount = await capturesTask;
@@ -87,6 +92,7 @@ public partial class NavMenu : IDisposable
             _projectsCount = (await projectsTask).Count();
             _todayEventsCount = (await eventsTask).Count();
             _goalsCount = (await goalsTask).Count();
+            _ideasCount = await ideasTask;
         }
         catch
         {
@@ -96,6 +102,7 @@ public partial class NavMenu : IDisposable
             _projectsCount = 0;
             _todayEventsCount = 0;
             _goalsCount = 0;
+            _ideasCount = 0;
         }
     }
 

@@ -240,6 +240,12 @@ else
     private DateTime? _lastExtractionRun = null;
     private RetroactiveTaggingResult? _extractionResult = null;
 
+    // Static cache to persist data across navigation
+    private static List<TagInfo>? _cachedTags = null;
+    private static List<string>? _cachedRecentTags = null;
+    private static DateTime _cacheTimestamp = DateTime.MinValue;
+    private static bool _cacheInvalidated = true;
+
     protected override async Task OnInitializedAsync()
     {
         DataChangeNotification.OnDataChanged += HandleDataChanged;
@@ -248,20 +254,46 @@ else
 
     private async void HandleDataChanged()
     {
-        await InvokeAsync(async () =>
+        // Mark cache as invalid but don't reload immediately
+        _cacheInvalidated = true;
+
+        // Only reload if this page is currently visible
+        await InvokeAsync(() =>
         {
-            await LoadTags();
             StateHasChanged();
         });
     }
 
     private async Task LoadTags()
     {
+        // Use cache if available and not invalidated
+        if (!_cacheInvalidated && _cachedTags != null && _cachedRecentTags != null)
+        {
+            _allTags = _cachedTags;
+            _recentTags = _cachedRecentTags;
+            _isLoading = false;
+            return;
+        }
+
         _isLoading = true;
+        StateHasChanged();
+
         try
         {
-            _allTags = await EntityExtraction.GetAllTagsAsync();
-            _recentTags = await GetRecentlyUsedTags();
+            // Load both in parallel for performance
+            var tagsTask = EntityExtraction.GetAllTagsAsync();
+            var recentTask = GetRecentlyUsedTags();
+
+            await Task.WhenAll(tagsTask, recentTask);
+
+            _allTags = await tagsTask;
+            _recentTags = await recentTask;
+
+            // Update cache
+            _cachedTags = _allTags;
+            _cachedRecentTags = _recentTags;
+            _cacheTimestamp = DateTime.UtcNow;
+            _cacheInvalidated = false;
         }
         finally
         {
@@ -273,9 +305,11 @@ else
     {
         var recentTags = new List<string>();
 
-        // Get tags from recently modified tasks
+        // Get only recently modified tasks (last 7 days) instead of all tasks
         var tasks = await TaskService.GetAllAsync();
+        var cutoffDate = DateTime.UtcNow.AddDays(-7);
         var recentTasks = tasks
+            .Where(t => t.ModifiedAt >= cutoffDate || t.CreatedAt >= cutoffDate)
             .OrderByDescending(t => t.ModifiedAt > t.CreatedAt ? t.ModifiedAt : t.CreatedAt)
             .Take(20);
 
@@ -284,8 +318,8 @@ else
             recentTags.AddRange(task.Tags);
         }
 
-        // Get tags from recent events
-        var events = await CalendarService.GetEventsForRangeAsync(DateTime.Today.AddDays(-7), DateTime.Today.AddDays(7));
+        // Get tags from recent events - use smaller window
+        var events = await CalendarService.GetEventsForRangeAsync(DateTime.Today.AddDays(-3), DateTime.Today.AddDays(3));
         foreach (var evt in events.OrderByDescending(e => e.StartTime).Take(10))
         {
             recentTags.AddRange(evt.Tags);

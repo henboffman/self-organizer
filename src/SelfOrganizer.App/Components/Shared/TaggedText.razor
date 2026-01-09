@@ -1,0 +1,76 @@
+@* Component to render text with #tags as clickable links *@
+@using SelfOrganizer.Core.Services
+@inject NavigationManager NavigationManager
+
+@if (string.IsNullOrWhiteSpace(Text))
+{
+    @* Nothing to render *@
+}
+else
+{
+    @((MarkupString)RenderTextWithTags())
+}
+
+@code {
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>
+    /// CSS class to apply to the container span
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// If true, tags are clickable and navigate to tag detail page
+    /// </summary>
+    [Parameter]
+    public bool Clickable { get; set; } = true;
+
+    private string RenderTextWithTags()
+    {
+        if (string.IsNullOrWhiteSpace(Text))
+            return string.Empty;
+
+        var tagMatches = TagParsingService.FindTagMatches(Text);
+
+        if (!tagMatches.Any())
+        {
+            // No tags, just return escaped text
+            return System.Web.HttpUtility.HtmlEncode(Text);
+        }
+
+        var result = new System.Text.StringBuilder();
+        var lastIndex = 0;
+
+        foreach (var match in tagMatches.OrderBy(m => m.StartIndex))
+        {
+            // Add text before this tag
+            if (match.StartIndex > lastIndex)
+            {
+                var textBefore = Text.Substring(lastIndex, match.StartIndex - lastIndex);
+                result.Append(System.Web.HttpUtility.HtmlEncode(textBefore));
+            }
+
+            // Add the styled tag
+            if (Clickable)
+            {
+                result.Append($"<a href=\"/tags/{System.Web.HttpUtility.UrlEncode(match.TagName)}\" class=\"tag-link\" onclick=\"event.stopPropagation();\">{System.Web.HttpUtility.HtmlEncode(match.FullMatch)}</a>");
+            }
+            else
+            {
+                result.Append($"<span class=\"tag-styled\">{System.Web.HttpUtility.HtmlEncode(match.FullMatch)}</span>");
+            }
+
+            lastIndex = match.StartIndex + match.Length;
+        }
+
+        // Add remaining text after last tag
+        if (lastIndex < Text.Length)
+        {
+            result.Append(System.Web.HttpUtility.HtmlEncode(Text.Substring(lastIndex)));
+        }
+
+        return result.ToString();
+    }
+}

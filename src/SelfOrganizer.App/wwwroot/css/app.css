@@ -6,7 +6,7 @@
 /* ----------------------------------------
    Base Styles
    ---------------------------------------- */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+/* Using system fonts for professional look - no external font imports needed */
 
 *,
 *::before,
@@ -741,4 +741,44 @@ pre {
 ::selection {
     background-color: var(--color-primary-subtle);
     color: var(--text-primary);
+}
+
+/* ----------------------------------------
+   Tag Links (for #hashtags in text)
+   ---------------------------------------- */
+.tag-link {
+    color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.tag-link:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
+    color: var(--bs-primary);
+    text-decoration: none;
+}
+
+.tag-styled {
+    color: var(--bs-primary);
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Dark mode adjustments for tags */
+[data-bs-theme="dark"] .tag-link {
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+[data-bs-theme="dark"] .tag-link:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+[data-bs-theme="dark"] .tag-styled {
+    background-color: rgba(var(--bs-primary-rgb), 0.2);
 }

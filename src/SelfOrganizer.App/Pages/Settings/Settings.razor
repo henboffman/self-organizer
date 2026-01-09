@@ -794,6 +794,8 @@
         await DbService.ClearAsync("categories");
         await DbService.ClearAsync("preferences");
         await DbService.ClearAsync("dailySnapshots");
+        await DbService.ClearAsync("goals");
+        await DbService.ClearAsync("ideas");
 
         _showClearConfirm = false;
         _preferences = null;

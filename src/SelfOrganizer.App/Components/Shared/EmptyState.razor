@@ -1,0 +1,249 @@
+@* Reusable empty state component with consistent styling *@
+<div class="empty-state @SizeClass @ThemeClass">
+    <div class="empty-state-icon">
+        <span class="oi @Icon"></span>
+    </div>
+    <h4 class="empty-state-title">@Title</h4>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <p class="empty-state-description">@Description</p>
+    }
+    @if (ChildContent != null)
+    {
+        <div class="empty-state-actions">
+            @ChildContent
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(PrimaryActionText) && PrimaryAction.HasDelegate)
+    {
+        <div class="empty-state-actions">
+            <button class="btn @PrimaryButtonClass" @onclick="PrimaryAction">
+                @if (!string.IsNullOrEmpty(PrimaryActionIcon))
+                {
+                    <span class="oi @PrimaryActionIcon me-1"></span>
+                }
+                @PrimaryActionText
+            </button>
+            @if (!string.IsNullOrEmpty(SecondaryActionText) && SecondaryAction.HasDelegate)
+            {
+                <button class="btn btn-outline-secondary" @onclick="SecondaryAction">
+                    @if (!string.IsNullOrEmpty(SecondaryActionIcon))
+                    {
+                        <span class="oi @SecondaryActionIcon me-1"></span>
+                    }
+                    @SecondaryActionText
+                </button>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 3rem 1.5rem;
+        min-height: 200px;
+    }
+
+    .empty-state.compact {
+        padding: 1.5rem;
+        min-height: auto;
+    }
+
+    .empty-state.large {
+        padding: 4rem 2rem;
+        min-height: 300px;
+    }
+
+    .empty-state-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: var(--bs-secondary-bg);
+        margin-bottom: 1.5rem;
+    }
+
+    .empty-state.compact .empty-state-icon {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state.large .empty-state-icon {
+        width: 100px;
+        height: 100px;
+        margin-bottom: 2rem;
+    }
+
+    .empty-state-icon .oi {
+        font-size: 2rem;
+        color: var(--bs-secondary);
+    }
+
+    .empty-state.compact .empty-state-icon .oi {
+        font-size: 1.5rem;
+    }
+
+    .empty-state.large .empty-state-icon .oi {
+        font-size: 2.5rem;
+    }
+
+    /* Theme variations */
+    .empty-state.success .empty-state-icon {
+        background: rgba(25, 135, 84, 0.1);
+    }
+
+    .empty-state.success .empty-state-icon .oi {
+        color: var(--bs-success);
+    }
+
+    .empty-state.info .empty-state-icon {
+        background: rgba(13, 202, 240, 0.1);
+    }
+
+    .empty-state.info .empty-state-icon .oi {
+        color: var(--bs-info);
+    }
+
+    .empty-state.warning .empty-state-icon {
+        background: rgba(255, 193, 7, 0.15);
+    }
+
+    .empty-state.warning .empty-state-icon .oi {
+        color: var(--bs-warning);
+    }
+
+    .empty-state.primary .empty-state-icon {
+        background: rgba(13, 110, 253, 0.1);
+    }
+
+    .empty-state.primary .empty-state-icon .oi {
+        color: var(--bs-primary);
+    }
+
+    .empty-state-title {
+        color: var(--bs-body-color);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .empty-state.compact .empty-state-title {
+        font-size: 1.1rem;
+    }
+
+    .empty-state-description {
+        color: var(--bs-secondary-color);
+        max-width: 400px;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .empty-state.compact .empty-state-description {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Dark mode adjustments */
+    :root[data-bs-theme="dark"] .empty-state-icon {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    :root[data-bs-theme="dark"] .empty-state.success .empty-state-icon {
+        background: rgba(25, 135, 84, 0.2);
+    }
+
+    :root[data-bs-theme="dark"] .empty-state.info .empty-state-icon {
+        background: rgba(13, 202, 240, 0.2);
+    }
+
+    :root[data-bs-theme="dark"] .empty-state.warning .empty-state-icon {
+        background: rgba(255, 193, 7, 0.2);
+    }
+
+    :root[data-bs-theme="dark"] .empty-state.primary .empty-state-icon {
+        background: rgba(13, 110, 253, 0.2);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Icon { get; set; } = "oi-info";
+
+    [Parameter]
+    public string Title { get; set; } = "Nothing here yet";
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string? PrimaryActionText { get; set; }
+
+    [Parameter]
+    public string? PrimaryActionIcon { get; set; }
+
+    [Parameter]
+    public EventCallback PrimaryAction { get; set; }
+
+    [Parameter]
+    public string? SecondaryActionText { get; set; }
+
+    [Parameter]
+    public string? SecondaryActionIcon { get; set; }
+
+    [Parameter]
+    public EventCallback SecondaryAction { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Size of the empty state: "compact", "normal" (default), or "large"
+    /// </summary>
+    [Parameter]
+    public string Size { get; set; } = "normal";
+
+    /// <summary>
+    /// Theme for the icon: "default", "success", "info", "warning", "primary"
+    /// </summary>
+    [Parameter]
+    public string Theme { get; set; } = "default";
+
+    private string SizeClass => Size switch
+    {
+        "compact" => "compact",
+        "large" => "large",
+        _ => ""
+    };
+
+    private string ThemeClass => Theme switch
+    {
+        "success" => "success",
+        "info" => "info",
+        "warning" => "warning",
+        "primary" => "primary",
+        _ => ""
+    };
+
+    private string PrimaryButtonClass => Theme switch
+    {
+        "success" => "btn-success",
+        "info" => "btn-info",
+        "warning" => "btn-warning",
+        "primary" => "btn-primary",
+        _ => "btn-primary"
+    };
+}

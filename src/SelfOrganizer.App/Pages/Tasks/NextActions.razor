@@ -191,9 +191,16 @@ else
                 }
             </div>
         </div>
-        <div class="mb-3">
-            <label class="form-label">Due Date (optional)</label>
-            <input type="date" class="form-control" @bind="_taskDueDate" />
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Due Date (optional)</label>
+                <input type="date" class="form-control" @bind="_taskDueDate" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Schedule For (optional)</label>
+                <input type="date" class="form-control" @bind="_taskScheduledDate" />
+                <small class="text-muted">Date when you plan to work on this</small>
+            </div>
         </div>
 
         @* Advanced Options - Collapsible *@
@@ -208,8 +215,8 @@ else
         {
             <div class="border rounded p-3 mb-3 bg-light">
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Energy Level (1-5)</label>
+                    <div class="col-md-4">
+                        <label class="form-label">Energy Level</label>
                         <select class="form-select" @bind="_taskEnergyLevel">
                             <option value="">Not set</option>
                             <option value="1">1 - Very Low</option>
@@ -219,7 +226,11 @@ else
                             <option value="5">5 - Very High</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <label class="form-label">Category</label>
+                        <input type="text" class="form-control" @bind="_taskCategory" placeholder="e.g., Work, Personal" />
+                    </div>
+                    <div class="col-md-4">
                         <label class="form-label">Who is this for?</label>
                         <input type="text" class="form-control" @bind="_taskWhoFor" placeholder="e.g., Client name, Team" />
                     </div>
@@ -339,12 +350,14 @@ else
     private int _taskEstimatedMinutes = 30;
     private int _taskPriority = 2;
     private DateTime? _taskDueDate;
+    private DateTime? _taskScheduledDate;
     private List<string> _selectedContexts = new();
     private readonly List<string> _availableContexts = new() { "@home", "@work", "@phone", "@computer", "@errands", "@anywhere" };
 
     // Advanced options fields
     private bool _showAdvancedOptions = false;
     private int? _taskEnergyLevel;
+    private string _taskCategory = string.Empty;
     private string _taskWhoFor = string.Empty;
     private string _taskTagsInput = string.Empty;
     private string _taskLinksInput = string.Empty;
@@ -394,11 +407,13 @@ else
         _taskEstimatedMinutes = 30;
         _taskPriority = 2;
         _taskDueDate = null;
+        _taskScheduledDate = null;
         _selectedContexts.Clear();
 
         // Reset advanced options
         _showAdvancedOptions = false;
         _taskEnergyLevel = null;
+        _taskCategory = string.Empty;
         _taskWhoFor = string.Empty;
         _taskTagsInput = string.Empty;
         _taskLinksInput = string.Empty;
@@ -418,10 +433,12 @@ else
         _taskEstimatedMinutes = task.EstimatedMinutes;
         _taskPriority = task.Priority;
         _taskDueDate = task.DueDate;
+        _taskScheduledDate = task.ScheduledDate;
         _selectedContexts = task.Contexts.ToList();
 
         // Load advanced options
         _taskEnergyLevel = task.EnergyLevel;
+        _taskCategory = task.Category ?? string.Empty;
         _taskWhoFor = task.WhoFor ?? string.Empty;
         _taskTagsInput = task.Tags.Any() ? string.Join(", ", task.Tags) : string.Empty;
         _taskLinksInput = task.Links.Any() ? string.Join("\n", task.Links) : string.Empty;
@@ -432,6 +449,7 @@ else
 
         // Show advanced options if any are populated
         _showAdvancedOptions = _taskEnergyLevel.HasValue ||
+                               !string.IsNullOrEmpty(_taskCategory) ||
                                !string.IsNullOrEmpty(_taskWhoFor) ||
                                task.Tags.Any() ||
                                task.Links.Any() ||
@@ -468,19 +486,24 @@ else
             ? new List<string>()
             : _taskLinksInput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
+        // Determine status based on scheduled date
+        var status = _taskScheduledDate.HasValue ? TodoTaskStatus.Scheduled : TodoTaskStatus.NextAction;
+
         if (_editingTask == null)
         {
             var task = new TodoTask
             {
                 Title = _taskTitle,
                 Description = _taskDescription,
-                Status = TodoTaskStatus.NextAction,
+                Status = status,
                 EstimatedMinutes = _taskEstimatedMinutes,
                 Priority = _taskPriority,
                 DueDate = _taskDueDate,
+                ScheduledDate = _taskScheduledDate,
                 Contexts = _selectedContexts.ToList(),
                 // Advanced options
                 EnergyLevel = _taskEnergyLevel,
+                Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory,
                 WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor,
                 Tags = tags,
                 Links = links,
@@ -498,9 +521,20 @@ else
             _editingTask.EstimatedMinutes = _taskEstimatedMinutes;
             _editingTask.Priority = _taskPriority;
             _editingTask.DueDate = _taskDueDate;
+            _editingTask.ScheduledDate = _taskScheduledDate;
             _editingTask.Contexts = _selectedContexts.ToList();
+            // Update status based on scheduled date
+            if (_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.NextAction)
+            {
+                _editingTask.Status = TodoTaskStatus.Scheduled;
+            }
+            else if (!_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.Scheduled)
+            {
+                _editingTask.Status = TodoTaskStatus.NextAction;
+            }
             // Advanced options
             _editingTask.EnergyLevel = _taskEnergyLevel;
+            _editingTask.Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory;
             _editingTask.WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor;
             _editingTask.Tags = tags;
             _editingTask.Links = links;

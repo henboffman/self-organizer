@@ -74,4 +74,5 @@ public static class StoreNames
     public const string Preferences = "preferences";
     public const string DailySnapshots = "dailySnapshots";
     public const string Goals = "goals";
+    public const string Ideas = "ideas";
 }

@@ -43,6 +43,8 @@ builder.Services.AddScoped<IRepository<DailySnapshot>>(sp =>
     new IndexedDbRepository<DailySnapshot>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.DailySnapshots));
 builder.Services.AddScoped<IRepository<Goal>>(sp =>
     new IndexedDbRepository<Goal>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.Goals));
+builder.Services.AddScoped<IRepository<Idea>>(sp =>
+    new IndexedDbRepository<Idea>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.Ideas));
 
 // Domain Services
 builder.Services.AddScoped<ICaptureService, CaptureService>();
@@ -55,6 +57,7 @@ builder.Services.AddScoped<IContextService, ContextService>();
 builder.Services.AddScoped<IMeetingInsightService, MeetingInsightService>();
 builder.Services.AddScoped<IExternalCalendarService, ExternalCalendarService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
+builder.Services.AddScoped<IIdeaService, IdeaService>();
 builder.Services.AddScoped<ISummaryService, SummaryService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 

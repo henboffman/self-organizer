@@ -15,8 +15,8 @@
 
 :root {
     /* === Font System === */
-    --font-primary: 'Poppins', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    --font-monospace: 'Fira Code', 'Consolas', monospace;
+    --font-primary: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, 'Segoe UI', Arial, sans-serif;
+    --font-monospace: 'SF Mono', 'Consolas', 'Liberation Mono', Menlo, monospace;
 
     /* === Spacing Scale === */
     --space-xs: 0.25rem;

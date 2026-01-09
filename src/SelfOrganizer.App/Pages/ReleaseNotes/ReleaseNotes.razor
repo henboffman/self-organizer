@@ -1,0 +1,494 @@
+@page "/release-notes"
+@using SelfOrganizer.Core.Models
+
+<div class="release-notes-container">
+    <div class="release-notes-header mb-5">
+        <h2 class="mb-2">
+            <span class="oi oi-document me-2"></span>Release Notes
+        </h2>
+        <p class="lead text-muted">Stay up to date with the latest features and improvements</p>
+    </div>
+
+    <div class="timeline">
+        @* Latest Release *@
+        <div class="release-card latest mb-5">
+            <div class="release-badge">
+                <span class="badge bg-success">Latest</span>
+            </div>
+            <div class="card border-success">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.8</h5>
+                        <small>January 2025</small>
+                    </div>
+                    <span class="oi oi-star"></span>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-success mb-3">Productivity Enhancements</h6>
+                    <ul class="feature-list">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-command"></span></span>
+                            <div>
+                                <strong>Keyboard Shortcuts Help</strong>
+                                <p class="text-muted small mb-0">Press ? anywhere to see all available keyboard shortcuts. Navigate with g+h (home), g+t (tasks), g+p (projects), and more.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-plus"></span></span>
+                            <div>
+                                <strong>Quick Actions Floating Button</strong>
+                                <p class="text-muted small mb-0">Access common actions instantly with the new floating action button - create ideas, projects, goals, or jump to daily review.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-calendar"></span></span>
+                            <div>
+                                <strong>Enhanced Task Scheduling</strong>
+                                <p class="text-muted small mb-0">Schedule tasks for specific dates directly when creating or editing. Tasks automatically move to Scheduled status.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-tags"></span></span>
+                            <div>
+                                <strong>Task Categories</strong>
+                                <p class="text-muted small mb-0">Organize tasks with categories like Work, Personal, or custom labels for better filtering and scheduling.</p>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <h6 class="text-success mb-3 mt-4">User Experience</h6>
+                    <ul class="feature-list">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-sun"></span></span>
+                            <div>
+                                <strong>Beautiful Empty States</strong>
+                                <p class="text-muted small mb-0">When pages are empty, helpful guidance and quick actions help you get started.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-document"></span></span>
+                            <div>
+                                <strong>Release Notes Page</strong>
+                                <p class="text-muted small mb-0">Track what's new in each version with the beautifully designed release notes timeline.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        @* Version 1.7 *@
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.7 - Ideas & Linking</h5>
+                        <small class="text-muted">January 2025</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-lightbulb"></span></span>
+                            <div>
+                                <strong>Ideas Management</strong>
+                                <p class="text-muted small mb-0">Capture thoughts and inspirations separately from tasks, with ability to convert to tasks when ready.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-link-intact"></span></span>
+                            <div>
+                                <strong>Link Projects and Tasks to Goals</strong>
+                                <p class="text-muted small mb-0">Associate existing tasks and projects with goals directly from the goal detail view.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-pencil"></span></span>
+                            <div>
+                                <strong>Full Task CRUD from Projects/Goals</strong>
+                                <p class="text-muted small mb-0">Edit, delete, and manage tasks directly within project and goal detail views.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-flash"></span></span>
+                            <div>
+                                <strong>Editable Task Energy & Context</strong>
+                                <p class="text-muted small mb-0">Set and modify energy levels and categories when editing tasks.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        @* Previous Releases *@
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.6 - Azure OpenAI Integration</h5>
+                        <small class="text-muted">December 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-cloud"></span></span>
+                            <div>
+                                <strong>Azure OpenAI Support</strong>
+                                <p class="text-muted small mb-0">Connect to Azure OpenAI services with full Azure AD authentication support.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-shield"></span></span>
+                            <div>
+                                <strong>Enterprise Authentication</strong>
+                                <p class="text-muted small mb-0">Support for Azure AD service principal authentication for enterprise deployments.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.5 - OpenAI Integration</h5>
+                        <small class="text-muted">December 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-lightbulb"></span></span>
+                            <div>
+                                <strong>OpenAI Integration</strong>
+                                <p class="text-muted small mb-0">Connect to OpenAI's GPT models for intelligent goal planning and task suggestions.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.4 - LLM Proxy Server</h5>
+                        <small class="text-muted">December 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-transfer"></span></span>
+                            <div>
+                                <strong>Server-Side LLM Proxy</strong>
+                                <p class="text-muted small mb-0">Secure server-side proxy for LLM API calls, keeping your API keys safe.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-cog"></span></span>
+                            <div>
+                                <strong>Configuration-Driven Setup</strong>
+                                <p class="text-muted small mb-0">Easy configuration through appsettings.json with support for multiple providers.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.3 - AI-Powered Features</h5>
+                        <small class="text-muted">November 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-target"></span></span>
+                            <div>
+                                <strong>Goal Clarification AI</strong>
+                                <p class="text-muted small mb-0">AI helps refine your goals with SMART criteria suggestions.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-layers"></span></span>
+                            <div>
+                                <strong>Goal Decomposition</strong>
+                                <p class="text-muted small mb-0">Automatically break down goals into actionable tasks with AI assistance.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.2 - Goals, LLM & Search</h5>
+                        <small class="text-muted">November 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-target"></span></span>
+                            <div>
+                                <strong>Strategic Goals</strong>
+                                <p class="text-muted small mb-0">Track long-term objectives with timeframes and progress tracking.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-magnifying-glass"></span></span>
+                            <div>
+                                <strong>Global Search</strong>
+                                <p class="text-muted small mb-0">Quickly find tasks, projects, and more with the global search feature.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-action-undo"></span></span>
+                            <div>
+                                <strong>Undo/Redo</strong>
+                                <p class="text-muted small mb-0">Command history lets you undo and redo actions.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.1 - Meeting Insights & Onboarding</h5>
+                        <small class="text-muted">October 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-calendar"></span></span>
+                            <div>
+                                <strong>Meeting Insights</strong>
+                                <p class="text-muted small mb-0">Analyze your meeting patterns and find time for deep work.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-sun"></span></span>
+                            <div>
+                                <strong>Radial Quick Actions</strong>
+                                <p class="text-muted small mb-0">Fast access to common meeting-related actions.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-person"></span></span>
+                            <div>
+                                <strong>Onboarding Wizard</strong>
+                                <p class="text-muted small mb-0">Guided setup for new users to configure their preferences.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-tags"></span></span>
+                            <div>
+                                <strong>Tags & Contexts</strong>
+                                <p class="text-muted small mb-0">Organize tasks with custom tags and GTD-style contexts.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="release-card mb-4">
+            <div class="release-marker"></div>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Version 1.0 - Initial Release</h5>
+                        <small class="text-muted">October 2024</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">The initial release of Self Organizer, a GTD-inspired task management application.</p>
+                    <ul class="feature-list compact">
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-inbox"></span></span>
+                            <div>
+                                <strong>GTD Workflow</strong>
+                                <p class="text-muted small mb-0">Full Getting Things Done workflow with capture, clarify, organize, reflect, and engage.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-task"></span></span>
+                            <div>
+                                <strong>Task Management</strong>
+                                <p class="text-muted small mb-0">Comprehensive task tracking with statuses, priorities, and time estimates.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-folder"></span></span>
+                            <div>
+                                <strong>Projects</strong>
+                                <p class="text-muted small mb-0">Group related tasks into projects with desired outcomes.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-calendar"></span></span>
+                            <div>
+                                <strong>Calendar Integration</strong>
+                                <p class="text-muted small mb-0">View your schedule and find time for tasks.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-clock"></span></span>
+                            <div>
+                                <strong>Focus Timer</strong>
+                                <p class="text-muted small mb-0">Pomodoro-style focus timer with hyperfocus alerts.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-sun"></span></span>
+                            <div>
+                                <strong>Theme Support</strong>
+                                <p class="text-muted small mb-0">Light and dark themes for comfortable viewing.</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><span class="oi oi-hard-drive"></span></span>
+                            <div>
+                                <strong>Offline-First</strong>
+                                <p class="text-muted small mb-0">All data stored locally in your browser - no account required.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .release-notes-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+
+    .release-notes-header {
+        text-align: center;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 10px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(to bottom, var(--bs-success) 0%, var(--bs-secondary) 100%);
+    }
+
+    .release-card {
+        position: relative;
+    }
+
+    .release-badge {
+        position: absolute;
+        left: -25px;
+        top: 15px;
+        z-index: 1;
+    }
+
+    .release-marker {
+        position: absolute;
+        left: -25px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        background: var(--bs-secondary);
+        border-radius: 50%;
+        border: 2px solid var(--bs-body-bg);
+    }
+
+    .latest .release-marker {
+        background: var(--bs-success);
+    }
+
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .feature-list li {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: var(--bs-light);
+        border-radius: 8px;
+    }
+
+    .feature-list.compact li {
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .feature-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bs-white);
+        border-radius: 8px;
+        margin-right: 1rem;
+        flex-shrink: 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .feature-icon .oi {
+        color: var(--bs-primary);
+    }
+
+    .feature-list li strong {
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Dark mode adjustments */
+    :root[data-bs-theme="dark"] .feature-list li {
+        background: rgba(255,255,255,0.05);
+    }
+
+    :root[data-bs-theme="dark"] .feature-icon {
+        background: rgba(255,255,255,0.1);
+    }
+
+    :root[data-bs-theme="dark"] .release-marker {
+        border-color: var(--bs-body-bg);
+    }
+</style>

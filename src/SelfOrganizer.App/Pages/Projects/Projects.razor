@@ -54,10 +54,14 @@
 }
 else if (!_filteredProjects.Any())
 {
-    <div class="text-center py-5">
-        <h5 class="text-muted">No projects found</h5>
-        <p class="text-muted">Create a new project to get started.</p>
-    </div>
+    <SelfOrganizer.App.Components.Shared.EmptyState
+        Icon="oi-folder"
+        Title="No projects found"
+        Description="@GetProjectsEmptyDescription()"
+        Theme="primary"
+        PrimaryActionText="Create Project"
+        PrimaryActionIcon="oi-plus"
+        PrimaryAction="ShowAddModal" />
 }
 else
 {
@@ -281,6 +285,15 @@ else
             _ => _projects.ToList()
         };
     }
+
+    private string GetProjectsEmptyDescription() => _statusFilter switch
+    {
+        "active" => "Create your first project to organize related tasks together.",
+        "onhold" => "Projects you pause will appear here for easy access later.",
+        "someday" => "Ideas for projects you might do someday live here.",
+        "completed" => "Completed projects show your accomplishments!",
+        _ => "Create a project to organize your tasks."
+    };
 
     private void ShowAddModal()
     {

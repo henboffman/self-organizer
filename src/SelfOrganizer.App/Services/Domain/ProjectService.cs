@@ -6,11 +6,16 @@ namespace SelfOrganizer.App.Services.Domain;
 public class ProjectService : IProjectService
 {
     private readonly IRepository<Project> _repository;
+    private readonly IRepository<Goal> _goalRepository;
     private readonly ITaskService _taskService;
 
-    public ProjectService(IRepository<Project> repository, ITaskService taskService)
+    public ProjectService(
+        IRepository<Project> repository,
+        IRepository<Goal> goalRepository,
+        ITaskService taskService)
     {
         _repository = repository;
+        _goalRepository = goalRepository;
         _taskService = taskService;
     }
 
@@ -36,20 +41,45 @@ public class ProjectService : IProjectService
 
     public async Task<IEnumerable<Project>> GetStalledProjectsAsync()
     {
-        // Load both datasets in parallel - eliminates N+1 query problem
+        // Load all datasets in parallel - eliminates N+1 query problem
         var activeProjectsTask = GetActiveAsync();
         var allTasksTask = _taskService.GetAllAsync();
+        var allGoalsTask = _goalRepository.GetAllAsync();
 
-        await Task.WhenAll(activeProjectsTask, allTasksTask);
+        await Task.WhenAll(activeProjectsTask, allTasksTask, allGoalsTask);
 
-        var activeProjects = await activeProjectsTask;
+        var activeProjects = (await activeProjectsTask).ToList();
         var allTasks = (await allTasksTask).ToList();
+        var allGoals = (await allGoalsTask).ToList();
 
-        // Build a set of project IDs that have at least one NextAction task
+        // Build a set of project IDs that have at least one NextAction task (direct tasks)
         var projectsWithNextActions = allTasks
             .Where(t => t.ProjectId.HasValue && t.Status == TodoTaskStatus.NextAction)
             .Select(t => t.ProjectId!.Value)
             .ToHashSet();
+
+        // Also check goals linked to projects - if a goal has tasks with NextAction, the project is not stalled
+        foreach (var project in activeProjects)
+        {
+            if (projectsWithNextActions.Contains(project.Id))
+                continue;
+
+            // Find goals that link to this project
+            var linkedGoals = allGoals.Where(g => g.LinkedProjectIds.Contains(project.Id));
+
+            foreach (var goal in linkedGoals)
+            {
+                // Check if any of the goal's linked tasks are NextAction
+                var hasNextAction = allTasks
+                    .Any(t => goal.LinkedTaskIds.Contains(t.Id) && t.Status == TodoTaskStatus.NextAction);
+
+                if (hasNextAction)
+                {
+                    projectsWithNextActions.Add(project.Id);
+                    break;
+                }
+            }
+        }
 
         // Return active projects that don't have any next actions
         return activeProjects.Where(p => !projectsWithNextActions.Contains(p.Id));
@@ -88,8 +118,29 @@ public class ProjectService : IProjectService
 
     public async Task<bool> HasNextActionAsync(Guid projectId)
     {
+        // Check direct project tasks
         var tasks = await _taskService.GetByProjectAsync(projectId);
-        return tasks.Any(t => t.Status == TodoTaskStatus.NextAction);
+        if (tasks.Any(t => t.Status == TodoTaskStatus.NextAction))
+            return true;
+
+        // Check tasks from linked goals
+        var allGoals = await _goalRepository.GetAllAsync();
+        var linkedGoals = allGoals.Where(g => g.LinkedProjectIds.Contains(projectId));
+
+        foreach (var goal in linkedGoals)
+        {
+            if (!goal.LinkedTaskIds.Any())
+                continue;
+
+            var goalTasks = await _taskService.GetAllAsync();
+            var hasNextAction = goalTasks
+                .Any(t => goal.LinkedTaskIds.Contains(t.Id) && t.Status == TodoTaskStatus.NextAction);
+
+            if (hasNextAction)
+                return true;
+        }
+
+        return false;
     }
 
     public async Task<(int completed, int total)> GetProgressAsync(Guid projectId)

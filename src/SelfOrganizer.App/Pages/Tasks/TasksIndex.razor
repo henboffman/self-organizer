@@ -75,10 +75,14 @@
 }
 else if (!_filteredTasks.Any())
 {
-    <div class="text-center py-5">
-        <h5 class="text-muted">No @GetStatusLabel() tasks</h5>
-        <p class="text-muted">@GetEmptyMessage()</p>
-    </div>
+    <SelfOrganizer.App.Components.Shared.EmptyState
+        Icon="@GetEmptyIcon()"
+        Title="@($"No {GetStatusLabel()} tasks")"
+        Description="@GetEmptyMessage()"
+        Theme="@GetEmptyTheme()"
+        PrimaryActionText="Create Task"
+        PrimaryActionIcon="oi-plus"
+        PrimaryAction="ShowAddModal" />
 }
 else
 {
@@ -361,12 +365,32 @@ else
 
     private string GetEmptyMessage() => CurrentStatus switch
     {
-        "next" => "Process your inbox to identify next actions.",
-        "waiting" => "No tasks are waiting for someone else.",
-        "scheduled" => "No tasks are scheduled for specific dates.",
-        "someday" => "No items in your someday/maybe list.",
-        "completed" => "No completed tasks yet.",
+        "next" => "Process your inbox to identify next actions, or create a new task to get started.",
+        "waiting" => "Tasks you're waiting on others for will appear here.",
+        "scheduled" => "Schedule tasks for specific dates to see them here.",
+        "someday" => "Ideas and tasks without urgency go here for later review.",
+        "completed" => "Complete some tasks to see your achievements!",
         _ => ""
+    };
+
+    private string GetEmptyIcon() => CurrentStatus switch
+    {
+        "next" => "oi-task",
+        "waiting" => "oi-clock",
+        "scheduled" => "oi-calendar",
+        "someday" => "oi-star",
+        "completed" => "oi-check",
+        _ => "oi-task"
+    };
+
+    private string GetEmptyTheme() => CurrentStatus switch
+    {
+        "next" => "success",
+        "waiting" => "warning",
+        "scheduled" => "info",
+        "someday" => "default",
+        "completed" => "success",
+        _ => "default"
     };
 
     private async Task ToggleComplete(TodoTask task)
@@ -411,13 +435,13 @@ else
     {
         if (string.IsNullOrWhiteSpace(_newTask.Title)) return;
 
-        // Extract tags from title and description
-        var (cleanTitle, titleTags) = SelfOrganizer.Core.Services.TagParsingService.ParseTextAndTags(_newTask.Title);
-        var (cleanDesc, descTags) = SelfOrganizer.Core.Services.TagParsingService.ParseTextAndTags(_newTask.Description);
+        // Extract tags from title and description without modifying original text
+        var titleTags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_newTask.Title);
+        var descTags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_newTask.Description);
 
-        _newTask.Title = cleanTitle;
-        _newTask.Description = cleanDesc;
-        _newTask.Tags = SelfOrganizer.Core.Services.TagParsingService.MergeTags(titleTags, descTags);
+        // Keep original text intact, just merge extracted tags into the tags list
+        _newTask.Tags = SelfOrganizer.Core.Services.TagParsingService.MergeTags(_newTask.Tags, titleTags);
+        _newTask.Tags = SelfOrganizer.Core.Services.TagParsingService.MergeTags(_newTask.Tags, descTags);
 
         await TaskService.CreateAsync(_newTask);
         DataChangeNotification.NotifyDataChanged();
