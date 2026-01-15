@@ -1,0 +1,762 @@
+@page "/data-jobs"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Services.Domain
+@using SelfOrganizer.App.Components.Shared
+@inject IDataSyncService DataSyncService
+@inject IExportService ExportService
+@inject IImportService ImportService
+@inject IJSRuntime JSRuntime
+
+<h3 class="mb-4">
+    <span class="oi oi-cloud-download me-2"></span>Data Jobs
+</h3>
+
+<div class="row">
+    <div class="col-lg-8">
+        @* Data Sources Overview *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <span class="oi oi-link-intact me-2"></span>Data Sources
+                </span>
+                <button class="btn btn-sm btn-outline-primary" @onclick="RefreshAllSources" disabled="@_isRefreshing">
+                    @if (_isRefreshing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-reload me-1"></span>
+                    }
+                    Refresh All
+                </button>
+            </div>
+            <div class="card-body p-0">
+                @if (_configurations == null)
+                {
+                    <div class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                        <span class="ms-2">Loading data sources...</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @* Microsoft Graph Calendar *@
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex align-items-start">
+                                    <div class="source-icon me-3">
+                                        <span class="oi oi-calendar" style="font-size: 1.5rem; color: #0078d4;"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">Microsoft Calendar</h6>
+                                        <div class="text-muted small">
+                                            @{
+                                                var graphConfig = _configurations.FirstOrDefault(c => c.SourceType == DataSourceType.MicrosoftGraph);
+                                            }
+                                            @if (graphConfig?.IsConnected == true)
+                                            {
+                                                <span class="badge bg-success me-2">Connected</span>
+                                                <span>@graphConfig.AccountIdentifier</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Not Connected</span>
+                                            }
+                                        </div>
+                                        @if (graphConfig?.LastSyncTime != null)
+                                        {
+                                            <div class="text-muted small mt-1">
+                                                <span class="oi oi-clock me-1"></span>
+                                                Last sync: @graphConfig.LastSyncTime.Value.ToLocalTime().ToString("MMM d, h:mm tt")
+                                                (@graphConfig.LastSyncRecordCount events)
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="btn-group">
+                                    @if (graphConfig?.IsConnected == true)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => SyncMicrosoftGraph()" disabled="@_isSyncing">
+                                            @if (_isSyncing)
+                                            {
+                                                <span class="spinner-border spinner-border-sm"></span>
+                                            }
+                                            else
+                                            {
+                                                <span class="oi oi-loop-circular"></span>
+                                            }
+                                            Sync Now
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ConfigureMicrosoftGraph()">
+                                            <span class="oi oi-cog"></span>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-primary" @onclick="() => ConnectMicrosoftGraph()">
+                                            <span class="oi oi-account-login me-1"></span>Connect
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Lifecycle Tasks *@
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex align-items-start">
+                                    <div class="source-icon me-3">
+                                        <span class="oi oi-task" style="font-size: 1.5rem; color: #10b981;"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">Task Import/Export</h6>
+                                        <div class="text-muted small">
+                                            <span class="badge bg-info">File-based</span>
+                                            <span class="ms-1">Import from Lifecycle or other systems</span>
+                                        </div>
+                                        @{
+                                            var lifecycleJobs = _recentJobs?.Where(j => j.SourceType == DataSourceType.LifecycleTasks).Take(1).FirstOrDefault();
+                                        }
+                                        @if (lifecycleJobs != null)
+                                        {
+                                            <div class="text-muted small mt-1">
+                                                <span class="oi oi-clock me-1"></span>
+                                                Last import: @lifecycleJobs.CompletedAt?.ToLocalTime().ToString("MMM d, h:mm tt")
+                                                (@lifecycleJobs.CreatedCount created, @lifecycleJobs.UpdatedCount updated)
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-success" @onclick="ShowImportModal">
+                                        <span class="oi oi-data-transfer-upload me-1"></span>Import
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="ExportTasks">
+                                        <span class="oi oi-data-transfer-download me-1"></span>Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        @* Generic File Import *@
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex align-items-start">
+                                    <div class="source-icon me-3">
+                                        <span class="oi oi-file" style="font-size: 1.5rem; color: #6366f1;"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">CSV Import</h6>
+                                        <div class="text-muted small">
+                                            <span class="badge bg-secondary">Coming Soon</span>
+                                            <span class="ms-1">Import from Todoist, Things, OmniFocus, etc.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary" disabled>
+                                        <span class="oi oi-data-transfer-upload me-1"></span>Import
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Sync History *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-clock me-2"></span>Sync History
+            </div>
+            <div class="card-body p-0">
+                @if (_recentJobs == null)
+                {
+                    <div class="text-center py-4">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                    </div>
+                }
+                else if (!_recentJobs.Any())
+                {
+                    <div class="text-center py-4 text-muted">
+                        <span class="oi oi-info me-1"></span>
+                        No sync jobs yet. Import or sync data to see history.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Records</th>
+                                    <th>Time</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var job in _recentJobs.Take(10))
+                                {
+                                    <tr>
+                                        <td>
+                                            <span class="oi @GetSourceIcon(job.SourceType) me-1"></span>
+                                            @GetSourceName(job.SourceType)
+                                        </td>
+                                        <td>@job.OperationType</td>
+                                        <td>
+                                            <span class="badge @GetStatusBadgeClass(job.Status)">
+                                                @job.Status
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (job.Status == SyncJobStatus.Running)
+                                            {
+                                                <span>@job.ProcessedItems / @job.TotalItems</span>
+                                            }
+                                            else
+                                            {
+                                                <span title="Created: @job.CreatedCount, Updated: @job.UpdatedCount, Skipped: @job.SkippedCount">
+                                                    @(job.CreatedCount + job.UpdatedCount) processed
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="text-muted small">
+                                            @job.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")
+                                        </td>
+                                        <td>
+                                            @if (job.Errors.Any())
+                                            {
+                                                <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => ShowJobDetails(job)">
+                                                    <span class="oi oi-warning"></span>
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        @* Quick Actions *@
+        <div class="card mb-4">
+            <div class="card-header">Quick Actions</div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" @onclick="ExportTasks">
+                        <span class="oi oi-data-transfer-download me-1"></span>
+                        Export Tasks (JSON)
+                    </button>
+                    <button class="btn btn-outline-success" @onclick="ShowImportModal">
+                        <span class="oi oi-data-transfer-upload me-1"></span>
+                        Import Tasks
+                    </button>
+                </div>
+
+                @if (_exportResult != null)
+                {
+                    <div class="alert @(_exportResult.Success ? "alert-success" : "alert-danger") py-2 small mt-3 mb-0">
+                        @if (_exportResult.Success)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>Exported @_exportResult.ItemCount tasks to @_exportResult.Filename</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            <span>@_exportResult.ErrorMessage</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Import Format Info *@
+        <div class="card mb-4">
+            <div class="card-header">Import Format</div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">
+                    The task interchange format supports importing from various sources:
+                </p>
+                <ul class="small text-muted mb-3">
+                    <li>Self-Organizer exports</li>
+                    <li>Lifecycle task exports</li>
+                    <li>Custom JSON following the schema</li>
+                </ul>
+                <p class="small text-muted mb-0">
+                    <strong>Fields:</strong> title, description, status, priority, dueDate, tags, contexts, estimatedMinutes, project
+                </p>
+            </div>
+        </div>
+
+        @* Microsoft Graph Info *@
+        <div class="card">
+            <div class="card-header">Microsoft Graph</div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">
+                    Connect your Microsoft account to sync calendar events automatically.
+                </p>
+                <ul class="small text-muted mb-0">
+                    <li>Sync Outlook calendar events</li>
+                    <li>Auto-create prep/decompress blocks</li>
+                    <li>Import meeting attendees</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Import Modal *@
+@if (_showImportModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <span class="oi oi-data-transfer-upload me-2"></span>Import Tasks
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseImportModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (_importStep == ImportStep.Upload)
+                    {
+                        <div class="mb-4">
+                            <label class="form-label">Select JSON file or paste content:</label>
+                            <div class="drop-zone p-4 border-2 border-dashed rounded text-center mb-3"
+                                 style="border-style: dashed; cursor: pointer;"
+                                 @ondragover:preventDefault
+                                 @ondrop="HandleFileDrop">
+                                <InputFile OnChange="HandleFileSelected" accept=".json" class="d-none" id="importFile" />
+                                <label for="importFile" class="d-block cursor-pointer">
+                                    <span class="oi oi-cloud-upload d-block mb-2" style="font-size: 2rem; color: var(--color-primary);"></span>
+                                    <span>Drop file here or <strong>click to browse</strong></span>
+                                </label>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Or paste JSON content:</label>
+                                <textarea class="form-control font-monospace" rows="6" @bind="_importContent"
+                                          placeholder='{"version": "1.0", "tasks": [...]}'></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-outline-secondary me-2" @onclick="CloseImportModal">Cancel</button>
+                            <button class="btn btn-primary" @onclick="PreviewImport"
+                                    disabled="@string.IsNullOrWhiteSpace(_importContent)">
+                                <span class="oi oi-eye me-1"></span>Preview
+                            </button>
+                        </div>
+                    }
+                    else if (_importStep == ImportStep.Preview)
+                    {
+                        <div class="mb-4">
+                            <h6>Import Preview</h6>
+                            @if (_previewResult != null)
+                            {
+                                <div class="alert @(_previewResult.Success ? "alert-info" : "alert-warning") py-2">
+                                    @if (_previewResult.Success)
+                                    {
+                                        <span class="oi oi-info me-1"></span>
+                                        <strong>@_previewResult.TotalProcessed items</strong>
+                                        <text> will be processed: </text>
+                                        <span>@_previewResult.Created to create, </span>
+                                        <span>@_previewResult.Updated to update, </span>
+                                        <span>@_previewResult.Skipped to skip</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="oi oi-warning me-1"></span>
+                                        <span>@string.Join("; ", _previewResult.Errors)</span>
+                                    }
+                                </div>
+
+                                @if (_previewResult.Items.Any())
+                                {
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Title</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var item in _previewResult.Items.Take(20))
+                                                {
+                                                    <tr>
+                                                        <td class="text-truncate" style="max-width: 300px;">@item.Title</td>
+                                                        <td>
+                                                            <span class="badge @GetActionBadgeClass(item.Action)">@item.Action</span>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                                @if (_previewResult.Items.Count > 20)
+                                                {
+                                                    <tr>
+                                                        <td colspan="2" class="text-muted text-center">
+                                                            ... and @(_previewResult.Items.Count - 20) more items
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                            }
+
+                            <h6 class="mt-3">Import Options</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Duplicate Handling</label>
+                                    <select class="form-select form-select-sm" @bind="_importOptions.DuplicateStrategy">
+                                        <option value="Skip">Skip duplicates</option>
+                                        <option value="Update">Update existing</option>
+                                        <option value="CreateNew">Create new copy</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Default Status</label>
+                                    <select class="form-select form-select-sm" @bind="_importOptions.DefaultStatus">
+                                        <option value="@TodoTaskStatus.Inbox">Inbox</option>
+                                        <option value="@TodoTaskStatus.NextAction">Next Action</option>
+                                        <option value="@TodoTaskStatus.Active">Active</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-outline-secondary me-2" @onclick="() => _importStep = ImportStep.Upload">Back</button>
+                            <button class="btn btn-primary" @onclick="ExecuteImport" disabled="@(!_previewResult?.Success ?? true)">
+                                <span class="oi oi-data-transfer-upload me-1"></span>Import
+                            </button>
+                        </div>
+                    }
+                    else if (_importStep == ImportStep.Complete)
+                    {
+                        <div class="text-center py-4">
+                            @if (_importResult?.Success == true)
+                            {
+                                <span class="oi oi-circle-check d-block mb-3" style="font-size: 3rem; color: #10b981;"></span>
+                                <h5>Import Complete!</h5>
+                                <p class="text-muted">
+                                    @_importResult.Created tasks created,
+                                    @_importResult.Updated updated,
+                                    @_importResult.Skipped skipped
+                                </p>
+                            }
+                            else
+                            {
+                                <span class="oi oi-warning d-block mb-3" style="font-size: 3rem; color: #ef4444;"></span>
+                                <h5>Import Failed</h5>
+                                <p class="text-danger">@string.Join("; ", _importResult?.Errors ?? new List<string>())</p>
+                            }
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button class="btn btn-primary" @onclick="CloseImportModal">Close</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Job Details Modal *@
+@if (_selectedJob != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Job Details</h5>
+                    <button type="button" class="btn-close" @onclick="() => _selectedJob = null"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Source</dt>
+                        <dd class="col-sm-8">@GetSourceName(_selectedJob.SourceType)</dd>
+
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge @GetStatusBadgeClass(_selectedJob.Status)">@_selectedJob.Status</span>
+                        </dd>
+
+                        <dt class="col-sm-4">Started</dt>
+                        <dd class="col-sm-8">@(_selectedJob.StartedAt?.ToLocalTime().ToString("g") ?? "N/A")</dd>
+
+                        <dt class="col-sm-4">Completed</dt>
+                        <dd class="col-sm-8">@(_selectedJob.CompletedAt?.ToLocalTime().ToString("g") ?? "N/A")</dd>
+
+                        <dt class="col-sm-4">Created</dt>
+                        <dd class="col-sm-8">@_selectedJob.CreatedCount</dd>
+
+                        <dt class="col-sm-4">Updated</dt>
+                        <dd class="col-sm-8">@_selectedJob.UpdatedCount</dd>
+
+                        <dt class="col-sm-4">Skipped</dt>
+                        <dd class="col-sm-8">@_selectedJob.SkippedCount</dd>
+
+                        <dt class="col-sm-4">Errors</dt>
+                        <dd class="col-sm-8">@_selectedJob.ErrorCount</dd>
+                    </dl>
+
+                    @if (_selectedJob.Errors.Any())
+                    {
+                        <hr />
+                        <h6>Errors</h6>
+                        <ul class="small text-danger mb-0">
+                            @foreach (var error in _selectedJob.Errors.Take(10))
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    }
+
+                    @if (_selectedJob.Warnings.Any())
+                    {
+                        <hr />
+                        <h6>Warnings</h6>
+                        <ul class="small text-warning mb-0">
+                            @foreach (var warning in _selectedJob.Warnings.Take(10))
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => _selectedJob = null">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<DataSourceConfiguration>? _configurations;
+    private List<SyncJob>? _recentJobs;
+    private bool _isRefreshing;
+    private bool _isSyncing;
+    private ExportResult? _exportResult;
+
+    // Import modal state
+    private bool _showImportModal;
+    private ImportStep _importStep = ImportStep.Upload;
+    private string _importContent = string.Empty;
+    private ImportOptions _importOptions = new();
+    private ImportResult? _previewResult;
+    private ImportResult? _importResult;
+
+    // Job details modal
+    private SyncJob? _selectedJob;
+
+    private enum ImportStep { Upload, Preview, Complete }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _configurations = await DataSyncService.GetAllConfigurationsAsync();
+        _recentJobs = await DataSyncService.GetSyncJobsAsync();
+    }
+
+    private async Task RefreshAllSources()
+    {
+        _isRefreshing = true;
+        StateHasChanged();
+
+        try
+        {
+            await LoadData();
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    private void ConnectMicrosoftGraph()
+    {
+        // TODO: Implement OAuth flow for Microsoft Graph
+        // This will redirect to Microsoft login and then back to the app
+    }
+
+    private async Task SyncMicrosoftGraph()
+    {
+        _isSyncing = true;
+        StateHasChanged();
+
+        try
+        {
+            // TODO: Implement actual Microsoft Graph sync
+            await Task.Delay(1000); // Placeholder
+            await LoadData();
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    private void ConfigureMicrosoftGraph()
+    {
+        // TODO: Open configuration modal
+    }
+
+    private async Task ExportTasks()
+    {
+        try
+        {
+            var json = await DataSyncService.ExportTasksAsync(new ExportTaskOptions
+            {
+                IncludeCompleted = false,
+                IncludeProjects = true
+            });
+
+            var filename = $"tasks-export-{DateTime.Now:yyyy-MM-dd}.json";
+            _exportResult = await ExportService.DownloadFileAsync(filename, json, "application/json");
+
+            // Create sync job record
+            var job = await DataSyncService.CreateSyncJobAsync(DataSourceType.LifecycleTasks, SyncOperationType.Export);
+            job.Status = SyncJobStatus.Completed;
+            job.StartedAt = DateTime.UtcNow;
+            job.CompletedAt = DateTime.UtcNow;
+            await DataSyncService.UpdateSyncJobAsync(job);
+
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _exportResult = ExportResult.Failed($"Export failed: {ex.Message}");
+        }
+    }
+
+    private void ShowImportModal()
+    {
+        _showImportModal = true;
+        _importStep = ImportStep.Upload;
+        _importContent = string.Empty;
+        _importOptions = new ImportOptions();
+        _previewResult = null;
+        _importResult = null;
+    }
+
+    private void CloseImportModal()
+    {
+        _showImportModal = false;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            using var reader = new StreamReader(file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024));
+            _importContent = await reader.ReadToEndAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleFileDrop(DragEventArgs e)
+    {
+        // File drop handling requires additional JS interop
+    }
+
+    private async Task PreviewImport()
+    {
+        if (string.IsNullOrWhiteSpace(_importContent))
+            return;
+
+        _previewResult = await DataSyncService.PreviewImportAsync(_importContent);
+        _importStep = ImportStep.Preview;
+    }
+
+    private async Task ExecuteImport()
+    {
+        if (string.IsNullOrWhiteSpace(_importContent))
+            return;
+
+        // Create sync job
+        var job = await DataSyncService.CreateSyncJobAsync(DataSourceType.LifecycleTasks, SyncOperationType.Import);
+        job.Status = SyncJobStatus.Running;
+        job.StartedAt = DateTime.UtcNow;
+        await DataSyncService.UpdateSyncJobAsync(job);
+
+        // Execute import
+        _importResult = await DataSyncService.ImportTasksAsync(_importContent, _importOptions);
+
+        // Update job status
+        job.Status = _importResult.Success ? SyncJobStatus.Completed : SyncJobStatus.Failed;
+        job.CompletedAt = DateTime.UtcNow;
+        job.CreatedCount = _importResult.Created;
+        job.UpdatedCount = _importResult.Updated;
+        job.SkippedCount = _importResult.Skipped;
+        job.ErrorCount = _importResult.Failed;
+        job.Errors = _importResult.Errors;
+        await DataSyncService.UpdateSyncJobAsync(job);
+
+        _importStep = ImportStep.Complete;
+        await LoadData();
+    }
+
+    private void ShowJobDetails(SyncJob job)
+    {
+        _selectedJob = job;
+    }
+
+    private static string GetSourceIcon(DataSourceType type) => type switch
+    {
+        DataSourceType.MicrosoftGraph => "oi-calendar",
+        DataSourceType.LifecycleTasks => "oi-task",
+        DataSourceType.GoogleCalendar => "oi-calendar",
+        DataSourceType.FileImport => "oi-file",
+        _ => "oi-question-mark"
+    };
+
+    private static string GetSourceName(DataSourceType type) => type switch
+    {
+        DataSourceType.MicrosoftGraph => "Microsoft Calendar",
+        DataSourceType.LifecycleTasks => "Task Import",
+        DataSourceType.GoogleCalendar => "Google Calendar",
+        DataSourceType.FileImport => "File Import",
+        _ => "Unknown"
+    };
+
+    private static string GetStatusBadgeClass(SyncJobStatus status) => status switch
+    {
+        SyncJobStatus.Pending => "bg-secondary",
+        SyncJobStatus.Running => "bg-primary",
+        SyncJobStatus.Completed => "bg-success",
+        SyncJobStatus.CompletedWithWarnings => "bg-warning text-dark",
+        SyncJobStatus.Failed => "bg-danger",
+        SyncJobStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private static string GetActionBadgeClass(string action) => action switch
+    {
+        "Would Create" or "Created" => "bg-success",
+        "Would Update" or "Updated" => "bg-primary",
+        "Skipped" => "bg-secondary",
+        "Failed" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

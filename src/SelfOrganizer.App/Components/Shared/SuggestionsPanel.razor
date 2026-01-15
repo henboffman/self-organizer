@@ -1,0 +1,159 @@
+@using SelfOrganizer.App.Services.Intelligence
+@inject IProactiveSuggestionsService SuggestionsService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@if (_suggestions.Any() || _isLoading)
+{
+    <div class="suggestions-panel @(_isExpanded ? "expanded" : "") @(_isMinimized ? "minimized" : "")">
+        <div class="suggestions-header" @onclick="ToggleExpanded">
+            <div class="suggestions-title">
+                <span class="oi oi-lightbulb"></span>
+                <span>Insights</span>
+                @if (_suggestions.Any())
+                {
+                    <span class="badge">@_suggestions.Count</span>
+                }
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" @onclick:stopPropagation="true" @onclick="RefreshSuggestions" title="Refresh">
+                    <span class="oi oi-reload @(_isLoading ? "spinning" : "")"></span>
+                </button>
+                <button class="btn-icon" @onclick:stopPropagation="true" @onclick="ToggleMinimized" title="@(_isMinimized ? "Expand" : "Minimize")">
+                    <span class="oi @(_isMinimized ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                </button>
+            </div>
+        </div>
+
+        @if (!_isMinimized)
+        {
+            <div class="suggestions-body">
+                @if (_isLoading && !_suggestions.Any())
+                {
+                    <div class="loading-state">
+                        <span class="oi oi-loop-circular spinning"></span>
+                        <span>Analyzing...</span>
+                    </div>
+                }
+                else if (!_suggestions.Any())
+                {
+                    <div class="empty-state">
+                        <span class="oi oi-check"></span>
+                        <span>All caught up!</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var suggestion in _suggestions)
+                    {
+                        <div class="suggestion-card @GetSuggestionClass(suggestion.Type)"
+                             @onclick="() => HandleSuggestionClick(suggestion)">
+                            <div class="suggestion-icon">
+                                <span class="oi @suggestion.Icon"></span>
+                            </div>
+                            <div class="suggestion-content">
+                                <div class="suggestion-category">@suggestion.Category</div>
+                                <div class="suggestion-message">@suggestion.Message</div>
+                            </div>
+                            <button class="dismiss-btn" @onclick:stopPropagation="true"
+                                    @onclick="() => DismissSuggestion(suggestion.Id)"
+                                    title="Dismiss">
+                                <span class="oi oi-x"></span>
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProactiveSuggestion> _suggestions = Array.Empty<ProactiveSuggestion>();
+    private bool _isLoading = true;
+    private bool _isExpanded = true;
+    private bool _isMinimized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SuggestionsService.OnSuggestionsChanged += OnSuggestionsChanged;
+        await LoadSuggestions();
+    }
+
+    private async Task LoadSuggestions()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _suggestions = await SuggestionsService.GetSuggestionsAsync();
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task RefreshSuggestions()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        _suggestions = await SuggestionsService.GetSuggestionsAsync(forceRefresh: true);
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void OnSuggestionsChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            _suggestions = await SuggestionsService.GetSuggestionsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void ToggleExpanded()
+    {
+        if (!_isMinimized)
+        {
+            _isExpanded = !_isExpanded;
+        }
+    }
+
+    private void ToggleMinimized()
+    {
+        _isMinimized = !_isMinimized;
+        if (!_isMinimized)
+        {
+            _isExpanded = true;
+        }
+    }
+
+    private void HandleSuggestionClick(ProactiveSuggestion suggestion)
+    {
+        if (!string.IsNullOrEmpty(suggestion.ActionUrl))
+        {
+            NavigationManager.NavigateTo(suggestion.ActionUrl);
+        }
+    }
+
+    private void DismissSuggestion(Guid suggestionId)
+    {
+        SuggestionsService.DismissSuggestion(suggestionId);
+    }
+
+    private static string GetSuggestionClass(SuggestionType type)
+    {
+        return type switch
+        {
+            SuggestionType.Action => "type-action",
+            SuggestionType.Reminder => "type-reminder",
+            SuggestionType.Warning => "type-warning",
+            SuggestionType.Insight => "type-insight",
+            SuggestionType.Celebration => "type-celebration",
+            _ => ""
+        };
+    }
+
+    public void Dispose()
+    {
+        SuggestionsService.OnSuggestionsChanged -= OnSuggestionsChanged;
+    }
+}

@@ -51,6 +51,7 @@ public class CalendarImportResult
     public int ImportedCount { get; set; }
     public int SkippedDuplicates { get; set; }
     public int ErrorCount { get; set; }
+    public int LinkedEventsCount { get; set; }
     public List<string> Errors { get; set; } = new();
     public List<CalendarEvent> ImportedEvents { get; set; } = new();
 }

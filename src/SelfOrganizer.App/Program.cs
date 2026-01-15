@@ -5,6 +5,7 @@ using SelfOrganizer.App.Services;
 using SelfOrganizer.App.Services.Commands;
 using SelfOrganizer.App.Services.Data;
 using SelfOrganizer.App.Services.Domain;
+using SelfOrganizer.App.Services.GoogleCalendar;
 using SelfOrganizer.App.Services.Intelligence;
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
@@ -45,6 +46,16 @@ builder.Services.AddScoped<IRepository<Goal>>(sp =>
     new IndexedDbRepository<Goal>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.Goals));
 builder.Services.AddScoped<IRepository<Idea>>(sp =>
     new IndexedDbRepository<Idea>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.Ideas));
+builder.Services.AddScoped<IRepository<Habit>>(sp =>
+    new IndexedDbRepository<Habit>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.Habits));
+builder.Services.AddScoped<IRepository<HabitLog>>(sp =>
+    new IndexedDbRepository<HabitLog>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.HabitLogs));
+builder.Services.AddScoped<IRepository<WeeklySnapshot>>(sp =>
+    new IndexedDbRepository<WeeklySnapshot>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.WeeklySnapshots));
+builder.Services.AddScoped<IRepository<EntityLinkRule>>(sp =>
+    new IndexedDbRepository<EntityLinkRule>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.EntityLinkRules));
+builder.Services.AddScoped<IRepository<FocusSessionLog>>(sp =>
+    new IndexedDbRepository<FocusSessionLog>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.FocusSessionLogs));
 
 // Domain Services
 builder.Services.AddScoped<ICaptureService, CaptureService>();
@@ -54,12 +65,14 @@ builder.Services.AddScoped<ICalendarService, CalendarService>();
 builder.Services.AddScoped<ISchedulingService, SchedulingService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IContextService, ContextService>();
+builder.Services.AddScoped<IBalanceDimensionService, BalanceDimensionService>();
 builder.Services.AddScoped<IMeetingInsightService, MeetingInsightService>();
 builder.Services.AddScoped<IExternalCalendarService, ExternalCalendarService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
 builder.Services.AddScoped<IIdeaService, IdeaService>();
 builder.Services.AddScoped<ISummaryService, SummaryService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IDataSyncService, DataSyncService>();
 
 // Intelligence Services
 builder.Services.AddScoped<ICategoryMatcherService, CategoryMatcherService>();
@@ -67,6 +80,9 @@ builder.Services.AddScoped<IEntityExtractionService, EntityExtractionService>();
 builder.Services.AddScoped<ITaskOptimizerService, TaskOptimizerService>();
 builder.Services.AddScoped<ILlmService, LlmService>();
 builder.Services.AddScoped<IGoalAiService, GoalAiService>();
+builder.Services.AddScoped<IProactiveSuggestionsService, ProactiveSuggestionsService>();
+builder.Services.AddScoped<IEntityLinkingService, EntityLinkingService>();
+builder.Services.AddScoped<ICalendarIntelligenceService, CalendarIntelligenceService>();
 
 // UI Services
 builder.Services.AddScoped<IThemeService, ThemeService>();
@@ -74,6 +90,10 @@ builder.Services.AddScoped<IPlatformService, PlatformService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
+
+// Google Calendar Services
+builder.Services.AddScoped<IGoogleCalendarAuthService, GoogleCalendarAuthService>();
+builder.Services.AddScoped<IGoogleCalendarSyncService, GoogleCalendarSyncService>();
 
 // Notification Service (Singleton so all components share the same instance)
 builder.Services.AddSingleton<IDataChangeNotificationService, DataChangeNotificationService>();
@@ -83,5 +103,8 @@ builder.Services.AddSingleton<ICommandHistory, CommandHistory>();
 
 // Focus Timer State (Singleton so timer state persists and syncs across components)
 builder.Services.AddSingleton<IFocusTimerState, FocusTimerState>();
+
+// Keyboard Navigation (Singleton so all components share the same event source)
+builder.Services.AddSingleton<KeyboardNavigationService>();
 
 await builder.Build().RunAsync();

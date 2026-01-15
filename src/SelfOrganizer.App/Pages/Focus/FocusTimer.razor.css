@@ -1,18 +1,83 @@
+/* ===========================================
+   Focus Timer - Scoped Styles
+   =========================================== */
+
 .focus-container {
     max-width: 600px;
     margin: 0 auto;
     padding: var(--space-xl);
 }
 
+/* Task Selection Panel */
+.task-selection-panel {
+    max-width: 500px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.search-box .input-group-text {
+    border-color: var(--input-border);
+}
+
+.search-box .form-control {
+    border-color: var(--input-border);
+}
+
+.search-box .form-control:focus {
+    box-shadow: none;
+    border-color: var(--color-primary);
+}
+
+/* Task List */
+.task-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.task-list .list-group-item {
+    border-color: var(--border-default);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+}
+
+.task-list .list-group-item:hover {
+    background-color: var(--color-primary-subtle);
+    border-color: var(--color-primary);
+}
+
+.task-list .list-group-item.active {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.task-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-title {
+    display: flex;
+    align-items: center;
+}
+
+.task-badges {
+    display: flex;
+    flex-shrink: 0;
+    margin-left: 0.5rem;
+}
+
+/* Timer Display */
 .timer-display {
     position: relative;
 }
 
 .timer-digits {
-    font-size: 5rem;
-    font-weight: 200;
-    font-family: var(--font-monospace);
-    letter-spacing: 0.1em;
+    font-family: var(--font-mono);
+    font-size: 4.5rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
     color: var(--text-primary);
     line-height: 1;
     transition: color var(--transition-normal);
@@ -27,14 +92,15 @@
     margin-top: var(--space-sm);
 }
 
+/* Progress Ring */
 .progress-container {
     display: flex;
     justify-content: center;
 }
 
 .progress-ring {
-    width: 120px;
-    height: 120px;
+    width: 150px;
+    height: 150px;
     transform: rotate(-90deg);
 }
 
@@ -62,35 +128,125 @@
     font-size: 1.1rem;
 }
 
-/* List group styling for task selection */
-.list-group-item {
-    border-color: var(--border-default);
-    background-color: var(--card-bg);
-    color: var(--text-primary);
-}
-
-.list-group-item:hover {
-    background-color: var(--bg-tertiary);
-}
-
+/* List group base styling */
 .list-group-item-action:focus {
     background-color: var(--bg-tertiary);
+}
+
+/* Quick create button */
+.btn-outline-success.text-start {
+    display: flex;
+    align-items: center;
+}
+
+/* Button group styling */
+.btn-group .btn {
+    font-family: var(--font-sans);
+}
+
+/* Session Intention */
+.intention-section {
+    max-width: 450px;
+    margin: 0 auto;
+}
+
+.intention-section .input-group-text {
+    border-color: var(--input-border);
+}
+
+.intention-section .form-control {
+    border-color: var(--input-border);
+}
+
+.intention-section .form-control:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
+}
+
+.current-intention {
+    background-color: var(--color-primary-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    display: inline-block;
+}
+
+.current-intention .intention-text {
+    font-style: italic;
+    color: var(--color-primary);
+}
+
+/* Session Complete Modal */
+.session-complete-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-success), var(--color-primary));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.session-complete-icon .oi {
+    font-size: 2rem;
+    color: white;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 40px rgba(167, 139, 250, 0.6);
+    }
+}
+
+.intention-review {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.intention-quote {
+    font-style: italic;
+    color: var(--color-primary);
+    font-size: 1.1rem;
+    padding: var(--space-sm) 0;
+}
+
+.focus-rating .btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
 }
 
 /* Responsive adjustments */
 @media (max-width: 576px) {
     .timer-digits {
-        font-size: 3.5rem;
+        font-size: 3rem;
     }
 
     .progress-ring {
-        width: 100px;
-        height: 100px;
+        width: 120px;
+        height: 120px;
     }
 
     .focus-container {
         padding: var(--space-md);
     }
-}
 
-/* Dark mode adjustments are handled by CSS variables */
+    .task-selection-panel .btn-group .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .focus-rating .btn {
+        width: 40px;
+        height: 40px;
+    }
+}

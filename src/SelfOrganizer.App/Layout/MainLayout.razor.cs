@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using SelfOrganizer.App.Services;
 using SelfOrganizer.App.Services.Data;
 using SelfOrganizer.Core.Models;
 using SelfOrganizer.Core.Interfaces;
@@ -17,11 +18,15 @@ public partial class MainLayout : IDisposable
     [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
 
+    [Inject]
+    private KeyboardNavigationService KeyboardNavigation { get; set; } = default!;
+
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private bool _showOnboarding = false;
     private bool _checkedOnboarding = false;
     private bool _showGlobalSearch = false;
     private bool _showKeyboardHelp = false;
+    private bool _showQuickAdd = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,7 +79,12 @@ public partial class MainLayout : IDisposable
     public void OnEscapeShortcut()
     {
         // Close any open overlays
-        if (_showKeyboardHelp)
+        if (_showQuickAdd)
+        {
+            _showQuickAdd = false;
+            StateHasChanged();
+        }
+        else if (_showKeyboardHelp)
         {
             _showKeyboardHelp = false;
             StateHasChanged();
@@ -113,6 +123,43 @@ public partial class MainLayout : IDisposable
         Console.WriteLine("Redo shortcut triggered");
     }
 
+    [JSInvokable]
+    public void OnQuickAddShortcut()
+    {
+        _showQuickAdd = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnListNavigateShortcut(string direction)
+    {
+        KeyboardNavigation.Navigate(direction);
+    }
+
+    [JSInvokable]
+    public void OnListSelectShortcut()
+    {
+        KeyboardNavigation.Select();
+    }
+
+    [JSInvokable]
+    public void OnListToggleShortcut()
+    {
+        KeyboardNavigation.Toggle();
+    }
+
+    [JSInvokable]
+    public void OnListEditShortcut()
+    {
+        KeyboardNavigation.Edit();
+    }
+
+    [JSInvokable]
+    public void OnListDeleteShortcut()
+    {
+        KeyboardNavigation.Delete();
+    }
+
     private void OpenGlobalSearch()
     {
         _showGlobalSearch = true;
@@ -131,6 +178,11 @@ public partial class MainLayout : IDisposable
     private void OnKeyboardHelpClosed()
     {
         _showKeyboardHelp = false;
+    }
+
+    private void OnQuickAddClosed()
+    {
+        _showQuickAdd = false;
     }
 
     public void Dispose()

@@ -1,0 +1,64 @@
+/* ===========================================
+   TaskCard Component - Scoped Styles
+   =========================================== */
+
+.task-card {
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.task-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Title wrapper for inline edit */
+.task-title-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Detail link (external link icon) */
+.task-detail-link {
+    color: var(--text-tertiary, #999);
+    opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    font-size: 0.75rem;
+    text-decoration: none;
+}
+
+.task-card:hover .task-detail-link {
+    opacity: 0.6;
+}
+
+.task-detail-link:hover {
+    opacity: 1 !important;
+    color: var(--color-primary, #3b82f6);
+}
+
+/* Task meta row */
+.task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+/* Action buttons */
+.task-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.task-card:hover .task-actions {
+    opacity: 1;
+}
+
+.task-actions .btn {
+    padding: 0.15rem 0.35rem;
+}

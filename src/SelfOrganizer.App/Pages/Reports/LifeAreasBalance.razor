@@ -1,0 +1,584 @@
+@page "/balance"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.IBalanceDimensionService BalanceDimensionService
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IRepository<Goal> GoalRepository
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager Navigation
+
+<div class="balance-page">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>
+                <span class="oi oi-dial me-2"></span>@GetPageTitle()
+            </h3>
+            <p class="text-muted mb-0">Check in on balance across key @GetModeLabel() areas</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            @* Mode Selector *@
+            <div class="mode-selector btn-group" role="group">
+                <button type="button"
+                        class="btn btn-sm @(_currentMode == AppMode.Work ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick="() => SwitchMode(AppMode.Work)">
+                    <span class="oi oi-briefcase me-1"></span>Work
+                </button>
+                <button type="button"
+                        class="btn btn-sm @(_currentMode == AppMode.Life ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick="() => SwitchMode(AppMode.Life)">
+                    <span class="oi oi-heart me-1"></span>Life
+                </button>
+                <button type="button"
+                        class="btn btn-sm @(_currentMode == AppMode.Balanced ? "btn-primary" : "btn-outline-secondary")"
+                        @onclick="() => SwitchMode(AppMode.Balanced)">
+                    <span class="oi oi-dial me-1"></span>Balanced
+                </button>
+            </div>
+            <button class="btn btn-primary" @onclick="StartAssessment">
+                <span class="oi oi-pencil me-1"></span>Update Assessment
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (_showAssessment)
+    {
+        <div class="assessment-wizard">
+            <div class="assessment-header">
+                <h5>Rate Your Satisfaction</h5>
+                <p class="text-muted">On a scale of 1-10, how satisfied are you in each area?</p>
+                <div class="progress mb-3">
+                    <div class="progress-bar" role="progressbar"
+                         style="width: @((_currentAreaIndex + 1) * 100 / _dimensions.Count)%"></div>
+                </div>
+            </div>
+
+            @if (_currentAreaIndex < _dimensions.Count)
+            {
+                var dimension = _dimensions[_currentAreaIndex];
+                <div class="assessment-area">
+                    <div class="area-header">
+                        <span class="area-icon" style="background-color: @dimension.Color;">
+                            <span class="oi @dimension.Icon"></span>
+                        </span>
+                        <div>
+                            <h4>@dimension.Name</h4>
+                            <p class="text-muted mb-0">@dimension.Description</p>
+                        </div>
+                    </div>
+
+                    <div class="satisfaction-scale">
+                        @for (int i = 1; i <= 10; i++)
+                        {
+                            var rating = i;
+                            <button class="scale-btn @(_currentRatings.GetValueOrDefault(dimension.Id, 0) == rating ? "selected" : "")"
+                                    style="@(_currentRatings.GetValueOrDefault(dimension.Id, 0) == rating ? $"background-color: {dimension.Color}; border-color: {dimension.Color};" : "")"
+                                    @onclick="() => SetRating(dimension.Id, rating)">
+                                @rating
+                            </button>
+                        }
+                    </div>
+
+                    <div class="scale-labels">
+                        <span>Needs Work</span>
+                        <span>Excellent</span>
+                    </div>
+                </div>
+            }
+
+            <div class="assessment-nav">
+                @if (_currentAreaIndex > 0)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="PreviousArea">
+                        <span class="oi oi-arrow-left me-1"></span>Back
+                    </button>
+                }
+                else
+                {
+                    <div></div>
+                }
+
+                @if (_currentAreaIndex < _dimensions.Count - 1)
+                {
+                    <button class="btn btn-primary" @onclick="NextArea"
+                            disabled="@(_currentRatings.GetValueOrDefault(_dimensions[_currentAreaIndex].Id, 0) == 0)">
+                        Next<span class="oi oi-arrow-right ms-1"></span>
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-success" @onclick="CompleteAssessment"
+                            disabled="@(_currentRatings.GetValueOrDefault(_dimensions[_currentAreaIndex].Id, 0) == 0)">
+                        <span class="oi oi-check me-1"></span>Complete
+                    </button>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="balance-dashboard">
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    @* Balance Wheel *@
+                    <div class="balance-wheel-card">
+                        <h5 class="mb-3">Balance Wheel</h5>
+                        <div class="wheel-container">
+                            <svg class="balance-wheel" viewBox="0 0 300 300">
+                                @* Background circles *@
+                                @for (int i = 1; i <= 10; i++)
+                                {
+                                    var radius = i * 12;
+                                    <circle cx="150" cy="150" r="@radius"
+                                            class="wheel-ring @(i == 5 || i == 10 ? "major" : "")" />
+                                }
+
+                                @* Axis lines *@
+                                @for (int i = 0; i < _dimensions.Count; i++)
+                                {
+                                    var angle = (i * 360.0 / _dimensions.Count) - 90;
+                                    var rad = angle * Math.PI / 180;
+                                    var x2 = 150 + 120 * Math.Cos(rad);
+                                    var y2 = 150 + 120 * Math.Sin(rad);
+                                    <line x1="150" y1="150" x2="@x2" y2="@y2" class="wheel-axis" />
+                                }
+
+                                @* Filled area polygon *@
+                                @{
+                                    var points = new List<string>();
+                                    for (int i = 0; i < _dimensions.Count; i++)
+                                    {
+                                        var dimension = _dimensions[i];
+                                        var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                        var angle = (i * 360.0 / _dimensions.Count) - 90;
+                                        var rad = angle * Math.PI / 180;
+                                        var r = rating * 12;
+                                        var x = 150 + r * Math.Cos(rad);
+                                        var y = 150 + r * Math.Sin(rad);
+                                        points.Add($"{x:F1},{y:F1}");
+                                    }
+                                }
+                                <polygon points="@string.Join(" ", points)" class="wheel-fill" />
+
+                                @* Data points *@
+                                @for (int i = 0; i < _dimensions.Count; i++)
+                                {
+                                    var dimension = _dimensions[i];
+                                    var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                    var angle = (i * 360.0 / _dimensions.Count) - 90;
+                                    var rad = angle * Math.PI / 180;
+                                    var r = rating * 12;
+                                    var x = 150 + r * Math.Cos(rad);
+                                    var y = 150 + r * Math.Sin(rad);
+                                    <circle cx="@x" cy="@y" r="6"
+                                            fill="@dimension.Color" class="wheel-point" />
+                                }
+
+                                @* Labels *@
+                                @for (int i = 0; i < _dimensions.Count; i++)
+                                {
+                                    var dimension = _dimensions[i];
+                                    var angle = (i * 360.0 / _dimensions.Count) - 90;
+                                    var rad = angle * Math.PI / 180;
+                                    var x = 150 + 138 * Math.Cos(rad);
+                                    var y = 150 + 138 * Math.Sin(rad);
+                                    var textAnchor = angle > -90 && angle < 90 ? "start" : "end";
+                                    if (Math.Abs(angle + 90) < 5 || Math.Abs(angle - 90) < 5)
+                                    {
+                                        textAnchor = "middle";
+                                    }
+                                    @((MarkupString)$"<text x=\"{x:F1}\" y=\"{y:F1}\" class=\"wheel-label\" style=\"text-anchor: {textAnchor};\">{dimension.Name}</text>")
+                                }
+                            </svg>
+                        </div>
+
+                        <div class="overall-score">
+                            <div class="score-value">@GetOverallScore().ToString("F1")</div>
+                            <div class="score-label">Overall Balance</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4">
+                    @* Area Details *@
+                    <div class="areas-detail">
+                        <h5 class="mb-3">Dimension Breakdown</h5>
+                        <div class="area-list">
+                            @foreach (var dimension in _dimensions.OrderByDescending(d => _ratings.GetValueOrDefault(d.Id, 0)))
+                            {
+                                var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                var goals = _goalsByDimension.GetValueOrDefault(dimension.Id, new List<Goal>());
+                                var tasksCount = _tasksByDimension.GetValueOrDefault(dimension.Id, 0);
+                                var isExpanded = _expandedDimension == dimension.Id;
+
+                                <div class="area-detail-item @(isExpanded ? "expanded" : "")">
+                                    <div class="area-detail-header" @onclick="() => ToggleDimension(dimension.Id)" style="cursor: pointer;">
+                                        <span class="area-icon-sm" style="background-color: @dimension.Color;">
+                                            <span class="oi @dimension.Icon"></span>
+                                        </span>
+                                        <span class="area-name">@dimension.Name</span>
+                                        <span class="area-rating" style="color: @GetRatingColor(rating);">@rating/10</span>
+                                        @if (goals.Any())
+                                        {
+                                            <span class="oi @(isExpanded ? "oi-chevron-top" : "oi-chevron-bottom") ms-2 text-muted small"></span>
+                                        }
+                                    </div>
+                                    <div class="rating-bar">
+                                        <div class="rating-fill" style="width: @(rating * 10)%; background-color: @dimension.Color;"></div>
+                                    </div>
+                                    <div class="area-stats">
+                                        @if (tasksCount > 0 || goals.Any())
+                                        {
+                                            <span class="text-muted small">
+                                                @if (tasksCount > 0)
+                                                {
+                                                    <span><span class="oi oi-task me-1"></span>@tasksCount tasks</span>
+                                                }
+                                                @if (goals.Any())
+                                                {
+                                                    <span class="ms-2"><span class="oi oi-target me-1"></span>@goals.Count goals</span>
+                                                }
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">No linked items</span>
+                                        }
+                                    </div>
+
+                                    @* Expanded goal list *@
+                                    @if (isExpanded && goals.Any())
+                                    {
+                                        <div class="dimension-goals">
+                                            @foreach (var goal in goals.Take(5))
+                                            {
+                                                <div class="linked-goal" @onclick="() => NavigateToGoal(goal.Id)" @onclick:stopPropagation="true">
+                                                    <span class="oi oi-target me-2" style="color: @dimension.Color;"></span>
+                                                    <span class="goal-title">@goal.Title</span>
+                                                    <span class="goal-progress">@goal.ProgressPercent%</span>
+                                                </div>
+                                            }
+                                            @if (goals.Count > 5)
+                                            {
+                                                <div class="more-goals text-muted small">
+                                                    +@(goals.Count - 5) more goals
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Insights *@
+            <div class="row">
+                <div class="col-12">
+                    <div class="balance-insights">
+                        <h5 class="mb-3"><span class="oi oi-lightbulb me-2"></span>Insights</h5>
+                        <div class="insights-grid">
+                            @{
+                                var lowestDimension = _dimensions.OrderBy(d => _ratings.GetValueOrDefault(d.Id, 0)).FirstOrDefault();
+                                var highestDimension = _dimensions.OrderByDescending(d => _ratings.GetValueOrDefault(d.Id, 0)).FirstOrDefault();
+                                var avgRating = GetOverallScore();
+                                var variance = CalculateVariance();
+                            }
+
+                            @if (lowestDimension != null && _ratings.GetValueOrDefault(lowestDimension.Id, 0) < 5)
+                            {
+                                <div class="insight-card needs-attention">
+                                    <span class="oi oi-target me-2"></span>
+                                    <strong>@lowestDimension.Name</strong> needs attention (rated @_ratings.GetValueOrDefault(lowestDimension.Id, 0)/10).
+                                    Consider setting goals in this area.
+                                </div>
+                            }
+
+                            @if (highestDimension != null && _ratings.GetValueOrDefault(highestDimension.Id, 0) >= 8)
+                            {
+                                <div class="insight-card strength">
+                                    <span class="oi oi-star me-2"></span>
+                                    <strong>@highestDimension.Name</strong> is a strength (rated @_ratings.GetValueOrDefault(highestDimension.Id, 0)/10).
+                                    Great job maintaining this area!
+                                </div>
+                            }
+
+                            @if (variance > 4)
+                            {
+                                <div class="insight-card imbalance">
+                                    <span class="oi oi-warning me-2"></span>
+                                    High imbalance detected. Consider focusing on neglected areas for better overall wellbeing.
+                                </div>
+                            }
+                            else if (variance < 2 && avgRating >= 6)
+                            {
+                                <div class="insight-card balanced">
+                                    <span class="oi oi-check me-2"></span>
+                                    Good balance! Your @GetModeLabel().ToLower() areas are fairly well-distributed.
+                                </div>
+                            }
+
+                            @{
+                                var dimensionsWithoutGoals = _dimensions.Where(d =>
+                                    !_goalsByDimension.GetValueOrDefault(d.Id, new List<Goal>()).Any() &&
+                                    _ratings.GetValueOrDefault(d.Id, 0) < 6).ToList();
+                            }
+                            @if (dimensionsWithoutGoals.Any())
+                            {
+                                <div class="insight-card suggestion">
+                                    <span class="oi oi-plus me-2"></span>
+                                    Consider creating goals for: @string.Join(", ", dimensionsWithoutGoals.Take(3).Select(d => d.Name))
+                                </div>
+                            }
+
+                            @if (_lastAssessmentDate.HasValue)
+                            {
+                                var daysSince = (DateTime.Today - _lastAssessmentDate.Value.Date).Days;
+                                @if (daysSince > 14)
+                                {
+                                    <div class="insight-card reminder">
+                                        <span class="oi oi-clock me-2"></span>
+                                        It's been @daysSince days since your last assessment. Consider updating your ratings.
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _showAssessment = false;
+    private int _currentAreaIndex = 0;
+    private Dictionary<string, int> _currentRatings = new();
+    private Dictionary<string, int> _ratings = new();
+    private Dictionary<string, int> _tasksByDimension = new();
+    private Dictionary<string, List<Goal>> _goalsByDimension = new();
+    private DateTime? _lastAssessmentDate;
+    private AppMode _currentMode = AppMode.Balanced;
+    private List<BalanceDimension> _dimensions = new();
+    private string? _expandedDimension;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            // Get current mode and dimensions
+            _currentMode = await BalanceDimensionService.GetCurrentModeAsync();
+            var enabledDimensions = await BalanceDimensionService.GetEnabledDimensionsAsync();
+            _dimensions = enabledDimensions.OrderBy(d => d.SortOrder).ToList();
+
+            // Load saved ratings for current mode
+            _ratings = await BalanceDimensionService.GetBalanceRatingsAsync();
+
+            // Initialize current ratings with saved values
+            _currentRatings = new Dictionary<string, int>();
+            foreach (var dimension in _dimensions)
+            {
+                _currentRatings[dimension.Id] = _ratings.GetValueOrDefault(dimension.Id, 5);
+            }
+
+            // Load goals and tasks
+            var allGoals = await GoalRepository.GetAllAsync();
+            var activeGoals = allGoals.Where(g => g.Status != GoalStatus.Completed && g.Status != GoalStatus.Archived).ToList();
+
+            var tasks = await TaskService.GetAllAsync();
+            var activeTasks = tasks.Where(t =>
+                t.Status != TodoTaskStatus.Completed &&
+                t.Status != TodoTaskStatus.Deleted).ToList();
+
+            // Group goals by dimension
+            _goalsByDimension = new Dictionary<string, List<Goal>>();
+            foreach (var dimension in _dimensions)
+            {
+                // Goals explicitly linked to this dimension
+                var linkedGoals = activeGoals.Where(g =>
+                    g.BalanceDimensionIds.Contains(dimension.Id) ||
+                    g.PrimaryBalanceDimensionId == dimension.Id).ToList();
+
+                // Also include goals that match the dimension's category mappings
+                var categoryMappedGoals = activeGoals.Where(g =>
+                    !linkedGoals.Contains(g) &&
+                    dimension.CategoryMappings.Contains(g.Category.ToString())).ToList();
+
+                _goalsByDimension[dimension.Id] = linkedGoals.Concat(categoryMappedGoals).ToList();
+            }
+
+            // Count tasks by dimension (using category/keyword mapping)
+            _tasksByDimension = new Dictionary<string, int>();
+            foreach (var dimension in _dimensions)
+            {
+                var count = activeTasks.Count(t =>
+                    MatchesDimension(t.Category, t.Title, dimension));
+                _tasksByDimension[dimension.Id] = count;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private bool MatchesDimension(string? category, string? title, BalanceDimension dimension)
+    {
+        if (!string.IsNullOrEmpty(category))
+        {
+            if (dimension.CategoryMappings.Any(cm =>
+                category.Equals(cm, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(title))
+        {
+            var lowerTitle = title.ToLowerInvariant();
+            if (dimension.KeywordMappings.Any(kw => lowerTitle.Contains(kw.ToLowerInvariant())))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task SwitchMode(AppMode mode)
+    {
+        if (_currentMode == mode) return;
+
+        _isLoading = true;
+        try
+        {
+            // Save current ratings before switching
+            if (_ratings.Any())
+            {
+                await BalanceDimensionService.SaveBalanceRatingsAsync(_ratings);
+            }
+
+            // Switch mode (don't seed contexts, just viewing different dimensions)
+            await BalanceDimensionService.SetModeAsync(mode, seedContexts: false);
+            _currentMode = mode;
+            _expandedDimension = null;
+
+            // Reload data for new mode
+            await LoadData();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetPageTitle() => _currentMode switch
+    {
+        AppMode.Work => "Professional Balance",
+        AppMode.Life => "Life Balance",
+        AppMode.Balanced => "Life Balance",
+        _ => "Balance"
+    };
+
+    private string GetModeLabel() => _currentMode switch
+    {
+        AppMode.Work => "professional",
+        AppMode.Life => "life",
+        AppMode.Balanced => "life",
+        _ => ""
+    };
+
+    private void ToggleDimension(string dimensionId)
+    {
+        _expandedDimension = _expandedDimension == dimensionId ? null : dimensionId;
+    }
+
+    private void NavigateToGoal(Guid goalId)
+    {
+        Navigation.NavigateTo($"/goals/{goalId}");
+    }
+
+    private void StartAssessment()
+    {
+        _showAssessment = true;
+        _currentAreaIndex = 0;
+        _currentRatings = _dimensions.ToDictionary(
+            d => d.Id,
+            d => _ratings.GetValueOrDefault(d.Id, 5));
+    }
+
+    private void SetRating(string dimensionId, int rating)
+    {
+        _currentRatings[dimensionId] = rating;
+    }
+
+    private void NextArea()
+    {
+        if (_currentAreaIndex < _dimensions.Count - 1)
+        {
+            _currentAreaIndex++;
+        }
+    }
+
+    private void PreviousArea()
+    {
+        if (_currentAreaIndex > 0)
+        {
+            _currentAreaIndex--;
+        }
+    }
+
+    private async Task CompleteAssessment()
+    {
+        _ratings = new Dictionary<string, int>(_currentRatings);
+        _lastAssessmentDate = DateTime.Now;
+
+        // Save ratings for current mode
+        await BalanceDimensionService.SaveBalanceRatingsAsync(_ratings);
+
+        _showAssessment = false;
+        DataChangeNotification.NotifyDataChanged();
+    }
+
+    private double GetOverallScore()
+    {
+        if (!_ratings.Any()) return 0;
+        var dimensionIds = _dimensions.Select(d => d.Id).ToHashSet();
+        var relevantRatings = _ratings.Where(r => dimensionIds.Contains(r.Key)).ToList();
+        if (!relevantRatings.Any()) return 0;
+        return relevantRatings.Average(r => r.Value);
+    }
+
+    private double CalculateVariance()
+    {
+        if (!_ratings.Any()) return 0;
+        var dimensionIds = _dimensions.Select(d => d.Id).ToHashSet();
+        var relevantRatings = _ratings.Where(r => dimensionIds.Contains(r.Key)).Select(r => r.Value).ToList();
+        if (!relevantRatings.Any()) return 0;
+        var avg = relevantRatings.Average();
+        return relevantRatings.Select(r => Math.Pow(r - avg, 2)).Average();
+    }
+
+    private string GetRatingColor(int rating) => rating switch
+    {
+        >= 8 => "#10b981",
+        >= 6 => "#f59e0b",
+        >= 4 => "#f97316",
+        _ => "#ef4444"
+    };
+}

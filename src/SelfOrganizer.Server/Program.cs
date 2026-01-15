@@ -9,6 +9,9 @@ builder.Services.AddHttpClient();
 // Register LLM proxy service
 builder.Services.AddScoped<ILlmProxyService, LlmProxyService>();
 
+// Register Google Calendar proxy service
+builder.Services.AddScoped<IGoogleCalendarProxyService, GoogleCalendarProxyService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline

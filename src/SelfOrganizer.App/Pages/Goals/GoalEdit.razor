@@ -3,6 +3,7 @@
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
 @inject IGoalService GoalService
+@inject SelfOrganizer.Core.Interfaces.IBalanceDimensionService BalanceDimensionService
 @inject IDataChangeNotificationService DataChangeNotification
 @inject NavigationManager NavigationManager
 
@@ -223,6 +224,83 @@
                         </div>
                     </div>
                 }
+
+                @* Balance Impact Section *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><span class="oi oi-dial me-1"></span> Balance Impact</h5>
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="SuggestDimensions"
+                                disabled="@(_isSuggesting)" title="Auto-suggest dimensions">
+                            @if (_isSuggesting)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-lightbulb"></span>
+                            }
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if (!_dimensions.Any())
+                        {
+                            <div class="text-muted small">Loading dimensions...</div>
+                        }
+                        else
+                        {
+                            @* Dimension Selection *@
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Life Areas</label>
+                                <div class="dimension-grid">
+                                    @foreach (var dim in _dimensions)
+                                    {
+                                        var isSelected = _goal.BalanceDimensionIds.Contains(dim.Id);
+                                        <div class="dimension-badge @(isSelected ? "selected" : "")"
+                                             style="@(isSelected ? $"background-color: {dim.Color}; color: white;" : $"border-color: {dim.Color}; color: {dim.Color};")"
+                                             @onclick="() => ToggleDimension(dim.Id)">
+                                            <span class="oi @dim.Icon me-1"></span>
+                                            @dim.Name
+                                        </div>
+                                    }
+                                </div>
+                                <small class="text-muted">Select areas this goal will improve</small>
+                            </div>
+
+                            @* Primary Dimension *@
+                            @if (_goal.BalanceDimensionIds.Any())
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Primary Area</label>
+                                    <select class="form-select form-select-sm" @bind="_goal.PrimaryBalanceDimensionId">
+                                        <option value="">-- Select primary --</option>
+                                        @foreach (var dimId in _goal.BalanceDimensionIds)
+                                        {
+                                            var dim = _dimensions.FirstOrDefault(d => d.Id == dimId);
+                                            if (dim != null)
+                                            {
+                                                <option value="@dim.Id">@dim.Name</option>
+                                            }
+                                        }
+                                    </select>
+                                    <small class="text-muted">Which area benefits most?</small>
+                                </div>
+                            }
+
+                            @* Balance Impact Level *@
+                            <div class="mb-0">
+                                <label class="form-label fw-bold small">
+                                    Impact Level: <span class="text-primary">@GetImpactLabel(_goal.BalanceImpact)</span>
+                                </label>
+                                <input type="range" class="form-range" min="1" max="5" step="1"
+                                       @bind="_goal.BalanceImpact" @bind:event="oninput" />
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">Minor</small>
+                                    <small class="text-muted">Transformative</small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -247,12 +325,18 @@
     private string _tagsInput = "";
     private bool _isLoading = true;
     private bool _notFound = false;
+    private List<BalanceDimension> _dimensions = new();
+    private bool _isSuggesting = false;
 
     private bool IsEditMode => GoalId.HasValue;
     private bool CanSave => !string.IsNullOrWhiteSpace(_goal.Title) && _goal.Title.Length >= 3;
 
     protected override async Task OnInitializedAsync()
     {
+        // Load dimensions for current mode
+        var enabledDimensions = await BalanceDimensionService.GetEnabledDimensionsAsync();
+        _dimensions = enabledDimensions.OrderBy(d => d.SortOrder).ToList();
+
         if (IsEditMode)
         {
             var existingGoal = await GoalService.GetByIdAsync(GoalId!.Value);
@@ -284,7 +368,11 @@
                     AiGeneratedPlan = existingGoal.AiGeneratedPlan,
                     Notes = existingGoal.Notes,
                     CreatedAt = existingGoal.CreatedAt,
-                    ModifiedAt = existingGoal.ModifiedAt
+                    ModifiedAt = existingGoal.ModifiedAt,
+                    // Balance fields
+                    BalanceDimensionIds = new List<string>(existingGoal.BalanceDimensionIds),
+                    PrimaryBalanceDimensionId = existingGoal.PrimaryBalanceDimensionId,
+                    BalanceImpact = existingGoal.BalanceImpact
                 };
                 _tagsInput = string.Join(" ", _goal.Tags.Select(t => $"#{t}"));
             }
@@ -296,11 +384,72 @@
                 Status = GoalStatus.Active,
                 Category = GoalCategory.Personal,
                 Timeframe = GoalTimeframe.Quarter,
-                Priority = 2
+                Priority = 2,
+                BalanceImpact = 3
             };
         }
         _isLoading = false;
     }
+
+    private void ToggleDimension(string dimensionId)
+    {
+        if (_goal.BalanceDimensionIds.Contains(dimensionId))
+        {
+            _goal.BalanceDimensionIds.Remove(dimensionId);
+            // Clear primary if it was this dimension
+            if (_goal.PrimaryBalanceDimensionId == dimensionId)
+            {
+                _goal.PrimaryBalanceDimensionId = _goal.BalanceDimensionIds.FirstOrDefault();
+            }
+        }
+        else
+        {
+            _goal.BalanceDimensionIds.Add(dimensionId);
+            // Auto-set primary if this is the first one
+            if (_goal.PrimaryBalanceDimensionId == null)
+            {
+                _goal.PrimaryBalanceDimensionId = dimensionId;
+            }
+        }
+    }
+
+    private async Task SuggestDimensions()
+    {
+        _isSuggesting = true;
+        StateHasChanged();
+
+        try
+        {
+            var suggestedIds = await BalanceDimensionService.SuggestDimensionsForGoalAsync(_goal);
+            foreach (var id in suggestedIds)
+            {
+                if (!_goal.BalanceDimensionIds.Contains(id))
+                {
+                    _goal.BalanceDimensionIds.Add(id);
+                }
+            }
+
+            // Set primary to first suggested if not set
+            if (string.IsNullOrEmpty(_goal.PrimaryBalanceDimensionId) && suggestedIds.Any())
+            {
+                _goal.PrimaryBalanceDimensionId = suggestedIds.First();
+            }
+        }
+        finally
+        {
+            _isSuggesting = false;
+        }
+    }
+
+    private string GetImpactLabel(int impact) => impact switch
+    {
+        1 => "Minor",
+        2 => "Moderate",
+        3 => "Significant",
+        4 => "Major",
+        5 => "Transformative",
+        _ => "Unknown"
+    };
 
     private async Task SaveGoal()
     {

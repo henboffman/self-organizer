@@ -75,4 +75,11 @@ public static class StoreNames
     public const string DailySnapshots = "dailySnapshots";
     public const string Goals = "goals";
     public const string Ideas = "ideas";
+    public const string DataSourceConfigs = "dataSourceConfigs";
+    public const string SyncJobs = "syncJobs";
+    public const string Habits = "habits";
+    public const string HabitLogs = "habitLogs";
+    public const string WeeklySnapshots = "weeklySnapshots";
+    public const string EntityLinkRules = "entityLinkRules";
+    public const string FocusSessionLogs = "focusSessionLogs";
 }

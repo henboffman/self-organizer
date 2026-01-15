@@ -1,0 +1,287 @@
+/* Morning Check-in Styles */
+.morning-checkin {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: var(--space-xl);
+}
+
+/* Completed State */
+.checkin-complete-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success-light) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3);
+}
+
+.checkin-complete-icon .oi {
+    font-size: 3rem;
+    color: white;
+}
+
+/* Wizard */
+.checkin-wizard {
+    background-color: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+/* Progress Steps */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-lg) var(--space-xl);
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1;
+    position: relative;
+}
+
+.step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: calc(50% + 20px);
+    width: calc(100% - 40px);
+    height: 2px;
+    background-color: var(--border-default);
+}
+
+.step.completed:not(:last-child)::after {
+    background-color: var(--color-primary);
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--bg-secondary);
+    border: 2px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    position: relative;
+    z-index: 1;
+    transition: all var(--transition-normal);
+}
+
+.step.active .step-number {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    box-shadow: 0 0 0 4px var(--color-primary-subtle);
+}
+
+.step.completed .step-number {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.step-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.step.active .step-label {
+    color: var(--color-primary-text);
+}
+
+/* Content */
+.checkin-content {
+    padding: var(--space-2xl);
+    min-height: 400px;
+}
+
+.step-content h2 {
+    font-family: var(--font-display);
+    margin-bottom: var(--space-xs);
+}
+
+.step-content .lead {
+    font-size: 1.1rem;
+}
+
+/* Rating Scale */
+.rating-scale {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.rating-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-md);
+    background-color: var(--bg-secondary);
+    border: 2px solid var(--border-default);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-width: 80px;
+}
+
+.rating-btn:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-subtle);
+}
+
+.rating-btn.selected {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.rating-icon {
+    font-size: 1.5rem;
+}
+
+.rating-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Priority Picker */
+.priority-picker h6 {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.selected-priorities .list-group-item {
+    display: flex;
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.priority-number {
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 1.1rem;
+}
+
+.task-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.task-item {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.task-item:hover:not(.disabled) {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-subtle);
+}
+
+.task-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-title {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Review Card */
+.review-card {
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-lg);
+}
+
+.review-section {
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.review-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.review-section h6 {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-sm);
+}
+
+/* Navigation */
+.checkin-nav {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-lg) var(--space-xl);
+    border-top: 1px solid var(--border-muted);
+    background-color: var(--bg-tertiary);
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+    .morning-checkin {
+        padding: var(--space-md);
+    }
+
+    .progress-steps {
+        padding: var(--space-md);
+    }
+
+    .step-label {
+        display: none;
+    }
+
+    .step-number {
+        width: 28px;
+        height: 28px;
+        font-size: 0.75rem;
+    }
+
+    .checkin-content {
+        padding: var(--space-lg);
+        min-height: 300px;
+    }
+
+    .rating-scale {
+        justify-content: center;
+    }
+
+    .rating-btn {
+        min-width: 60px;
+        padding: var(--space-sm);
+    }
+
+    .rating-icon {
+        font-size: 1.25rem;
+    }
+}

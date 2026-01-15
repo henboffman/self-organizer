@@ -1,4 +1,10 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
 @inject NavigationManager NavigationManager
+@inject SelfOrganizer.App.Services.IFocusTimerState FocusTimerService
+@inject SelfOrganizer.Core.Interfaces.IRepository<CaptureItem> CaptureRepository
+@inject SelfOrganizer.App.Services.IDataChangeNotificationService DataChangeNotification
+@implements IDisposable
 
 <div class="fab-container @(_isExpanded ? "expanded" : "")">
     @if (_isExpanded)
@@ -6,27 +12,41 @@
         <div class="fab-backdrop" @onclick="ToggleExpanded"></div>
 
         <div class="fab-menu">
-            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToDailyReview)" title="Daily Review">
-                <span class="oi oi-check"></span>
-                <span class="fab-label">Daily Review</span>
-            </button>
-            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewGoal)" title="New Goal">
-                <span class="oi oi-target"></span>
-                <span class="fab-label">New Goal</span>
-            </button>
-            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewProject)" title="New Project">
-                <span class="oi oi-folder"></span>
-                <span class="fab-label">New Project</span>
-            </button>
-            <button class="fab-item" @onclick="() => NavigateToAndClose(NavigateToNewIdea)" title="New Idea">
-                <span class="oi oi-lightbulb"></span>
-                <span class="fab-label">New Idea</span>
-            </button>
-            <button class="fab-item primary" @onclick="() => NavigateToAndClose(NavigateToQuickCapture)" title="Quick Capture">
-                <span class="oi oi-bolt"></span>
-                <span class="fab-label">Quick Capture</span>
-            </button>
+            @foreach (var action in GetContextualActions())
+            {
+                <button class="fab-item @(action.IsPrimary ? "primary" : "")"
+                        @onclick="() => ExecuteAction(action)"
+                        title="@action.Label">
+                    <span class="oi @action.Icon"></span>
+                    <span class="fab-label">@action.Label</span>
+                    @if (!string.IsNullOrEmpty(action.Shortcut))
+                    {
+                        <span class="fab-shortcut">@action.Shortcut</span>
+                    }
+                </button>
+            }
         </div>
+    }
+
+    @* Focus Timer Mini - shows when timer is running *@
+    @if (_focusState.TaskTitle != null && _focusState.IsRunning)
+    {
+        <button class="fab-focus @(_focusState.IsBreak ? "break" : "")"
+                @onclick='() => NavigateTo("/focus")'
+                title="Focus Timer">
+            <span class="focus-time">@FormatTime(_focusState.RemainingSeconds)</span>
+        </button>
+    }
+
+    @* Inbox Badge - shows if items pending *@
+    @if (_inboxCount > 0)
+    {
+        <button class="fab-badge"
+                @onclick='() => NavigateTo("/inbox")'
+                title="@_inboxCount items in inbox">
+            <span class="oi oi-inbox"></span>
+            <span class="badge-count">@_inboxCount</span>
+        </button>
     }
 
     <button class="fab-main @(_isExpanded ? "active" : "")" @onclick="ToggleExpanded" title="Quick Actions">
@@ -34,181 +54,117 @@
     </button>
 </div>
 
-<style>
-    .fab-container {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-    }
-
-    .fab-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: -1;
-        animation: fadeIn 0.2s ease-out;
-    }
-
-    .fab-main {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: var(--bs-primary);
-        border: none;
-        color: white;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-        transition: all 0.2s ease;
-        z-index: 10;
-    }
-
-    .fab-main:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-    }
-
-    .fab-main.active {
-        background: var(--bs-secondary);
-    }
-
-    .fab-icon {
-        font-size: 1.25rem;
-        transition: transform 0.3s ease;
-    }
-
-    .fab-main.active .fab-icon {
-        transform: rotate(45deg);
-    }
-
-    .fab-menu {
-        position: absolute;
-        bottom: 70px;
-        right: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        animation: slideUp 0.2s ease-out;
-    }
-
-    @@keyframes slideUp {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @@keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    .fab-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 16px;
-        background: var(--bs-body-bg);
-        border: 1px solid var(--bs-border-color);
-        border-radius: 28px;
-        color: var(--bs-body-color);
-        cursor: pointer;
-        transition: all 0.15s ease;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        white-space: nowrap;
-    }
-
-    .fab-item:hover {
-        background: var(--bs-primary);
-        color: white;
-        border-color: var(--bs-primary);
-        transform: translateX(-4px);
-    }
-
-    .fab-item.primary {
-        background: var(--bs-success);
-        color: white;
-        border-color: var(--bs-success);
-    }
-
-    .fab-item.primary:hover {
-        background: var(--bs-success);
-        filter: brightness(1.1);
-    }
-
-    .fab-item .oi {
-        font-size: 1rem;
-        width: 20px;
-        text-align: center;
-    }
-
-    .fab-label {
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-
-    /* Hide on mobile for now since sidebar is more accessible */
-    @@media (max-width: 768px) {
-        .fab-container {
-            bottom: 80px; /* Account for mobile nav */
-        }
-    }
-
-    /* Dark mode */
-    :root[data-bs-theme="dark"] .fab-item {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    }
-</style>
-
 @code {
     private bool _isExpanded = false;
+    private FocusTimerStateData _focusState = new();
+    private int _inboxCount = 0;
+    private string _currentPath = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FocusTimerService.InitializeAsync();
+        _focusState = FocusTimerService.State;
+        FocusTimerService.OnStateChanged += OnFocusStateChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+        DataChangeNotification.OnDataChanged += OnDataChangedHandler;
+        _currentPath = GetCurrentPath();
+
+        await LoadInboxCount();
+    }
+
+    private async Task LoadInboxCount()
+    {
+        var captures = await CaptureRepository.GetAllAsync();
+        _inboxCount = captures.Count(c => !c.IsProcessed);
+    }
+
+    private void OnFocusStateChanged()
+    {
+        _focusState = FocusTimerService.State;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _currentPath = GetCurrentPath();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void OnDataChangedHandler()
+    {
+        await LoadInboxCount();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetCurrentPath()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        return uri.AbsolutePath.ToLowerInvariant().TrimEnd('/');
+    }
 
     private void ToggleExpanded()
     {
         _isExpanded = !_isExpanded;
     }
 
-    private void NavigateToAndClose(Action navigate)
+    private void NavigateTo(string path)
     {
+        NavigationManager.NavigateTo(path);
         _isExpanded = false;
-        navigate();
     }
 
-    private void NavigateToQuickCapture()
+    private void ExecuteAction(ActionItem action)
     {
-        NavigationManager.NavigateTo("/capture");
+        if (!string.IsNullOrEmpty(action.NavigateTo))
+        {
+            NavigateTo(action.NavigateTo);
+        }
+        _isExpanded = false;
     }
 
-    private void NavigateToNewIdea()
+    private List<ActionItem> GetContextualActions()
     {
-        NavigationManager.NavigateTo("/ideas?new=true");
+        var actions = new List<ActionItem>();
+
+        // Context-specific actions based on current page
+        if (_currentPath.Contains("/tasks"))
+        {
+            actions.Add(new("Review Day", "oi-check", "/review/daily", null, false));
+        }
+        else if (_currentPath.Contains("/calendar"))
+        {
+            actions.Add(new("Today", "oi-home", "/calendar?view=day&date=" + DateTime.Today.ToString("yyyy-MM-dd"), "t", false));
+        }
+        else if (_currentPath.Contains("/goals"))
+        {
+            actions.Add(new("New Goal", "oi-target", "/goals?new=true", null, false));
+        }
+
+        // Standard actions (in reverse order for proper stacking)
+        actions.Add(new("Focus Timer", "oi-clock", "/focus", "f", false));
+        actions.Add(new("Daily Review", "oi-check", "/review/daily", null, false));
+        actions.Add(new("New Goal", "oi-target", "/goals?new=true", null, false));
+        actions.Add(new("New Project", "oi-folder", "/projects?new=true", null, false));
+        actions.Add(new("New Idea", "oi-lightbulb", "/ideas?new=true", null, false));
+        actions.Add(new("Quick Capture", "oi-bolt", "/capture", "c", true));
+
+        // Remove duplicates and take max 6
+        return actions.DistinctBy(a => a.NavigateTo).Take(6).ToList();
     }
 
-    private void NavigateToNewProject()
+    private static string FormatTime(int totalSeconds)
     {
-        NavigationManager.NavigateTo("/projects?new=true");
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes:D2}:{seconds:D2}";
     }
 
-    private void NavigateToNewGoal()
+    public void Dispose()
     {
-        NavigationManager.NavigateTo("/goals?new=true");
+        FocusTimerService.OnStateChanged -= OnFocusStateChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
+        DataChangeNotification.OnDataChanged -= OnDataChangedHandler;
     }
 
-    private void NavigateToDailyReview()
-    {
-        NavigationManager.NavigateTo("/review/daily");
-    }
+    private record ActionItem(string Label, string Icon, string NavigateTo, string? Shortcut, bool IsPrimary);
 }

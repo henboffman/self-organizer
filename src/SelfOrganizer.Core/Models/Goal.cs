@@ -21,4 +21,14 @@ public class Goal : BaseEntity
     public string? AiGeneratedPlan { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Notes { get; set; }
+
+    // Balance Dimension Integration
+    /// <summary>IDs of balance dimensions this goal contributes to</summary>
+    public List<string> BalanceDimensionIds { get; set; } = new();
+
+    /// <summary>Primary balance dimension (shown prominently in UI)</summary>
+    public string? PrimaryBalanceDimensionId { get; set; }
+
+    /// <summary>How much this goal impacts overall balance (1-5 scale)</summary>
+    public int BalanceImpact { get; set; } = 3;
 }

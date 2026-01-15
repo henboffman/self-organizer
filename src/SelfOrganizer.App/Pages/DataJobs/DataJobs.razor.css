@@ -1,0 +1,77 @@
+/* ===========================================
+   Data Jobs Page - Scoped Styles
+   =========================================== */
+
+.source-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary, #f8f9fa);
+    border-radius: var(--radius-md, 8px);
+}
+
+.drop-zone {
+    border: 2px dashed var(--border-default, #dee2e6) !important;
+    background: var(--bg-secondary, #f8f9fa);
+    transition: all 0.2s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: var(--color-primary, #3b82f6) !important;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.drop-zone label {
+    cursor: pointer;
+}
+
+/* Table styling */
+.table th {
+    font-weight: 500;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary, #6c757d);
+    border-bottom-width: 1px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Modal improvements */
+.modal-content {
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Progress indicator */
+.sync-progress {
+    height: 4px;
+    background: var(--bg-tertiary, #e9ecef);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.sync-progress-bar {
+    height: 100%;
+    background: var(--color-primary, #3b82f6);
+    transition: width 0.3s ease;
+}
+
+/* List group items */
+.list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
+.list-group-item:first-child {
+    border-top: none;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}

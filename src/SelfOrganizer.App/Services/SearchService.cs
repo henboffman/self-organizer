@@ -13,12 +13,25 @@ public class SearchService : ISearchService
 
     private static readonly List<QuickAction> _quickActions = new()
     {
-        new QuickAction { Id = "capture", Title = "Quick Capture", Shortcut = "C", Icon = "oi-plus" },
-        new QuickAction { Id = "inbox", Title = "Go to Inbox", Shortcut = "I", Icon = "oi-inbox" },
-        new QuickAction { Id = "tasks", Title = "View Tasks", Shortcut = "T", Icon = "oi-task" },
-        new QuickAction { Id = "projects", Title = "View Projects", Shortcut = "P", Icon = "oi-folder" },
-        new QuickAction { Id = "calendar", Title = "View Calendar", Shortcut = "K", Icon = "oi-calendar" },
-        new QuickAction { Id = "review", Title = "Daily Review", Shortcut = "R", Icon = "oi-eye" },
+        // Navigation
+        new QuickAction { Id = "capture", Title = "Quick Capture", Shortcut = "C", Icon = "oi-plus", Category = "Navigation" },
+        new QuickAction { Id = "inbox", Title = "Go to Inbox", Shortcut = "I", Icon = "oi-inbox", Category = "Navigation" },
+        new QuickAction { Id = "tasks", Title = "View Tasks", Shortcut = "T", Icon = "oi-task", Category = "Navigation" },
+        new QuickAction { Id = "projects", Title = "View Projects", Shortcut = "P", Icon = "oi-folder", Category = "Navigation" },
+        new QuickAction { Id = "calendar", Title = "View Calendar", Shortcut = "K", Icon = "oi-calendar", Category = "Navigation" },
+        new QuickAction { Id = "goals", Title = "View Goals", Shortcut = "G", Icon = "oi-target", Category = "Navigation" },
+        new QuickAction { Id = "review", Title = "Daily Review", Shortcut = "R", Icon = "oi-eye", Category = "Navigation" },
+
+        // Actions
+        new QuickAction { Id = "new-task", Title = "Create New Task", Shortcut = "N", Icon = "oi-plus", Category = "Actions" },
+        new QuickAction { Id = "new-project", Title = "Create New Project", Icon = "oi-folder", Category = "Actions" },
+        new QuickAction { Id = "new-goal", Title = "Create New Goal", Icon = "oi-target", Category = "Actions" },
+        new QuickAction { Id = "focus-timer", Title = "Start Focus Timer", Shortcut = "F", Icon = "oi-timer", Category = "Actions" },
+
+        // Task Actions (context-aware)
+        new QuickAction { Id = "link-to-project", Title = "Link to Project...", Icon = "oi-link-intact", Category = "Task Actions" },
+        new QuickAction { Id = "link-to-goal", Title = "Link to Goal...", Icon = "oi-target", Category = "Task Actions" },
+        new QuickAction { Id = "change-status", Title = "Change Status...", Icon = "oi-dashboard", Category = "Task Actions" },
     };
 
     public SearchService(

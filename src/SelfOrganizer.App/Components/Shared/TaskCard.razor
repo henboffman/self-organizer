@@ -10,6 +10,17 @@
     [Parameter] public bool ShowProject { get; set; } = true;
     [Parameter] public bool ShowDeactivate { get; set; } = false;
     [Parameter] public bool ShowFocus { get; set; } = true;
+    [Parameter] public bool EnableInlineEdit { get; set; } = true;
+
+    private async Task OnTitleChanged(string newTitle)
+    {
+        if (!string.IsNullOrWhiteSpace(newTitle) && Task.Title != newTitle)
+        {
+            Task.Title = newTitle;
+            Task.ModifiedAt = DateTime.UtcNow;
+            await OnEdit.InvokeAsync(Task);
+        }
+    }
 }
 
 <div class="card task-card mb-2">
@@ -21,9 +32,28 @@
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center">
                     <PriorityIndicator Priority="@Task.Priority" />
-                    <a href="/tasks/@Task.Id" class="task-title ms-2 text-decoration-none">
-                        <TaggedText Text="@Task.Title" />
-                    </a>
+                    @if (EnableInlineEdit)
+                    {
+                        <div class="task-title-wrapper ms-2">
+                            <InlineEdit TValue="string"
+                                        Value="@Task.Title"
+                                        OnSave="OnTitleChanged"
+                                        Placeholder="Task title">
+                                <DisplayTemplate>
+                                    <TaggedText Text="@Task.Title" />
+                                </DisplayTemplate>
+                            </InlineEdit>
+                            <a href="/tasks/@Task.Id" class="task-detail-link ms-1" title="View details">
+                                <span class="oi oi-external-link"></span>
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <a href="/tasks/@Task.Id" class="task-title ms-2 text-decoration-none">
+                            <TaggedText Text="@Task.Title" />
+                        </a>
+                    }
                 </div>
                 <div class="task-meta small text-muted">
                     @if (Task.EstimatedMinutes > 0)

@@ -1,6 +1,6 @@
-namespace SelfOrganizer.Core.Interfaces;
-
 using SelfOrganizer.Core.Models;
+
+namespace SelfOrganizer.Core.Interfaces;
 
 /// <summary>
 /// Service for managing contexts (where/how tasks can be done)
@@ -51,4 +51,19 @@ public interface IContextService
     /// Ensure built-in contexts exist (called on app startup)
     /// </summary>
     Task EnsureBuiltInContextsAsync();
+
+    /// <summary>
+    /// Seed contexts appropriate for the specified app mode
+    /// </summary>
+    Task SeedContextsForModeAsync(AppMode mode);
+
+    /// <summary>
+    /// Reset contexts to defaults for the specified mode (clears user-created contexts)
+    /// </summary>
+    Task ResetContextsForModeAsync(AppMode mode);
+
+    /// <summary>
+    /// Get the recommended contexts for an app mode (without actually creating them)
+    /// </summary>
+    IReadOnlyList<(string Name, string Icon, string Color)> GetContextDefinitionsForMode(AppMode mode);
 }

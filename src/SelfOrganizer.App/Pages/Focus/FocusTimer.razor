@@ -9,40 +9,139 @@
 @inject IDataChangeNotificationService DataChangeNotification
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject SelfOrganizer.Core.Interfaces.IRepository<FocusSessionLog> FocusSessionRepository
 @implements IDisposable
 
 <div class="focus-container">
     @if (_state.TaskTitle == null)
     {
-        <div class="text-center py-5">
-            <h2 class="mb-4">
+        <div class="text-center py-4">
+            <h2 class="mb-2">
                 <span class="oi oi-clock me-2"></span>Focus Timer
             </h2>
             <p class="text-muted mb-4">Select a task to focus on, or start a free focus session.</p>
 
-            @if (_availableTasks.Any())
-            {
-                <div class="mb-4">
-                    <h5 class="mb-3">Pick a task:</h5>
-                    <div class="list-group" style="max-width: 500px; margin: 0 auto;">
-                        @foreach (var task in _availableTasks.Take(5))
+            @* Task Search/Selection *@
+            <div class="task-selection-panel mb-4">
+                @* Search input *@
+                <div class="search-box mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0">
+                            <span class="oi oi-magnifying-glass text-muted"></span>
+                        </span>
+                        <input type="text"
+                               class="form-control border-start-0"
+                               placeholder="Search tasks or create new..."
+                               @bind="_searchQuery"
+                               @bind:event="oninput"
+                               @onkeydown="HandleSearchKeydown" />
+                        @if (!string.IsNullOrEmpty(_searchQuery))
                         {
-                            <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                                    @onclick="() => SelectTask(task)">
-                                <span>@task.Title</span>
-                                @if (task.EstimatedMinutes > 0)
-                                {
-                                    <span class="badge bg-secondary">@task.EstimatedMinutes min</span>
-                                }
+                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+                                <span class="oi oi-x"></span>
                             </button>
                         }
                     </div>
                 </div>
-            }
 
-            <button class="btn btn-lg btn-outline-primary" @onclick="StartFreeSession">
-                <span class="oi oi-media-play me-2"></span>Start Free Focus Session
-            </button>
+                @* Quick create option *@
+                @if (!string.IsNullOrWhiteSpace(_searchQuery) && !_filteredTasks.Any(t => t.Title.Equals(_searchQuery, StringComparison.OrdinalIgnoreCase)))
+                {
+                    <button class="btn btn-outline-success w-100 mb-3 text-start" @onclick="CreateAndSelectTask">
+                        <span class="oi oi-plus me-2"></span>
+                        Create task: "<strong>@_searchQuery</strong>"
+                    </button>
+                }
+
+                @* Filter tabs *@
+                <div class="btn-group w-100 mb-3" role="group">
+                    <button class="btn btn-sm @(_taskFilter == "suggested" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => SetTaskFilter("suggested")'>
+                        <span class="oi oi-star me-1"></span>Suggested
+                    </button>
+                    <button class="btn btn-sm @(_taskFilter == "all" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => SetTaskFilter("all")'>
+                        <span class="oi oi-list me-1"></span>All Tasks
+                    </button>
+                    <button class="btn btn-sm @(_taskFilter == "scheduled" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() => SetTaskFilter("scheduled")'>
+                        <span class="oi oi-calendar me-1"></span>Today
+                    </button>
+                </div>
+
+                @* Task list *@
+                <div class="task-list">
+                    @if (_filteredTasks.Any())
+                    {
+                        <div class="list-group">
+                            @foreach (var task in _filteredTasks.Take(_showAllTasks ? 50 : 8))
+                            {
+                                <button class="list-group-item list-group-item-action @(_selectedPreviewTask?.Id == task.Id ? "active" : "")"
+                                        @onclick="() => SelectTask(task)">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="task-info">
+                                            <div class="task-title">
+                                                <PriorityIndicator Priority="@task.Priority" />
+                                                <span class="ms-2">@task.Title</span>
+                                            </div>
+                                            @if (task.ProjectId.HasValue || task.Contexts.Any())
+                                            {
+                                                <div class="task-meta small text-muted mt-1">
+                                                    @foreach (var ctx in task.Contexts.Take(2))
+                                                    {
+                                                        <span class="badge bg-secondary bg-opacity-25 text-secondary me-1">@ctx</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="task-badges">
+                                            @if (task.EstimatedMinutes > 0)
+                                            {
+                                                <span class="badge bg-primary bg-opacity-10 text-primary">@task.EstimatedMinutes min</span>
+                                            }
+                                            @if (task.EnergyLevel.HasValue)
+                                            {
+                                                <span class="badge bg-warning bg-opacity-10 text-warning ms-1" title="Energy level">
+                                                    @(new string('⚡', task.EnergyLevel.Value > 3 ? 3 : task.EnergyLevel.Value))
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                </button>
+                            }
+                        </div>
+
+                        @if (_filteredTasks.Count > 8 && !_showAllTasks)
+                        {
+                            <button class="btn btn-link btn-sm w-100 mt-2" @onclick="() => _showAllTasks = true">
+                                Show @(_filteredTasks.Count - 8) more tasks...
+                            </button>
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_searchQuery))
+                    {
+                        <div class="text-muted text-center py-3">
+                            <span class="oi oi-magnifying-glass me-1"></span>
+                            No tasks match your search
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted text-center py-3">
+                            <span class="oi oi-inbox me-1"></span>
+                            No tasks available
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* Free focus button *@
+            <div class="mt-4 pt-3 border-top">
+                <p class="text-muted small mb-2">Or work without a specific task:</p>
+                <button class="btn btn-outline-primary" @onclick="StartFreeSession">
+                    <span class="oi oi-media-play me-2"></span>Start Free Focus Session
+                </button>
+            </div>
         </div>
     }
     else
@@ -113,6 +212,34 @@
                 </button>
             </div>
 
+            @* Session Intention *@
+            @if (!_state.IsRunning && !_state.IsBreak)
+            {
+                <div class="intention-section mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent">
+                            <span class="oi oi-target text-primary"></span>
+                        </span>
+                        <input type="text"
+                               class="form-control"
+                               placeholder="What's your intention for this session? (optional)"
+                               @bind="_sessionIntention" />
+                    </div>
+                    <div class="form-text text-center mt-1">
+                        Setting an intention helps maintain focus
+                    </div>
+                </div>
+            }
+
+            @* Show current intention while running *@
+            @if (_state.IsRunning && !string.IsNullOrWhiteSpace(_sessionIntention))
+            {
+                <div class="current-intention mb-3">
+                    <small class="text-muted">Intention:</small>
+                    <div class="intention-text">"@_sessionIntention"</div>
+                </div>
+            }
+
             @* Session Settings *@
             <div class="mb-4">
                 <div class="btn-group" role="group">
@@ -156,67 +283,92 @@
 
 <CelebrationEffect @ref="_celebrationEffect" />
 
-<style>
-    .focus-container {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 2rem 1rem;
-    }
+@* Session Reflection Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="Session Complete!" IsVisible="@_showReflectionModal" OnClose="CloseReflection">
+    <ChildContent>
+        <div class="text-center mb-4">
+            <div class="session-complete-icon">
+                <span class="oi oi-check"></span>
+            </div>
+            <h5 class="mt-3">Great work on your focus session!</h5>
+            <p class="text-muted">Take a moment to reflect before your break.</p>
+        </div>
 
-    .timer-display {
-        margin-bottom: 2rem;
-    }
+        @if (!string.IsNullOrWhiteSpace(_sessionIntention))
+        {
+            <div class="intention-review mb-4">
+                <label class="form-label text-muted">Your intention was:</label>
+                <div class="intention-quote">"@_sessionIntention"</div>
+            </div>
+        }
 
-    .timer-digits {
-        font-size: 4rem;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
-        line-height: 1;
-        color: var(--text-primary);
-    }
+        <div class="mb-4">
+            <label class="form-label">How focused were you?</label>
+            <div class="focus-rating d-flex justify-content-center gap-2">
+                @for (int i = 1; i <= 5; i++)
+                {
+                    var rating = i;
+                    <button class="btn btn-lg @(_focusRating == rating ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => _focusRating = rating">
+                        @rating
+                    </button>
+                }
+            </div>
+            <div class="d-flex justify-content-between small text-muted mt-1 px-2">
+                <span>Distracted</span>
+                <span>Deeply Focused</span>
+            </div>
+        </div>
 
-    .timer-label {
-        font-size: 1rem;
-        margin-top: 0.5rem;
-    }
+        <div class="mb-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="_wasDistracted" id="wasDistracted" />
+                <label class="form-check-label" for="wasDistracted">
+                    I was interrupted or distracted during this session
+                </label>
+            </div>
+        </div>
 
-    .progress-container {
-        display: flex;
-        justify-content: center;
-    }
-
-    .progress-ring {
-        width: 180px;
-        height: 180px;
-        transform: rotate(-90deg);
-    }
-
-    .progress-ring-bg {
-        fill: none;
-        stroke: var(--border-default, #e5e7eb);
-        stroke-width: 8;
-    }
-
-    .progress-ring-fill {
-        fill: none;
-        stroke: var(--color-primary, #6366f1);
-        stroke-width: 8;
-        stroke-linecap: round;
-        transition: stroke-dashoffset 0.5s ease;
-    }
-
-    .progress-ring-fill.break {
-        stroke: var(--color-success, #22c55e);
-    }
-</style>
+        <div class="mb-3">
+            <label class="form-label">Quick notes (optional)</label>
+            <textarea class="form-control"
+                      rows="2"
+                      placeholder="What went well? What could be better?"
+                      @bind="_reflectionNotes"></textarea>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="SkipReflection">Skip</button>
+        <button class="btn btn-primary" @onclick="SaveReflection">
+            <span class="oi oi-check me-1"></span>Save & Start Break
+        </button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
 
 @code {
     [Parameter] public Guid? TaskId { get; set; }
 
     private FocusTimerStateData _state = new();
-    private List<TodoTask> _availableTasks = new();
+    private List<TodoTask> _allTasks = new();
+    private List<TodoTask> _nextActionTasks = new();
+    private List<TodoTask> _scheduledTasks = new();
+    private List<TodoTask> _filteredTasks = new();
     private CelebrationEffect? _celebrationEffect;
     private bool _enableCelebrations = true;
+
+    private string _searchQuery = string.Empty;
+    private string _taskFilter = "suggested";
+    private bool _showAllTasks = false;
+    private TodoTask? _selectedPreviewTask;
+
+    // Session intention/reflection
+    private string _sessionIntention = string.Empty;
+    private bool _showReflectionModal = false;
+    private int _focusRating = 3;
+    private string _reflectionNotes = string.Empty;
+    private bool _wasDistracted = false;
+    private int _lastSessionsCompleted = 0;
+    private DateTime _sessionStartTime = DateTime.UtcNow;
 
     protected override async Task OnInitializedAsync()
     {
@@ -224,7 +376,7 @@
         _state = FocusTimerService.State;
         FocusTimerService.OnStateChanged += OnTimerStateChanged;
 
-        _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
+        await LoadTasks();
 
         var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
         if (prefs != null)
@@ -235,22 +387,142 @@
         // If a task ID was passed via route parameter, start focus on that task
         if (TaskId.HasValue)
         {
-            var task = _availableTasks.FirstOrDefault(t => t.Id == TaskId.Value);
+            var task = _allTasks.FirstOrDefault(t => t.Id == TaskId.Value);
             if (task != null)
             {
                 await FocusTimerService.StartFocusAsync(task);
             }
         }
+
+        ApplyFilter();
+    }
+
+    private async Task LoadTasks()
+    {
+        _allTasks = (await TaskService.GetAllAsync())
+            .Where(t => t.Status != TodoTaskStatus.Completed &&
+                       t.Status != TodoTaskStatus.Deleted &&
+                       t.Status != TodoTaskStatus.SomedayMaybe)
+            .OrderByDescending(t => t.Priority == 1)
+            .ThenByDescending(t => t.Priority == 2)
+            .ThenBy(t => t.DueDate)
+            .ToList();
+
+        _nextActionTasks = (await TaskService.GetNextActionsAsync()).ToList();
+
+        var today = DateTime.Today;
+        _scheduledTasks = _allTasks
+            .Where(t => t.ScheduledDate?.Date == today || t.DueDate?.Date == today)
+            .ToList();
+    }
+
+    private void ApplyFilter()
+    {
+        var tasks = _taskFilter switch
+        {
+            "all" => _allTasks,
+            "scheduled" => _scheduledTasks,
+            _ => _nextActionTasks
+        };
+
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            var query = _searchQuery.ToLowerInvariant();
+            tasks = tasks.Where(t =>
+                t.Title.ToLowerInvariant().Contains(query) ||
+                (t.Description?.ToLowerInvariant().Contains(query) ?? false) ||
+                t.Contexts.Any(c => c.ToLowerInvariant().Contains(query)) ||
+                (t.Category?.ToLowerInvariant().Contains(query) ?? false)
+            ).ToList();
+        }
+
+        _filteredTasks = tasks;
+        _showAllTasks = false;
+    }
+
+    private void SetTaskFilter(string filter)
+    {
+        _taskFilter = filter;
+        ApplyFilter();
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = string.Empty;
+        ApplyFilter();
+    }
+
+    private void HandleSearchKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            if (_filteredTasks.Any())
+            {
+                _ = SelectTask(_filteredTasks.First());
+            }
+            else if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                _ = CreateAndSelectTask();
+            }
+        }
+        else
+        {
+            // Debounce search
+            ApplyFilter();
+        }
+    }
+
+    private async Task CreateAndSelectTask()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery)) return;
+
+        var newTask = new TodoTask
+        {
+            Title = _searchQuery.Trim(),
+            Status = TodoTaskStatus.NextAction,
+            Priority = 2,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        var created = await TaskService.CreateAsync(newTask);
+        await LoadTasks();
+        ApplyFilter();
+        DataChangeNotification.NotifyDataChanged();
+
+        await FocusTimerService.StartFocusAsync(created);
+        _searchQuery = string.Empty;
     }
 
     private void OnTimerStateChanged()
     {
+        var previousState = _state;
         _state = FocusTimerService.State;
+
+        // Detect session completion (transition to break)
+        if (_state.SessionsCompleted > _lastSessionsCompleted && _state.IsBreak)
+        {
+            _lastSessionsCompleted = _state.SessionsCompleted;
+            // Show reflection modal after a brief delay
+            _ = ShowReflectionWithDelay();
+        }
+
         InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ShowReflectionWithDelay()
+    {
+        await Task.Delay(500); // Brief delay for notification
+        _showReflectionModal = true;
+        _focusRating = 3;
+        _reflectionNotes = string.Empty;
+        _wasDistracted = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SelectTask(TodoTask task)
     {
+        _selectedPreviewTask = task;
         await FocusTimerService.StartFocusAsync(task);
     }
 
@@ -266,6 +538,7 @@
 
     private async Task StartTimer()
     {
+        _sessionStartTime = DateTime.UtcNow;
         await FocusTimerService.PlayAsync();
     }
 
@@ -288,7 +561,7 @@
     {
         if (_state.TaskId.HasValue)
         {
-            var task = _availableTasks.FirstOrDefault(t => t.Id == _state.TaskId);
+            var task = _allTasks.FirstOrDefault(t => t.Id == _state.TaskId);
             if (task != null)
             {
                 if (task.IsRecurring)
@@ -306,7 +579,8 @@
                 }
 
                 DataChangeNotification.NotifyDataChanged();
-                _availableTasks = (await TaskService.GetNextActionsAsync()).ToList();
+                await LoadTasks();
+                ApplyFilter();
             }
             await FocusTimerService.ClearFocusAsync();
         }
@@ -331,6 +605,59 @@
             ? (double)_state.RemainingSeconds / _state.TotalSeconds
             : 1;
         return circumference * (1 - progress);
+    }
+
+    private void CloseReflection()
+    {
+        _showReflectionModal = false;
+        _sessionIntention = string.Empty;
+    }
+
+    private void SkipReflection()
+    {
+        _showReflectionModal = false;
+        _sessionIntention = string.Empty;
+    }
+
+    private async Task SaveReflection()
+    {
+        // Save focus session log
+        var sessionLog = new FocusSessionLog
+        {
+            TaskId = _state.TaskId,
+            TaskTitle = _state.TaskTitle ?? "Free Focus",
+            DurationMinutes = _state.FocusMinutes,
+            StartedAt = _sessionStartTime,
+            EndedAt = DateTime.UtcNow,
+            Intention = string.IsNullOrWhiteSpace(_sessionIntention) ? null : _sessionIntention,
+            FocusRating = _focusRating,
+            WasDistracted = _wasDistracted,
+            Notes = string.IsNullOrWhiteSpace(_reflectionNotes) ? null : _reflectionNotes,
+            TaskCompleted = false // Will be set to true if task was completed during session
+        };
+
+        // Try to get the task's project if linked
+        if (_state.TaskId.HasValue)
+        {
+            var task = _allTasks.FirstOrDefault(t => t.Id == _state.TaskId);
+            if (task != null)
+            {
+                sessionLog.ProjectId = task.ProjectId;
+                sessionLog.Context = task.Category;
+                sessionLog.EnergyLevel = task.EnergyLevel;
+            }
+        }
+
+        await FocusSessionRepository.AddAsync(sessionLog);
+
+        _showReflectionModal = false;
+        _sessionIntention = string.Empty;
+
+        // Show celebration for completing reflection
+        if (_enableCelebrations && _celebrationEffect != null)
+        {
+            _ = _celebrationEffect.ShowAsync("Session complete! Time for a break.");
+        }
     }
 
     public void Dispose()

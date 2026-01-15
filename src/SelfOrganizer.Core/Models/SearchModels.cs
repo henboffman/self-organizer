@@ -30,4 +30,8 @@ public class QuickAction
     public string Title { get; set; } = string.Empty;
     public string? Shortcut { get; set; }
     public string Icon { get; set; } = string.Empty;
+    /// <summary>
+    /// Category for grouping actions in command palette (e.g., "Navigation", "Actions", "Task Actions")
+    /// </summary>
+    public string? Category { get; set; }
 }

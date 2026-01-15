@@ -2,16 +2,21 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
+using SelfOrganizer.App.Services.Intelligence;
 
 namespace SelfOrganizer.App.Services.Domain;
 
 public class ExternalCalendarService : IExternalCalendarService
 {
     private readonly IRepository<CalendarEvent> _calendarRepository;
+    private readonly IEntityLinkingService _entityLinkingService;
 
-    public ExternalCalendarService(IRepository<CalendarEvent> calendarRepository)
+    public ExternalCalendarService(
+        IRepository<CalendarEvent> calendarRepository,
+        IEntityLinkingService entityLinkingService)
     {
         _calendarRepository = calendarRepository;
+        _entityLinkingService = entityLinkingService;
     }
 
     public async Task<IEnumerable<ExternalCalendarEvent>> ImportFromFileAsync(string content, CalendarProvider provider)
@@ -169,6 +174,20 @@ public class ExternalCalendarService : IExternalCalendarService
             {
                 result.ErrorCount++;
                 result.Errors.Add($"Failed to import '{extEvent.Title}': {ex.Message}");
+            }
+        }
+
+        // Auto-link imported events to entities based on patterns
+        if (result.ImportedEvents.Any())
+        {
+            try
+            {
+                var linkResults = await _entityLinkingService.AnalyzeAndLinkEventsAsync(result.ImportedEvents);
+                result.LinkedEventsCount = linkResults.Count(r => r.WasModified);
+            }
+            catch
+            {
+                // Don't fail import if linking fails
             }
         }
 

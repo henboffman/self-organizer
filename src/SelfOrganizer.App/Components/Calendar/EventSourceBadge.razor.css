@@ -1,0 +1,69 @@
+/* Event Source Badge Styles */
+.event-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.event-source-badge:hover {
+    opacity: 1;
+}
+
+/* Size Variants */
+.source-sm {
+    font-size: 0.65rem;
+}
+
+.source-sm .oi {
+    font-size: 0.6rem;
+}
+
+.source-md {
+    font-size: 0.75rem;
+}
+
+.source-md .oi {
+    font-size: 0.7rem;
+}
+
+.source-lg {
+    font-size: 0.85rem;
+}
+
+.source-lg .oi {
+    font-size: 0.8rem;
+}
+
+/* Provider Colors */
+.source-google {
+    color: #4285f4;
+}
+
+.source-outlook {
+    color: #0078d4;
+}
+
+.source-ics {
+    color: var(--text-muted);
+}
+
+.source-other {
+    color: var(--text-secondary);
+}
+
+/* Label */
+.source-label {
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* Hover glow effect for provider badges */
+.source-google:hover {
+    text-shadow: 0 0 8px rgba(66, 133, 244, 0.4);
+}
+
+.source-outlook:hover {
+    text-shadow: 0 0 8px rgba(0, 120, 212, 0.4);
+}

@@ -1,0 +1,420 @@
+@page "/habits"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.IRepository<Habit> HabitRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<HabitLog> HabitLogRepository
+@inject IDataChangeNotificationService DataChangeNotification
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3>
+            <span class="oi oi-pulse me-2"></span>Habit Tracker
+        </h3>
+        <p class="text-muted mb-0">Build positive habits with daily tracking</p>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowAddModal">
+        <span class="oi oi-plus me-1"></span> New Habit
+    </button>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    @* Date selector *@
+    <div class="d-flex gap-2 align-items-center mb-4">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeDate(-7)">
+            <span class="oi oi-chevron-left"></span><span class="oi oi-chevron-left"></span>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeDate(-1)">
+            <span class="oi oi-chevron-left"></span>
+        </button>
+        <span class="px-3 fw-bold">@_currentDate.ToString("dddd, MMMM d")</span>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeDate(1)" disabled="@(_currentDate >= DateOnly.FromDateTime(DateTime.Today))">
+            <span class="oi oi-chevron-right"></span>
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="() => ChangeDate(7)" disabled="@(_currentDate >= DateOnly.FromDateTime(DateTime.Today))">
+            <span class="oi oi-chevron-right"></span><span class="oi oi-chevron-right"></span>
+        </button>
+        @if (_currentDate != DateOnly.FromDateTime(DateTime.Today))
+        {
+            <button class="btn btn-link btn-sm" @onclick="GoToToday">Today</button>
+        }
+    </div>
+
+    @* Stats *@
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">@_completedToday / @_habits.Count(h => h.IsActive)</div>
+                <div class="stat-label">Today's Progress</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">@_currentStreak</div>
+                <div class="stat-label">Day Streak</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">@_weeklyCompletionRate%</div>
+                <div class="stat-label">This Week</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">@_totalCompletions</div>
+                <div class="stat-label">Total Completions</div>
+            </div>
+        </div>
+    </div>
+
+    @if (!_habits.Any())
+    {
+        <div class="empty-state text-center py-5">
+            <div class="empty-icon mb-3">
+                <span class="oi oi-pulse"></span>
+            </div>
+            <h5>No habits yet</h5>
+            <p class="text-muted">Start building positive habits by creating your first one.</p>
+            <button class="btn btn-primary" @onclick="ShowAddModal">
+                <span class="oi oi-plus me-1"></span> Create First Habit
+            </button>
+        </div>
+    }
+    else
+    {
+        @* Habit list *@
+        <div class="habit-list">
+            @foreach (var habit in _habits.Where(h => h.IsActive).OrderBy(h => h.SortOrder))
+            {
+                var isCompleted = IsHabitCompletedForDate(habit.Id, _currentDate);
+                <div class="habit-item @(isCompleted ? "completed" : "")">
+                    <button class="habit-check" @onclick="() => ToggleHabit(habit)">
+                        @if (isCompleted)
+                        {
+                            <span class="oi oi-check"></span>
+                        }
+                    </button>
+                    <div class="habit-info">
+                        <div class="habit-name">@habit.Name</div>
+                        @if (!string.IsNullOrEmpty(habit.Description))
+                        {
+                            <div class="habit-description">@habit.Description</div>
+                        }
+                        <div class="habit-meta">
+                            <span class="badge bg-secondary">@habit.Frequency</span>
+                            @if (!string.IsNullOrEmpty(habit.Category))
+                            {
+                                <span class="badge bg-info">@habit.Category</span>
+                            }
+                            <span class="text-muted small ms-2">@GetStreakForHabit(habit.Id) day streak</span>
+                        </div>
+                    </div>
+                    <div class="habit-actions">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditHabit(habit)">
+                            <span class="oi oi-pencil"></span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteHabit(habit)">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* Weekly view *@
+        <div class="weekly-view mt-5">
+            <h5>This Week</h5>
+            <div class="week-grid">
+                <div class="week-header">
+                    <div class="habit-name-col"></div>
+                    @for (int i = 6; i >= 0; i--)
+                    {
+                        var date = DateOnly.FromDateTime(DateTime.Today.AddDays(-i));
+                        <div class="day-col @(date == _currentDate ? "current" : "")">
+                            <div class="day-name">@date.ToString("ddd")</div>
+                            <div class="day-num">@date.Day</div>
+                        </div>
+                    }
+                </div>
+                @foreach (var habit in _habits.Where(h => h.IsActive).OrderBy(h => h.SortOrder))
+                {
+                    <div class="week-row">
+                        <div class="habit-name-col">@habit.Name</div>
+                        @for (int i = 6; i >= 0; i--)
+                        {
+                            var date = DateOnly.FromDateTime(DateTime.Today.AddDays(-i));
+                            var isCompleted = IsHabitCompletedForDate(habit.Id, date);
+                            <div class="day-col @(date == _currentDate ? "current" : "")">
+                                @if (isCompleted)
+                                {
+                                    <span class="completion-dot completed"></span>
+                                }
+                                else if (date <= DateOnly.FromDateTime(DateTime.Today))
+                                {
+                                    <span class="completion-dot missed"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@* Add/Edit Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingHabit == null ? "New Habit" : "Edit Habit")" IsVisible="@_showModal" OnClose="CloseModal">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" class="form-control" @bind="_habitForm.Name" placeholder="e.g., Morning Exercise" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Description (optional)</label>
+            <textarea class="form-control" rows="2" @bind="_habitForm.Description" placeholder="What does this habit involve?"></textarea>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Frequency</label>
+                <select class="form-select" @bind="_habitForm.Frequency">
+                    <option value="@HabitFrequency.Daily">Daily</option>
+                    <option value="@HabitFrequency.Weekdays">Weekdays</option>
+                    <option value="@HabitFrequency.Weekends">Weekends</option>
+                    <option value="@HabitFrequency.Weekly">Weekly</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Category</label>
+                <input type="text" class="form-control" @bind="_habitForm.Category" placeholder="e.g., Health, Productivity" />
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveHabit" disabled="@string.IsNullOrWhiteSpace(_habitForm.Name)">
+            @if (_editingHabit == null)
+            {
+                <span class="oi oi-plus me-1"></span>@:Add Habit
+            }
+            else
+            {
+                <span class="oi oi-check me-1"></span>@:Save Changes
+            }
+        </button>
+    </Footer>
+</SelfOrganizer.App.Components.Shared.Modal>
+
+@code {
+    private bool _isLoading = true;
+    private List<Habit> _habits = new();
+    private List<HabitLog> _habitLogs = new();
+    private DateOnly _currentDate = DateOnly.FromDateTime(DateTime.Today);
+
+    private bool _showModal = false;
+    private Habit? _editingHabit;
+    private Habit _habitForm = new();
+
+    // Stats
+    private int _completedToday;
+    private int _currentStreak;
+    private int _weeklyCompletionRate;
+    private int _totalCompletions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            _habits = (await HabitRepository.GetAllAsync()).ToList();
+            _habitLogs = (await HabitLogRepository.GetAllAsync()).ToList();
+            CalculateStats();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void CalculateStats()
+    {
+        var activeHabits = _habits.Where(h => h.IsActive).ToList();
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        // Today's completions
+        _completedToday = _habitLogs.Count(l => l.Date == today && l.Completed);
+
+        // Total completions
+        _totalCompletions = _habitLogs.Count(l => l.Completed);
+
+        // Calculate current streak (consecutive days with all habits completed)
+        _currentStreak = 0;
+        if (activeHabits.Any())
+        {
+            for (int i = 0; i < 365; i++)
+            {
+                var date = today.AddDays(-i);
+                var allCompleted = activeHabits.All(h => IsHabitCompletedForDate(h.Id, date));
+                if (allCompleted)
+                {
+                    _currentStreak++;
+                }
+                else if (i > 0) // Don't break on today if not all completed yet
+                {
+                    break;
+                }
+            }
+        }
+
+        // Weekly completion rate
+        var weekStart = today.AddDays(-6);
+        var weekLogs = _habitLogs.Where(l => l.Date >= weekStart && l.Date <= today && l.Completed).ToList();
+        var expectedCompletions = activeHabits.Count * 7;
+        _weeklyCompletionRate = expectedCompletions > 0 ? (int)Math.Round(weekLogs.Count * 100.0 / expectedCompletions) : 0;
+    }
+
+    private bool IsHabitCompletedForDate(Guid habitId, DateOnly date)
+    {
+        return _habitLogs.Any(l => l.HabitId == habitId && l.Date == date && l.Completed);
+    }
+
+    private int GetStreakForHabit(Guid habitId)
+    {
+        var streak = 0;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        for (int i = 0; i < 365; i++)
+        {
+            var date = today.AddDays(-i);
+            if (IsHabitCompletedForDate(habitId, date))
+            {
+                streak++;
+            }
+            else if (i > 0)
+            {
+                break;
+            }
+        }
+
+        return streak;
+    }
+
+    private async Task ToggleHabit(Habit habit)
+    {
+        var existingLog = _habitLogs.FirstOrDefault(l => l.HabitId == habit.Id && l.Date == _currentDate);
+
+        if (existingLog != null)
+        {
+            existingLog.Completed = !existingLog.Completed;
+            existingLog.CompletedAt = existingLog.Completed ? DateTime.UtcNow : null;
+            await HabitLogRepository.UpdateAsync(existingLog);
+        }
+        else
+        {
+            var newLog = new HabitLog
+            {
+                HabitId = habit.Id,
+                Date = _currentDate,
+                Completed = true,
+                CompletedAt = DateTime.UtcNow
+            };
+            await HabitLogRepository.AddAsync(newLog);
+            _habitLogs.Add(newLog);
+        }
+
+        CalculateStats();
+        DataChangeNotification.NotifyDataChanged();
+    }
+
+    private void ChangeDate(int days)
+    {
+        var newDate = _currentDate.AddDays(days);
+        if (newDate <= DateOnly.FromDateTime(DateTime.Today))
+        {
+            _currentDate = newDate;
+        }
+    }
+
+    private void GoToToday()
+    {
+        _currentDate = DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private void ShowAddModal()
+    {
+        _editingHabit = null;
+        _habitForm = new Habit();
+        _showModal = true;
+    }
+
+    private void EditHabit(Habit habit)
+    {
+        _editingHabit = habit;
+        _habitForm = new Habit
+        {
+            Id = habit.Id,
+            Name = habit.Name,
+            Description = habit.Description,
+            Frequency = habit.Frequency,
+            Category = habit.Category,
+            IsActive = habit.IsActive,
+            SortOrder = habit.SortOrder
+        };
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _editingHabit = null;
+        _habitForm = new();
+    }
+
+    private async Task SaveHabit()
+    {
+        if (string.IsNullOrWhiteSpace(_habitForm.Name)) return;
+
+        if (_editingHabit != null)
+        {
+            // Update existing
+            _editingHabit.Name = _habitForm.Name;
+            _editingHabit.Description = _habitForm.Description;
+            _editingHabit.Frequency = _habitForm.Frequency;
+            _editingHabit.Category = _habitForm.Category;
+            await HabitRepository.UpdateAsync(_editingHabit);
+        }
+        else
+        {
+            // Create new
+            _habitForm.SortOrder = _habits.Count;
+            _habitForm.StartDate = DateTime.UtcNow;
+            await HabitRepository.AddAsync(_habitForm);
+            _habits.Add(_habitForm);
+        }
+
+        CloseModal();
+        await LoadData();
+        DataChangeNotification.NotifyDataChanged();
+    }
+
+    private async Task DeleteHabit(Habit habit)
+    {
+        habit.IsActive = false;
+        await HabitRepository.UpdateAsync(habit);
+        await LoadData();
+        DataChangeNotification.NotifyDataChanged();
+    }
+}

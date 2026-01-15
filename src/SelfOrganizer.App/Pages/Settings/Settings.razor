@@ -10,6 +10,7 @@
 @inject IImportService ImportService
 @inject IContextService ContextService
 @inject ILlmService LlmService
+@inject IBalanceDimensionService BalanceDimensionService
 
 <h3 class="mb-4">
     <span class="oi oi-cog me-2"></span>Settings
@@ -17,6 +18,70 @@
 
 <div class="row">
     <div class="col-lg-8">
+        @* App Mode *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-dial me-2"></span>App Mode
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Choose your focus mode. This affects which contexts and balance dimensions are available.
+                </p>
+
+                <div class="mode-selection mb-3">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="appMode" id="modeWork"
+                               checked="@(_appMode == AppMode.Work)"
+                               @onchange="() => SelectMode(AppMode.Work)" />
+                        <label class="form-check-label" for="modeWork">
+                            <strong><span class="oi oi-briefcase me-1"></span>Work Mode</strong>
+                            <br /><small class="text-muted">Professional focus - career-oriented contexts and dimensions</small>
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="appMode" id="modeLife"
+                               checked="@(_appMode == AppMode.Life)"
+                               @onchange="() => SelectMode(AppMode.Life)" />
+                        <label class="form-check-label" for="modeLife">
+                            <strong><span class="oi oi-heart me-1"></span>Life Mode</strong>
+                            <br /><small class="text-muted">Personal focus - home and life contexts and dimensions</small>
+                        </label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="appMode" id="modeBalanced"
+                               checked="@(_appMode == AppMode.Balanced)"
+                               @onchange="() => SelectMode(AppMode.Balanced)" />
+                        <label class="form-check-label" for="modeBalanced">
+                            <strong><span class="oi oi-dial me-1"></span>Balanced Mode</strong>
+                            <br /><small class="text-muted">Hybrid approach - curated mix of work and life dimensions</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (_pendingModeChange.HasValue && _pendingModeChange != _appMode)
+                {
+                    <div class="alert alert-warning py-2 mb-0">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span>
+                                <span class="oi oi-warning me-1"></span>
+                                Switching modes will update your available contexts.
+                            </span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-2" @onclick="CancelModeChange">Cancel</button>
+                                <button class="btn btn-sm btn-warning" @onclick="ConfirmModeChange" disabled="@_isSwitchingMode">
+                                    @if (_isSwitchingMode)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
         @* Work Schedule *@
         <div class="card mb-4">
             <div class="card-header">Work Schedule</div>
@@ -530,6 +595,30 @@
             </div>
         </div>
 
+        @* Advanced Settings Links *@
+        <div class="card mb-4">
+            <div class="card-header">Advanced Settings</div>
+            <div class="card-body">
+                <a href="/settings/linking-rules" class="d-flex align-items-center text-decoration-none text-reset p-2 rounded hover-bg-light">
+                    <span class="oi oi-link-intact me-3 text-primary" style="font-size: 1.2rem;"></span>
+                    <div>
+                        <div class="fw-bold">Entity Linking Rules</div>
+                        <small class="text-muted">Auto-link calendar events to projects & goals</small>
+                    </div>
+                    <span class="oi oi-chevron-right ms-auto text-muted"></span>
+                </a>
+                <hr class="my-2" />
+                <a href="/settings/calendar-providers" class="d-flex align-items-center text-decoration-none text-reset p-2 rounded hover-bg-light">
+                    <span class="oi oi-calendar me-3 text-primary" style="font-size: 1.2rem;"></span>
+                    <div>
+                        <div class="fw-bold">Calendar Providers</div>
+                        <small class="text-muted">Connect Google Calendar & other sources</small>
+                    </div>
+                    <span class="oi oi-chevron-right ms-auto text-muted"></span>
+                </a>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header">About</div>
             <div class="card-body">
@@ -583,6 +672,11 @@
         public string Message { get; set; } = "";
     }
 
+    // App Mode
+    private AppMode _appMode = AppMode.Balanced;
+    private AppMode? _pendingModeChange;
+    private bool _isSwitchingMode;
+
     // ADHD Accommodation settings
     private bool _enableCelebrationEffects = true;
     private bool _enablePickForMe = true;
@@ -600,6 +694,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Load App Mode
+        _appMode = await BalanceDimensionService.GetCurrentModeAsync();
+
         var prefs = await PreferencesRepository.GetAllAsync();
         _preferences = prefs.FirstOrDefault();
 
@@ -627,6 +724,41 @@
 
         // Load LLM settings
         await LoadLlmSettings();
+    }
+
+    private void SelectMode(AppMode mode)
+    {
+        if (mode != _appMode)
+        {
+            _pendingModeChange = mode;
+        }
+    }
+
+    private void CancelModeChange()
+    {
+        _pendingModeChange = null;
+    }
+
+    private async Task ConfirmModeChange()
+    {
+        if (!_pendingModeChange.HasValue) return;
+
+        _isSwitchingMode = true;
+        StateHasChanged();
+
+        try
+        {
+            await BalanceDimensionService.SetModeAsync(_pendingModeChange.Value, seedContexts: true);
+            _appMode = _pendingModeChange.Value;
+            _pendingModeChange = null;
+
+            // Reload contexts to show updated list
+            await LoadContexts();
+        }
+        finally
+        {
+            _isSwitchingMode = false;
+        }
     }
 
     private async Task LoadLlmSettings()

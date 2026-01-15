@@ -22,6 +22,32 @@ public class CalendarEvent : BaseEntity
     public bool RequiresPrep { get; set; }
     public bool RequiresFollowUp { get; set; }
 
+    // Entity linking fields
+    /// <summary>
+    /// Project linked to this calendar event (for project-focused time tracking)
+    /// </summary>
+    public Guid? LinkedProjectId { get; set; }
+
+    /// <summary>
+    /// Goals linked to this calendar event
+    /// </summary>
+    public List<Guid> LinkedGoalIds { get; set; } = new();
+
+    /// <summary>
+    /// Ideas linked to this calendar event
+    /// </summary>
+    public List<Guid> LinkedIdeaIds { get; set; } = new();
+
+    /// <summary>
+    /// Whether the entity links were automatically determined by pattern matching
+    /// </summary>
+    public bool IsAutoLinked { get; set; }
+
+    /// <summary>
+    /// When the event was last analyzed for entity linking
+    /// </summary>
+    public DateTime? LastLinkAnalysisAt { get; set; }
+
     /// <summary>
     /// Tags extracted from description or manually added.
     /// Used for grouping, filtering, and smart scheduling.

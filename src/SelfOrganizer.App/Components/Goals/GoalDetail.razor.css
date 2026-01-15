@@ -180,6 +180,34 @@
     font-size: 0.85rem;
 }
 
+/* Task promotion indicator */
+.promotion-indicator {
+    animation: pulse-warning 2s ease-in-out infinite;
+    display: inline-flex;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.linked-item .dropdown-menu {
+    min-width: 150px;
+    font-size: 0.85rem;
+}
+
+.linked-item .dropdown-item {
+    padding: var(--space-xs) var(--space-sm);
+}
+
+.linked-item .dropdown-item:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.min-width-0 {
+    min-width: 0;
+}
+
 /* Scrollbar styling */
 .goal-detail::-webkit-scrollbar {
     width: 6px;

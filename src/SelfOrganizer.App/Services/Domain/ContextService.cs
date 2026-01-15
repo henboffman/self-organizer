@@ -8,7 +8,7 @@ public class ContextService : IContextService
     private readonly IRepository<Context> _repository;
     private bool _initialized = false;
 
-    // Default built-in contexts following GTD methodology
+    // Default built-in contexts following GTD methodology (used as fallback)
     private static readonly (string Name, string Icon, string Color)[] DefaultContexts = new[]
     {
         ("think", "lightbulb", "#6c757d"),      // Planning, brainstorming
@@ -21,6 +21,51 @@ public class ContextService : IContextService
         ("home", "home", "#e83e8c"),            // Tasks at home
         ("work", "briefcase", "#17a2b8"),       // Tasks at work/office
         ("anywhere", "globe", "#ffc107"),       // Location-independent
+    };
+
+    // Work Mode Contexts (10) - Professional focus
+    private static readonly (string Name, string Icon, string Color)[] WorkModeContexts = new[]
+    {
+        ("deep-work", "bullseye", "#0d6efd"),
+        ("meetings", "people", "#6c757d"),
+        ("1-on-1", "person", "#fd7e14"),
+        ("planning", "calendar3", "#6610f2"),
+        ("admin", "folder", "#20c997"),
+        ("review", "check2-circle", "#28a745"),
+        ("email", "envelope-closed", "#0d6efd"),
+        ("calls", "phone", "#dc3545"),
+        ("collaborate", "people-fill", "#e83e8c"),
+        ("research", "search", "#17a2b8")
+    };
+
+    // Life Mode Contexts (10) - Personal focus
+    private static readonly (string Name, string Icon, string Color)[] LifeModeContexts = new[]
+    {
+        ("home", "home", "#e83e8c"),
+        ("errands", "location", "#20c997"),
+        ("computer", "laptop", "#6610f2"),
+        ("phone", "phone", "#dc3545"),
+        ("read", "book", "#fd7e14"),
+        ("think", "lightbulb", "#6c757d"),
+        ("weekend", "sun", "#ffc107"),
+        ("evening", "moon", "#17a2b8"),
+        ("outdoors", "tree", "#28a745"),
+        ("anywhere", "globe", "#0d6efd")
+    };
+
+    // Balanced Mode Contexts (10) - Curated mix
+    private static readonly (string Name, string Icon, string Color)[] BalancedModeContexts = new[]
+    {
+        ("work", "briefcase", "#17a2b8"),
+        ("home", "home", "#e83e8c"),
+        ("deep-work", "bullseye", "#0d6efd"),
+        ("meetings", "people", "#6c757d"),
+        ("errands", "location", "#20c997"),
+        ("computer", "laptop", "#6610f2"),
+        ("phone", "phone", "#dc3545"),
+        ("email", "envelope-closed", "#0d6efd"),
+        ("read", "book", "#fd7e14"),
+        ("anywhere", "globe", "#ffc107")
     };
 
     public ContextService(IRepository<Context> repository)
@@ -177,6 +222,67 @@ public class ContextService : IContextService
         }
 
         _initialized = true;
+    }
+
+    public async Task SeedContextsForModeAsync(AppMode mode)
+    {
+        var contextDefinitions = GetContextDefinitionsForMode(mode);
+
+        foreach (var (name, icon, color) in contextDefinitions)
+        {
+            try
+            {
+                var existing = await GetByNameAsync(name);
+                if (existing == null)
+                {
+                    var allContexts = await _repository.GetAllAsync();
+                    var maxSortOrder = allContexts.Any() ? allContexts.Max(c => c.SortOrder) : 0;
+
+                    var context = new Context
+                    {
+                        Name = name.ToLowerInvariant().Trim(),
+                        Icon = icon,
+                        Color = color,
+                        IsActive = true,
+                        SortOrder = maxSortOrder + 1,
+                        IsBuiltIn = true,
+                        UsageCount = 0
+                    };
+                    await _repository.AddAsync(context);
+                }
+            }
+            catch
+            {
+                // Context may already exist, that's fine
+            }
+        }
+    }
+
+    public async Task ResetContextsForModeAsync(AppMode mode)
+    {
+        // Get all existing contexts
+        var allContexts = await _repository.GetAllAsync();
+
+        // Mark user-created contexts as inactive (soft delete)
+        foreach (var context in allContexts.Where(c => !c.IsBuiltIn))
+        {
+            context.IsActive = false;
+            await _repository.UpdateAsync(context);
+        }
+
+        // Seed the mode-specific contexts
+        await SeedContextsForModeAsync(mode);
+    }
+
+    public IReadOnlyList<(string Name, string Icon, string Color)> GetContextDefinitionsForMode(AppMode mode)
+    {
+        return mode switch
+        {
+            AppMode.Work => WorkModeContexts.ToList(),
+            AppMode.Life => LifeModeContexts.ToList(),
+            AppMode.Balanced => BalancedModeContexts.ToList(),
+            _ => DefaultContexts.ToList()
+        };
     }
 
     private static string GenerateColor(string name)

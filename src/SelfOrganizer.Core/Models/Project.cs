@@ -16,4 +16,9 @@ public class Project : BaseEntity
     public List<string> Tags { get; set; } = new();
     public string? Notes { get; set; }
     public string? Url { get; set; }
+
+    /// <summary>
+    /// Hex color code for visual identification (e.g., "#3b82f6")
+    /// </summary>
+    public string? Color { get; set; }
 }

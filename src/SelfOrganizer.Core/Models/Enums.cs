@@ -89,3 +89,16 @@ public enum RecurrencePattern
 public enum GoalStatus { Active, OnHold, Completed, Archived }
 public enum GoalCategory { Career, Health, Financial, Personal, Learning, Relationships, Creative, Other }
 public enum GoalTimeframe { Week, Month, Quarter, Year, MultiYear }
+
+/// <summary>
+/// App mode that determines which contexts and balance dimensions are shown
+/// </summary>
+public enum AppMode
+{
+    /// <summary>Professional focus - career-oriented contexts and dimensions</summary>
+    Work,
+    /// <summary>Personal focus - life-oriented contexts and dimensions</summary>
+    Life,
+    /// <summary>Hybrid mode - curated mix of both work and life dimensions</summary>
+    Balanced
+}

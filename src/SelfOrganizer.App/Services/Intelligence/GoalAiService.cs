@@ -10,7 +10,7 @@ namespace SelfOrganizer.App.Services.Intelligence;
 public interface IGoalAiService
 {
     Task<bool> IsAvailableAsync();
-    Task<GoalClarificationResult?> ClarifyGoalAsync(Goal goal);
+    Task<GoalClarificationResult?> ClarifyGoalAsync(Goal goal, IReadOnlyList<BalanceDimension>? availableDimensions = null);
     Task<GoalDecompositionResult?> DecomposeGoalAsync(Goal goal);
     Task<List<TodoTask>> GenerateTasksFromGoalAsync(Goal goal);
 }
@@ -26,6 +26,10 @@ public class GoalClarificationResult
     public List<string> ClarifyingQuestions { get; set; } = new();
     public List<string> Assumptions { get; set; } = new();
     public string? SuggestedTimeframe { get; set; }
+
+    // Balance dimensions suggested by AI
+    [JsonPropertyName("suggestedBalanceDimensions")]
+    public List<string> SuggestedBalanceDimensions { get; set; } = new();
 
     // These can come as either strings or arrays from the LLM
     // Using JsonPropertyName to match what the LLM returns
@@ -101,10 +105,12 @@ public class GoalAiService : IGoalAiService
         return await _llmService.IsAvailableAsync();
     }
 
-    public async Task<GoalClarificationResult?> ClarifyGoalAsync(Goal goal)
+    public async Task<GoalClarificationResult?> ClarifyGoalAsync(Goal goal, IReadOnlyList<BalanceDimension>? availableDimensions = null)
     {
-        var goalContext = BuildGoalContext(goal);
-        var prompt = string.Format(ClarificationPrompt, goalContext);
+        var goalContext = BuildGoalContext(goal, availableDimensions);
+        var prompt = availableDimensions?.Any() == true
+            ? string.Format(ClarificationWithBalancePrompt, goalContext)
+            : string.Format(ClarificationPrompt, goalContext);
 
         return await _llmService.GenerateStructuredAsync<GoalClarificationResult>(prompt, new LlmOptions
         {
@@ -160,7 +166,7 @@ public class GoalAiService : IGoalAiService
         return tasks;
     }
 
-    private static string BuildGoalContext(Goal goal)
+    private static string BuildGoalContext(Goal goal, IReadOnlyList<BalanceDimension>? availableDimensions = null)
     {
         var parts = new List<string>
         {
@@ -187,6 +193,17 @@ public class GoalAiService : IGoalAiService
 
         if (goal.TargetDate.HasValue)
             parts.Add($"Target Date: {goal.TargetDate.Value:MMMM d, yyyy}");
+
+        // Add available balance dimensions if provided
+        if (availableDimensions?.Any() == true)
+        {
+            parts.Add("");
+            parts.Add("Available Life Balance Dimensions:");
+            foreach (var dim in availableDimensions)
+            {
+                parts.Add($"- {dim.Id}: {dim.Name} ({dim.Description})");
+            }
+        }
 
         return string.Join("\n", parts);
     }
@@ -254,6 +271,36 @@ Respond with a JSON object:
 Energy levels: 1=Very Low (mindless tasks), 2=Low, 3=Medium, 4=High, 5=Very High (deep focus required)
 Contexts are GTD-style starting with @ indicating where/how the task is done.
 Limit to 3-5 phases with 3-7 tasks each for manageability.
+
+Goal Information:
+{0}";
+
+    private const string ClarificationWithBalancePrompt = @"You are a productivity coach helping users clarify and improve their goals using GTD (Getting Things Done) methodology and SMART goal principles.
+
+Given the following goal information, help improve and clarify it by:
+1. Making the goal more specific and actionable
+2. Defining what success looks like (the desired outcome)
+3. Identifying measurable success criteria
+4. Uncovering potential obstacles
+5. Identifying resources needed
+6. Suggesting clarifying questions if the goal is still vague
+7. Identifying which life balance dimensions this goal impacts
+
+Respond with a JSON object:
+{{
+    ""originalGoal"": ""the user's original goal title"",
+    ""clarifiedGoal"": ""a clearer, more specific version of the goal"",
+    ""desiredOutcome"": ""vivid description of what success looks like when achieved"",
+    ""successCriteria"": [""specific, measurable criteria to know when the goal is complete""],
+    ""obstacles"": [""potential challenges or blockers to anticipate""],
+    ""resources"": [""tools, skills, people, or time needed to achieve this""],
+    ""clarifyingQuestions"": [""questions that would help further refine the goal""],
+    ""assumptions"": [""assumptions that should be validated""],
+    ""suggestedTimeframe"": ""recommended timeframe if the current one seems off"",
+    ""suggestedBalanceDimensions"": [""dimension IDs from the list below that this goal impacts""]
+}}
+
+Important: For suggestedBalanceDimensions, use the exact dimension IDs provided in the Available Life Balance Dimensions section. Select 1-3 dimensions that this goal will most positively impact when achieved.
 
 Goal Information:
 {0}";

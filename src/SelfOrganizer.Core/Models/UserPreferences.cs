@@ -54,4 +54,46 @@ public class UserPreferences : BaseEntity
     public int TagSimilarityWeight { get; set; } = 40; // Group tasks with similar tags
     public int DeepWorkPreferenceWeight { get; set; } = 60; // Prefer morning for deep work
     public int BlockedTaskPenalty { get; set; } = 100; // Deprioritize blocked tasks
+
+    // Life Areas Balance
+    public Dictionary<string, int>? LifeAreaRatings { get; set; }
+    public DateTime? LifeAreaAssessmentDate { get; set; }
+
+    // App Mode
+    /// <summary>Current app mode (Work/Life/Balanced) affecting contexts and dimensions</summary>
+    public AppMode AppMode { get; set; } = AppMode.Balanced;
+
+    /// <summary>When the app mode was last changed</summary>
+    public DateTime? AppModeSetAt { get; set; }
+
+    /// <summary>Which balance dimensions the user has enabled (null = all for mode)</summary>
+    public List<string>? EnabledBalanceDimensions { get; set; }
+
+    /// <summary>Balance ratings stored per mode to preserve when switching</summary>
+    public Dictionary<string, Dictionary<string, int>>? BalanceRatingsByMode { get; set; }
+
+    // Google Calendar OAuth
+    /// <summary>OAuth access token for Google Calendar API</summary>
+    public string? GoogleCalendarAccessToken { get; set; }
+
+    /// <summary>OAuth refresh token for obtaining new access tokens</summary>
+    public string? GoogleCalendarRefreshToken { get; set; }
+
+    /// <summary>When the access token expires</summary>
+    public DateTime? GoogleCalendarTokenExpiry { get; set; }
+
+    /// <summary>Connected Google account email</summary>
+    public string? GoogleCalendarEmail { get; set; }
+
+    /// <summary>IDs of calendars selected for sync</summary>
+    public List<string>? GoogleCalendarSelectedCalendarIds { get; set; }
+
+    /// <summary>How many days in the past to sync</summary>
+    public int GoogleCalendarSyncPastDays { get; set; } = 7;
+
+    /// <summary>How many days in the future to sync</summary>
+    public int GoogleCalendarSyncFutureDays { get; set; } = 30;
+
+    /// <summary>Last successful sync timestamp</summary>
+    public DateTime? GoogleCalendarLastSyncTime { get; set; }
 }

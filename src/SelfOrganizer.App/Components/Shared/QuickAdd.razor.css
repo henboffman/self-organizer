@@ -1,0 +1,191 @@
+/* Quick Add Modal Styles */
+.quick-add-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: var(--bg-overlay);
+    z-index: var(--z-modal-backdrop);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 15vh;
+    backdrop-filter: blur(4px);
+}
+
+.quick-add-container {
+    width: 100%;
+    max-width: 560px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    animation: quickAddSlide 0.2s ease-out;
+}
+
+@keyframes quickAddSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.quick-add-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.quick-add-header h5 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.quick-add-body {
+    padding: var(--space-lg);
+}
+
+.quick-add-input {
+    width: 100%;
+    padding: var(--space-md);
+    font-size: 1.1rem;
+    font-family: var(--font-sans);
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius-md);
+    outline: none;
+    transition: all var(--transition-fast);
+}
+
+.quick-add-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.quick-add-input::placeholder {
+    color: var(--input-placeholder);
+}
+
+/* Parsed Preview */
+.parsed-preview {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border-left: 3px solid var(--color-primary);
+}
+
+.preview-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+}
+
+.preview-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.preview-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-weight: 500;
+}
+
+.preview-badge.due-date {
+    background-color: var(--color-info-bg);
+    color: var(--color-info);
+    border: 1px solid var(--color-info-border);
+}
+
+.preview-badge.context {
+    background-color: var(--color-secondary-subtle);
+    color: var(--color-secondary);
+    border: 1px solid var(--color-secondary);
+}
+
+.preview-badge.estimate {
+    background-color: var(--color-warning-bg);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning-border);
+}
+
+.preview-badge.priority-high {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger-border);
+}
+
+.preview-badge.tag {
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary-text);
+    border: 1px solid var(--color-primary);
+}
+
+/* Hints */
+.quick-add-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-muted);
+}
+
+.hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.hint kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+}
+
+/* Footer */
+.quick-add-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--border-muted);
+    background-color: var(--bg-tertiary);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+    .quick-add-overlay {
+        padding-top: 5vh;
+        padding-left: var(--space-md);
+        padding-right: var(--space-md);
+    }
+
+    .quick-add-input {
+        font-size: 1rem;
+    }
+
+    .quick-add-hints {
+        gap: var(--space-sm);
+    }
+
+    .hint {
+        font-size: 0.65rem;
+    }
+}

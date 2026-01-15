@@ -1,0 +1,627 @@
+@page "/settings/calendar-providers"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Services.GoogleCalendar
+@using SelfOrganizer.App.Components.Shared
+@using Microsoft.AspNetCore.Components.Web
+@inject IExternalCalendarService ExternalCalendarService
+@inject IRepository<UserPreferences> PreferencesRepository
+@inject IDataChangeNotificationService DataChangeNotification
+@inject IGoogleCalendarAuthService GoogleAuthService
+@inject IGoogleCalendarSyncService GoogleSyncService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+                <li class="breadcrumb-item active">Calendar Providers</li>
+            </ol>
+        </nav>
+        <h3 class="mt-2">
+            <span class="oi oi-calendar me-2"></span>Calendar Providers
+        </h3>
+    </div>
+</div>
+
+<p class="text-muted mb-4">
+    Connect external calendar providers to sync events and meetings into Self-Organizer.
+</p>
+
+<div class="row">
+    <div class="col-lg-8">
+        @* Google Calendar *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <span class="me-2" style="font-size: 1.2rem;">
+                        <div class="google-icon-small">G</div>
+                    </span>
+                    <span>Google Calendar</span>
+                </div>
+                @if (_googleConnected)
+                {
+                    <span class="badge bg-success"><span class="oi oi-check me-1"></span>Connected</span>
+                }
+                else if (!_googleConfigured)
+                {
+                    <span class="badge bg-warning text-dark">Not Configured</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary">Not Connected</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (!_googleConfigured)
+                {
+                    <div class="alert alert-warning mb-3">
+                        <span class="oi oi-warning me-2"></span>
+                        <strong>Server Configuration Required</strong>
+                        <p class="mb-0 small mt-1">
+                            Google Calendar OAuth requires server-side configuration. Please add your Google OAuth credentials
+                            to the server's appsettings.json file.
+                        </p>
+                    </div>
+                }
+                else if (!_googleConnected)
+                {
+                    <p class="text-muted">
+                        Connect your Google Calendar to automatically sync events and meetings.
+                    </p>
+                    <button class="btn btn-outline-primary" @onclick="ConnectGoogleCalendar" disabled="@_isConnecting">
+                        @if (_isConnecting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Connecting...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-external-link me-1"></span>
+                            <span>Connect Google Calendar</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Connected Account</label>
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">@_googleEmail</span>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="DisconnectGoogleCalendar">
+                                <span class="oi oi-account-logout me-1"></span> Disconnect
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Calendars to Sync</label>
+                        @if (_isLoadingCalendars)
+                        {
+                            <div class="text-muted">
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                Loading calendars...
+                            </div>
+                        }
+                        else if (_googleCalendars.Any())
+                        {
+                            @foreach (var cal in _googleCalendars)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="cal-@cal.Id"
+                                           checked="@cal.Selected"
+                                           @onchange="() => ToggleCalendarSelection(cal)" />
+                                    <label class="form-check-label" for="cal-@cal.Id">
+                                        <span class="me-2" style="color: @(cal.BackgroundColor ?? "#4285f4");">@("\u25CF")</span>
+                                        @cal.Summary
+                                        @if (cal.Primary)
+                                        {
+                                            <span class="badge bg-primary ms-1">Primary</span>
+                                        }
+                                    </label>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted small">No calendars found.</p>
+                        }
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Sync Past Days</label>
+                            <input type="number" class="form-control" @bind="_syncPastDays" min="0" max="365" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sync Future Days</label>
+                            <input type="number" class="form-control" @bind="_syncFutureDays" min="1" max="365" />
+                        </div>
+                    </div>
+
+                    @if (_syncResult != null)
+                    {
+                        <div class="alert @(_syncResult.Success ? "alert-success" : "alert-danger") py-2 mb-3">
+                            @if (_syncResult.Success)
+                            {
+                                <span class="oi oi-check me-1"></span>
+                                <span>Synced @_syncResult.EventsSynced events (@_syncResult.EventsCreated new, @_syncResult.EventsUpdated updated)</span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-warning me-1"></span>
+                                <span>@_syncResult.Error</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted small">
+                            @if (_lastSyncTime.HasValue)
+                            {
+                                <span>Last synced: @_lastSyncTime.Value.ToLocalTime().ToString("g")</span>
+                            }
+                            else
+                            {
+                                <span>Never synced</span>
+                            }
+                        </div>
+                        <button class="btn btn-primary" @onclick="SyncGoogleCalendar" disabled="@_isSyncing">
+                            @if (_isSyncing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Syncing...</span>
+                            }
+                            else
+                            {
+                                <span class="oi oi-reload me-1"></span>
+                                <span>Sync Now</span>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ICS File Import *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <span class="oi oi-file me-2 text-secondary" style="font-size: 1.2rem;"></span>
+                    <span>ICS File Import</span>
+                </div>
+                <span class="badge bg-success"><span class="oi oi-check me-1"></span>Available</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Import calendar events from .ics files exported from Google Calendar, Outlook, or other calendar applications.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label">Select ICS File</label>
+                    <InputFile OnChange="HandleIcsFileSelected" class="form-control" accept=".ics" />
+                </div>
+
+                @if (_icsFileName != null)
+                {
+                    <div class="alert alert-info py-2">
+                        <span class="oi oi-file me-1"></span>
+                        Selected: @_icsFileName
+                    </div>
+                }
+
+                @if (_importResult != null)
+                {
+                    <div class="alert @(_importResult.Success ? "alert-success" : "alert-danger") py-2">
+                        @if (_importResult.Success)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            @_importResult.Message
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            @_importResult.Message
+                        }
+                    </div>
+                }
+
+                <button class="btn btn-outline-primary" @onclick="ImportIcsFile"
+                        disabled="@(_icsContent == null || _isImporting)">
+                    @if (_isImporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-data-transfer-upload me-1"></span>
+                    }
+                    Import Events
+                </button>
+            </div>
+        </div>
+
+        @* Microsoft Outlook (Future) *@
+        <div class="card mb-4 opacity-75">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <span class="me-2" style="color: #0078d4; font-size: 1.2rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 3H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-9 14H4V7h8v10zm8 0h-6v-4h6v4zm0-6h-6V7h6v4z"/>
+                        </svg>
+                    </span>
+                    <span>Microsoft Outlook</span>
+                </div>
+                <span class="badge bg-secondary">Coming Soon</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Microsoft Outlook integration via Microsoft Graph API will be available in a future update.
+                </p>
+                <button class="btn btn-outline-secondary" disabled>
+                    <span class="oi oi-external-link me-1"></span> Connect Outlook
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        @* Sync Status *@
+        <div class="card mb-4">
+            <div class="card-header">Sync Statistics</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total External Events:</span>
+                    <strong>@_totalExternalEvents</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Google Calendar:</span>
+                    <strong>@_googleEventCount</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>ICS Imports:</span>
+                    <strong>@_icsEventCount</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Auto-Linked:</span>
+                    <strong>@_linkedEventCount</strong>
+                </div>
+            </div>
+        </div>
+
+        @* Help *@
+        <div class="card">
+            <div class="card-header">How It Works</div>
+            <div class="card-body small">
+                <h6>Automatic Entity Linking</h6>
+                <p class="text-muted">
+                    When events are imported, they're automatically analyzed and linked to your projects and goals
+                    based on your <a href="/settings/linking-rules">entity linking rules</a>.
+                </p>
+
+                <h6>Event Sources</h6>
+                <p class="text-muted">
+                    Imported events show source indicators on your calendar view, making it easy to distinguish
+                    between manually created and synced events.
+                </p>
+
+                <h6>ICS Export Tips</h6>
+                <ul class="text-muted mb-0">
+                    <li>Google Calendar: Settings > Import & Export > Export</li>
+                    <li>Outlook: File > Open & Export > Import/Export</li>
+                    <li>Apple Calendar: File > Export > Export...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .google-icon-small {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: white;
+        background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335);
+    }
+</style>
+
+@code {
+    // Google Calendar state
+    private bool _googleConfigured = false;
+    private bool _googleConnected = false;
+    private string? _googleEmail;
+    private List<GoogleCalendarDto> _googleCalendars = new();
+    private int _syncPastDays = 7;
+    private int _syncFutureDays = 30;
+    private DateTime? _lastSyncTime;
+    private bool _isConnecting = false;
+    private bool _isSyncing = false;
+    private bool _isLoadingCalendars = false;
+    private CalendarSyncResult? _syncResult;
+
+    // ICS Import state
+    private string? _icsFileName;
+    private string? _icsContent;
+    private bool _isImporting = false;
+    private ImportResultMessage? _importResult;
+
+    // Statistics
+    private int _totalExternalEvents = 0;
+    private int _googleEventCount = 0;
+    private int _icsEventCount = 0;
+    private int _linkedEventCount = 0;
+
+    private class ImportResultMessage
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check for OAuth callback
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var code = query["code"];
+
+        if (!string.IsNullOrEmpty(code))
+        {
+            // Complete the OAuth flow
+            await CompleteOAuthCallback(code);
+        }
+
+        await LoadGoogleStatus();
+        await LoadStatistics();
+        await LoadSyncSettings();
+    }
+
+    private async Task LoadGoogleStatus()
+    {
+        _googleConfigured = await GoogleAuthService.IsConfiguredAsync();
+        _googleConnected = await GoogleAuthService.IsConnectedAsync();
+
+        if (_googleConnected)
+        {
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            _googleEmail = prefs?.GoogleCalendarEmail;
+            _lastSyncTime = prefs?.GoogleCalendarLastSyncTime;
+            _syncPastDays = prefs?.GoogleCalendarSyncPastDays ?? 7;
+            _syncFutureDays = prefs?.GoogleCalendarSyncFutureDays ?? 30;
+
+            await LoadCalendars();
+        }
+    }
+
+    private async Task LoadCalendars()
+    {
+        _isLoadingCalendars = true;
+        StateHasChanged();
+
+        try
+        {
+            _googleCalendars = await GoogleSyncService.GetCalendarsAsync();
+        }
+        finally
+        {
+            _isLoadingCalendars = false;
+        }
+    }
+
+    private async Task LoadStatistics()
+    {
+        // TODO: Query actual event counts from calendar service
+        _totalExternalEvents = 0;
+        _googleEventCount = 0;
+        _icsEventCount = 0;
+        _linkedEventCount = 0;
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadSyncSettings()
+    {
+        var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (prefs != null)
+        {
+            _syncPastDays = prefs.GoogleCalendarSyncPastDays;
+            _syncFutureDays = prefs.GoogleCalendarSyncFutureDays;
+        }
+    }
+
+    private async Task ConnectGoogleCalendar()
+    {
+        _isConnecting = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await GoogleAuthService.StartAuthFlowAsync();
+
+            if (result.Success && !string.IsNullOrEmpty(result.AuthUrl))
+            {
+                // Redirect to Google OAuth
+                await JS.InvokeVoidAsync("open", result.AuthUrl, "_self");
+            }
+            else
+            {
+                // Show error
+                _syncResult = new CalendarSyncResult
+                {
+                    Success = false,
+                    Error = result.Error ?? "Failed to start authorization"
+                };
+            }
+        }
+        finally
+        {
+            _isConnecting = false;
+        }
+    }
+
+    private async Task CompleteOAuthCallback(string code)
+    {
+        _isConnecting = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await GoogleAuthService.CompleteAuthFlowAsync(code);
+
+            if (result.Success)
+            {
+                _googleConnected = true;
+                _googleEmail = result.Email;
+
+                // Clear the query string
+                Navigation.NavigateTo("/settings/calendar-providers", replace: true);
+
+                // Load calendars
+                await LoadCalendars();
+            }
+            else
+            {
+                _syncResult = new CalendarSyncResult
+                {
+                    Success = false,
+                    Error = result.Error ?? "Authorization failed"
+                };
+            }
+        }
+        finally
+        {
+            _isConnecting = false;
+        }
+    }
+
+    private async Task DisconnectGoogleCalendar()
+    {
+        await GoogleAuthService.DisconnectAsync();
+        _googleConnected = false;
+        _googleEmail = null;
+        _googleCalendars.Clear();
+        _lastSyncTime = null;
+        _syncResult = null;
+    }
+
+    private void ToggleCalendarSelection(GoogleCalendarDto calendar)
+    {
+        calendar.Selected = !calendar.Selected;
+    }
+
+    private async Task SyncGoogleCalendar()
+    {
+        _isSyncing = true;
+        _syncResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var selectedCalendars = _googleCalendars.Where(c => c.Selected).Select(c => c.Id);
+
+            if (!selectedCalendars.Any())
+            {
+                _syncResult = new CalendarSyncResult
+                {
+                    Success = false,
+                    Error = "Please select at least one calendar to sync"
+                };
+                return;
+            }
+
+            _syncResult = await GoogleSyncService.SyncCalendarsAsync(selectedCalendars, _syncPastDays, _syncFutureDays);
+
+            if (_syncResult.Success)
+            {
+                _lastSyncTime = DateTime.UtcNow;
+                await LoadStatistics();
+                DataChangeNotification.NotifyDataChanged();
+            }
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    private async Task HandleIcsFileSelected(InputFileChangeEventArgs e)
+    {
+        _importResult = null;
+
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                _icsFileName = file.Name;
+
+                using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10 MB max
+                using var reader = new System.IO.StreamReader(stream);
+                _icsContent = await reader.ReadToEndAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _importResult = new ImportResultMessage
+            {
+                Success = false,
+                Message = $"Error reading file: {ex.Message}"
+            };
+        }
+    }
+
+    private async Task ImportIcsFile()
+    {
+        if (string.IsNullOrEmpty(_icsContent)) return;
+
+        _isImporting = true;
+        _importResult = null;
+        StateHasChanged();
+
+        try
+        {
+            // Parse the ICS content (use None for generic ICS imports)
+            var externalEvents = await ExternalCalendarService.ParseIcsContent(_icsContent, CalendarProvider.None);
+
+            // Save the imported events
+            var result = await ExternalCalendarService.SaveImportedEventsAsync(externalEvents, skipDuplicates: true);
+
+            _importResult = new ImportResultMessage
+            {
+                Success = result.Success,
+                Message = $"Successfully imported {result.ImportedCount} events" +
+                         (result.SkippedDuplicates > 0 ? $" ({result.SkippedDuplicates} duplicates skipped)" : "") +
+                         (result.LinkedEventsCount > 0 ? $", {result.LinkedEventsCount} auto-linked" : "")
+            };
+
+            // Refresh statistics
+            await LoadStatistics();
+
+            // Notify other components
+            DataChangeNotification.NotifyDataChanged();
+
+            // Clear the file
+            _icsFileName = null;
+            _icsContent = null;
+        }
+        catch (Exception ex)
+        {
+            _importResult = new ImportResultMessage
+            {
+                Success = false,
+                Message = $"Import failed: {ex.Message}"
+            };
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+}

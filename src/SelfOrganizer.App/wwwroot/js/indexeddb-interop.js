@@ -1,6 +1,6 @@
 // IndexedDB Interop for Blazor WebAssembly
 const DB_NAME = "SelfOrganizerDb";
-const DB_VERSION = 3; // Incremented to add ideas store
+const DB_VERSION = 7; // Incremented to add focusSessionLogs
 
 let db = null;
 
@@ -17,7 +17,14 @@ const stores = {
     preferences: { keyPath: "id" },
     dailySnapshots: { keyPath: "id", indexes: ["date"] },
     goals: { keyPath: "id", indexes: ["status", "category", "targetDate"] },
-    ideas: { keyPath: "id", indexes: ["status", "category", "linkedGoalId", "linkedProjectId"] }
+    ideas: { keyPath: "id", indexes: ["status", "category", "linkedGoalId", "linkedProjectId"] },
+    dataSourceConfigs: { keyPath: "id", indexes: ["sourceType", "isEnabled"] },
+    syncJobs: { keyPath: "id", indexes: ["sourceType", "status", "createdAt"] },
+    habits: { keyPath: "id", indexes: ["isActive", "category"] },
+    habitLogs: { keyPath: "id", indexes: ["habitId", "date"] },
+    weeklySnapshots: { keyPath: "id", indexes: ["weekStart"] },
+    entityLinkRules: { keyPath: "id", indexes: ["targetType", "isEnabled", "priority"] },
+    focusSessionLogs: { keyPath: "id", indexes: ["taskId", "startedAt", "endedAt", "focusRating"] }
 };
 
 window.indexedDbInterop = {

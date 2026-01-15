@@ -72,18 +72,23 @@
                 else
                 {
                     <div class="quick-actions">
-                        <div class="quick-actions-header">Quick Actions</div>
-                        @foreach (var action in _quickActions)
+                        @foreach (var group in _quickActions.GroupBy(a => a.Category ?? "General"))
                         {
-                            var actionIndex = _quickActions.ToList().IndexOf(action);
-                            <div class="quick-action-item @(actionIndex == _selectedIndex ? "selected" : "")"
-                                 @onclick="() => ExecuteQuickAction(action)"
-                                 @onmouseenter="() => _selectedIndex = actionIndex">
-                                <span class="oi @action.Icon quick-action-icon"></span>
-                                <span class="quick-action-title">@action.Title</span>
-                                @if (!string.IsNullOrEmpty(action.Shortcut))
+                            <div class="quick-actions-group">
+                                <div class="quick-actions-header">@group.Key</div>
+                                @foreach (var action in group)
                                 {
-                                    <span class="quick-action-shortcut">@action.Shortcut</span>
+                                    var actionIndex = _quickActions.ToList().IndexOf(action);
+                                    <div class="quick-action-item @(actionIndex == _selectedIndex ? "selected" : "")"
+                                         @onclick="() => ExecuteQuickAction(action)"
+                                         @onmouseenter="() => _selectedIndex = actionIndex">
+                                        <span class="oi @action.Icon quick-action-icon"></span>
+                                        <span class="quick-action-title">@action.Title</span>
+                                        @if (!string.IsNullOrEmpty(action.Shortcut))
+                                        {
+                                            <span class="quick-action-shortcut">@action.Shortcut</span>
+                                        }
+                                    </div>
                                 }
                             </div>
                         }
@@ -93,6 +98,7 @@
 
             <div class="search-footer">
                 <div class="footer-hints">
+                    <span class="hint"><kbd>/</kbd> or <kbd>⌘K</kbd> Open</span>
                     <span class="hint"><kbd>↑↓</kbd> Navigate</span>
                     <span class="hint"><kbd>Enter</kbd> Select</span>
                     <span class="hint"><kbd>Esc</kbd> Close</span>

@@ -231,6 +231,14 @@
     padding: var(--space-sm) 0;
 }
 
+.quick-actions-group {
+    padding-top: var(--space-sm);
+}
+
+.quick-actions-group:first-child {
+    padding-top: 0;
+}
+
 .quick-actions-header {
     font-size: 0.7rem;
     font-weight: 600;
@@ -238,6 +246,13 @@
     letter-spacing: 0.05em;
     color: var(--text-tertiary);
     padding: var(--space-xs) var(--space-lg) var(--space-sm);
+    border-top: 1px solid var(--border-muted, rgba(0,0,0,0.05));
+    margin-top: var(--space-xs);
+}
+
+.quick-actions-group:first-child .quick-actions-header {
+    border-top: none;
+    margin-top: 0;
 }
 
 .quick-action-item {

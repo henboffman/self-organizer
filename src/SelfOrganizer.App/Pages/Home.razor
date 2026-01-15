@@ -1,6 +1,7 @@
 @page "/"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Services.Intelligence
 @using SelfOrganizer.App.Components.Shared
 @inject SelfOrganizer.Core.Interfaces.ICaptureService CaptureService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
@@ -81,6 +82,13 @@
                 Review <span class="oi oi-arrow-right"></span>
             </a>
         </div>
+    </div>
+</div>
+
+@* AI Insights Panel *@
+<div class="row mb-4">
+    <div class="col-12">
+        <SuggestionsPanel />
     </div>
 </div>
 

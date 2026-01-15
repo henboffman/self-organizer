@@ -1,0 +1,179 @@
+@* Shows linked entities (project, goals, tasks) on calendar events *@
+@using SelfOrganizer.Core.Models
+
+@if (HasAnyLinks)
+{
+    <div class="linked-entities @SizeClass">
+        @* Project indicator with color dot *@
+        @if (LinkedProject != null)
+        {
+            <span class="linked-entity project-entity"
+                  title="Project: @LinkedProject.Name"
+                  style="--project-color: @(LinkedProject.Color ?? "#6b7280")">
+                <span class="project-dot"></span>
+                @if (ShowLabels)
+                {
+                    <span class="entity-label">@TruncateName(LinkedProject.Name, 12)</span>
+                }
+            </span>
+        }
+
+        @* Goals indicator *@
+        @if (LinkedGoalCount > 0)
+        {
+            <span class="linked-entity goal-entity" title="@GoalTooltip">
+                <span class="oi oi-target"></span>
+                @if (LinkedGoalCount > 1 || ShowLabels)
+                {
+                    <span class="entity-count">@LinkedGoalCount</span>
+                }
+            </span>
+        }
+
+        @* Tasks indicator *@
+        @if (LinkedTaskCount > 0)
+        {
+            <span class="linked-entity task-entity" title="@TaskTooltip">
+                <span class="oi oi-task"></span>
+                @if (LinkedTaskCount > 1 || ShowLabels)
+                {
+                    <span class="entity-count">@LinkedTaskCount</span>
+                }
+            </span>
+        }
+
+        @* Ideas indicator *@
+        @if (LinkedIdeaCount > 0)
+        {
+            <span class="linked-entity idea-entity" title="@IdeaTooltip">
+                <span class="oi oi-lightbulb"></span>
+                @if (LinkedIdeaCount > 1 || ShowLabels)
+                {
+                    <span class="entity-count">@LinkedIdeaCount</span>
+                }
+            </span>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// The linked project (if any)
+    /// </summary>
+    [Parameter]
+    public Project? LinkedProject { get; set; }
+
+    /// <summary>
+    /// Names of linked goals for tooltip
+    /// </summary>
+    [Parameter]
+    public IEnumerable<string>? LinkedGoalNames { get; set; }
+
+    /// <summary>
+    /// Names of linked tasks for tooltip
+    /// </summary>
+    [Parameter]
+    public IEnumerable<string>? LinkedTaskNames { get; set; }
+
+    /// <summary>
+    /// Names of linked ideas for tooltip
+    /// </summary>
+    [Parameter]
+    public IEnumerable<string>? LinkedIdeaNames { get; set; }
+
+    /// <summary>
+    /// Count of linked goals (use when names not available)
+    /// </summary>
+    [Parameter]
+    public int LinkedGoalCount { get; set; }
+
+    /// <summary>
+    /// Count of linked tasks (use when names not available)
+    /// </summary>
+    [Parameter]
+    public int LinkedTaskCount { get; set; }
+
+    /// <summary>
+    /// Count of linked ideas (use when names not available)
+    /// </summary>
+    [Parameter]
+    public int LinkedIdeaCount { get; set; }
+
+    /// <summary>
+    /// Whether to show text labels alongside icons
+    /// </summary>
+    [Parameter]
+    public bool ShowLabels { get; set; } = false;
+
+    /// <summary>
+    /// Size variant: "sm" (default), "md"
+    /// </summary>
+    [Parameter]
+    public string Size { get; set; } = "sm";
+
+    private bool HasAnyLinks => LinkedProject != null
+        || LinkedGoalCount > 0
+        || LinkedTaskCount > 0
+        || LinkedIdeaCount > 0
+        || (LinkedGoalNames?.Any() ?? false)
+        || (LinkedTaskNames?.Any() ?? false)
+        || (LinkedIdeaNames?.Any() ?? false);
+
+    private string SizeClass => Size == "md" ? "entities-md" : "entities-sm";
+
+    private int EffectiveGoalCount => LinkedGoalNames?.Count() ?? LinkedGoalCount;
+    private int EffectiveTaskCount => LinkedTaskNames?.Count() ?? LinkedTaskCount;
+    private int EffectiveIdeaCount => LinkedIdeaNames?.Count() ?? LinkedIdeaCount;
+
+    private string GoalTooltip
+    {
+        get
+        {
+            if (LinkedGoalNames?.Any() == true)
+            {
+                var names = string.Join(", ", LinkedGoalNames.Take(3));
+                if (LinkedGoalNames.Count() > 3)
+                    names += $" +{LinkedGoalNames.Count() - 3} more";
+                return $"Goals: {names}";
+            }
+            return LinkedGoalCount == 1 ? "1 linked goal" : $"{LinkedGoalCount} linked goals";
+        }
+    }
+
+    private string TaskTooltip
+    {
+        get
+        {
+            if (LinkedTaskNames?.Any() == true)
+            {
+                var names = string.Join(", ", LinkedTaskNames.Take(3));
+                if (LinkedTaskNames.Count() > 3)
+                    names += $" +{LinkedTaskNames.Count() - 3} more";
+                return $"Tasks: {names}";
+            }
+            return LinkedTaskCount == 1 ? "1 linked task" : $"{LinkedTaskCount} linked tasks";
+        }
+    }
+
+    private string IdeaTooltip
+    {
+        get
+        {
+            if (LinkedIdeaNames?.Any() == true)
+            {
+                var names = string.Join(", ", LinkedIdeaNames.Take(3));
+                if (LinkedIdeaNames.Count() > 3)
+                    names += $" +{LinkedIdeaNames.Count() - 3} more";
+                return $"Ideas: {names}";
+            }
+            return LinkedIdeaCount == 1 ? "1 linked idea" : $"{LinkedIdeaCount} linked ideas";
+        }
+    }
+
+    private static string TruncateName(string name, int maxLength)
+    {
+        if (string.IsNullOrEmpty(name) || name.Length <= maxLength)
+            return name;
+        return name.Substring(0, maxLength - 1) + "...";
+    }
+}

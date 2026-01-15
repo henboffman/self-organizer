@@ -10,11 +10,14 @@
 @using Microsoft.JSInterop
 @inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
 @inject SelfOrganizer.Core.Interfaces.ISchedulingService SchedulingService
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
 @inject ITaskOptimizerService TaskOptimizer
 @inject IExportService ExportService
 @inject IDataChangeNotificationService DataChangeNotification
+@inject IEntityLinkingService EntityLinkingService
+@inject SelfOrganizer.Core.Interfaces.IGoalService GoalService
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 @implements IAsyncDisposable
@@ -470,6 +473,124 @@ else
                     <small class="text-muted d-block">Shows a reminder on calendar. Click it to create a follow-up task.</small>
                 </label>
             </div>
+
+            @* Entity Linking Section *@
+            <div class="border-top pt-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="oi oi-link-intact text-muted"></span>
+                        <strong>Link to Project/Goal</strong>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _showLinkingSection = !_showLinkingSection">
+                        @(_showLinkingSection ? "Hide" : "Show")
+                    </button>
+                </div>
+
+                @if (_showLinkingSection)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Project</label>
+                            <select class="form-select form-select-sm" @bind="_eventLinkedProjectId">
+                                <option value="">-- No Project --</option>
+                                @foreach (var project in _projectsCache.Values.Where(p => p.Status != ProjectStatus.Completed))
+                                {
+                                    <option value="@project.Id">
+                                        @project.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Goal</label>
+                            <select class="form-select form-select-sm" @onchange="OnGoalLinkChanged">
+                                <option value="">-- Add Goal Link --</option>
+                                @foreach (var goal in _availableGoals.Where(g => !_eventLinkedGoalIds.Contains(g.Id)))
+                                {
+                                    <option value="@goal.Id">@goal.Title</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (_eventLinkedGoalIds.Any())
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted">Linked Goals:</small>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                @foreach (var goalId in _eventLinkedGoalIds)
+                                {
+                                    var goal = _availableGoals.FirstOrDefault(g => g.Id == goalId);
+                                    if (goal != null)
+                                    {
+                                        <span class="badge bg-purple d-flex align-items-center gap-1" style="background-color: #8b5cf6;">
+                                            <span class="oi oi-target" style="font-size: 0.65rem;"></span>
+                                            @goal.Title
+                                            <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.5rem;"
+                                                    @onclick="() => _eventLinkedGoalIds.Remove(goalId)"></button>
+                                        </span>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_suggestedLinks.Any() && _editingEvent != null)
+                    {
+                        <div class="alert alert-info py-2 mb-2">
+                            <small class="d-block mb-1"><strong>Suggested links:</strong></small>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var suggestion in _suggestedLinks.Where(s => s.TargetType == EntityLinkTargetType.Project && s.TargetEntityId != _eventLinkedProjectId).Take(3))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2"
+                                            @onclick="() => _eventLinkedProjectId = suggestion.TargetEntityId"
+                                            title="@($"Confidence: {suggestion.Confidence:P0}")">
+                                        <span class="oi oi-briefcase me-1"></span>@suggestion.TargetEntityName
+                                    </button>
+                                }
+                                @foreach (var suggestion in _suggestedLinks.Where(s => s.TargetType == EntityLinkTargetType.Goal && !_eventLinkedGoalIds.Contains(s.TargetEntityId)).Take(3))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                            @onclick="() => _eventLinkedGoalIds.Add(suggestion.TargetEntityId)"
+                                            title="@($"Confidence: {suggestion.Confidence:P0}")">
+                                        <span class="oi oi-target me-1"></span>@suggestion.TargetEntityName
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (_editingEvent != null && _eventLinkedProjectId.HasValue)
+                    {
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-info" @onclick="CreateLinkRuleFromEvent">
+                                <span class="oi oi-bolt me-1"></span>Create Auto-Link Rule
+                            </button>
+                        </div>
+                    }
+                }
+                else if (_eventLinkedProjectId.HasValue || _eventLinkedGoalIds.Any())
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (_eventLinkedProjectId.HasValue && _projectsCache.TryGetValue(_eventLinkedProjectId.Value, out var project))
+                        {
+                            <span class="badge" style="background-color: @(project.Color ?? "#6b7280");">
+                                <span class="oi oi-briefcase me-1"></span>@project.Name
+                            </span>
+                        }
+                        @foreach (var goalId in _eventLinkedGoalIds)
+                        {
+                            var goal = _availableGoals.FirstOrDefault(g => g.Id == goalId);
+                            if (goal != null)
+                            {
+                                <span class="badge" style="background-color: #8b5cf6;">
+                                    <span class="oi oi-target me-1"></span>@goal.Title
+                                </span>
+                            }
+                        }
+                    </div>
+                }
+            </div>
         </div>
     </ChildContent>
     <Footer>
@@ -608,6 +729,13 @@ else
     private int _eventDecompressTime = 5;
     private bool _eventRequiresFollowUp = false;
 
+    // Entity linking state (for modal)
+    private Guid? _eventLinkedProjectId = null;
+    private List<Guid> _eventLinkedGoalIds = new();
+    private List<Goal> _availableGoals = new();
+    private bool _showLinkingSection = false;
+    private List<EntityLinkMatch> _suggestedLinks = new();
+
     // Modal focus management
     private ElementReference _titleInputRef;
     private bool _shouldFocusTitle = false;
@@ -629,6 +757,9 @@ else
     private List<TodoTask> _availableTasks = new();
     private List<ScheduledTaskItem> _scheduledTasks = new();
     private UserPreferences? _preferences;
+
+    // Projects cache for color coding
+    private Dictionary<Guid, Project> _projectsCache = new();
 
     // Focus optimization
     private List<string> _focusSuggestions = new();
@@ -660,6 +791,13 @@ else
         await LoadPreferences();
         await LoadEvents();
         await LoadAvailableTasks();
+        await LoadProjectsCache();
+    }
+
+    private async Task LoadProjectsCache()
+    {
+        var projects = await ProjectService.GetAllAsync();
+        _projectsCache = projects.ToDictionary(p => p.Id);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1432,11 +1570,18 @@ else
         _eventPrepTime = _lastPrepTime;
         _eventDecompressTime = _lastDecompressTime;
         _eventRequiresFollowUp = false;
+
+        // Reset entity linking state
+        _eventLinkedProjectId = null;
+        _eventLinkedGoalIds = new();
+        _showLinkingSection = false;
+        _suggestedLinks = new();
+
         _showModal = true;
         _shouldFocusTitle = true;
     }
 
-    private void EditEvent(CalendarEvent evt)
+    private async Task EditEventAsync(CalendarEvent evt)
     {
         _editingEvent = evt;
         _eventTitle = evt.Title;
@@ -1449,7 +1594,25 @@ else
         _eventPrepTime = evt.PrepTimeMinutes ?? 5;
         _eventDecompressTime = evt.DecompressTimeMinutes ?? 5;
         _eventRequiresFollowUp = evt.RequiresFollowUp;
+
+        // Load entity linking state
+        _eventLinkedProjectId = evt.LinkedProjectId;
+        _eventLinkedGoalIds = evt.LinkedGoalIds.ToList();
+        _showLinkingSection = evt.LinkedProjectId.HasValue || evt.LinkedGoalIds.Any();
+
+        // Load available goals for linking
+        _availableGoals = (await GoalService.GetActiveGoalsAsync()).ToList();
+
+        // Get suggested links for this event
+        _suggestedLinks = (await EntityLinkingService.GetPotentialLinksAsync(evt)).ToList();
+
         _showModal = true;
+    }
+
+    private void EditEvent(CalendarEvent evt)
+    {
+        // Fire and forget to avoid blocking - state will update when ready
+        _ = EditEventAsync(evt);
     }
 
     private void CloseModal()
@@ -1458,6 +1621,33 @@ else
         _editingEvent = null;
         _viewingTask = null;
         _showTaskModal = false;
+        _showLinkingSection = false;
+        _suggestedLinks = new();
+    }
+
+    private void OnGoalLinkChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var goalId))
+        {
+            if (!_eventLinkedGoalIds.Contains(goalId))
+            {
+                _eventLinkedGoalIds.Add(goalId);
+            }
+        }
+    }
+
+    private async Task CreateLinkRuleFromEvent()
+    {
+        if (_editingEvent == null || !_eventLinkedProjectId.HasValue)
+            return;
+
+        await EntityLinkingService.CreateRuleFromEventAsync(
+            _editingEvent,
+            _eventLinkedProjectId.Value,
+            EntityLinkTargetType.Project);
+
+        // Show feedback
+        StateHasChanged();
     }
 
     private async Task OnModalKeyDown(KeyboardEventArgs e)
@@ -1537,7 +1727,11 @@ else
                 DecompressTimeMinutes = _eventDecompressTime,
                 RequiresPrep = _eventPrepTime > 0,
                 RequiresFollowUp = _eventRequiresFollowUp,
-                Tags = allTags
+                Tags = allTags,
+                // Entity linking
+                LinkedProjectId = _eventLinkedProjectId,
+                LinkedGoalIds = _eventLinkedGoalIds.ToList(),
+                IsAutoLinked = false
             };
             await CalendarService.CreateAsync(evt);
 
@@ -1561,6 +1755,10 @@ else
             _editingEvent.RequiresFollowUp = _eventRequiresFollowUp;
             // Merge existing tags with newly extracted tags
             _editingEvent.Tags = TagParsingService.MergeTags(_editingEvent.Tags, allTags);
+            // Entity linking
+            _editingEvent.LinkedProjectId = _eventLinkedProjectId;
+            _editingEvent.LinkedGoalIds = _eventLinkedGoalIds.ToList();
+            _editingEvent.IsAutoLinked = false; // Manual edit overrides auto-linking
             await CalendarService.UpdateAsync(_editingEvent);
 
             // Also update last scheduled event tracking
@@ -1616,7 +1814,8 @@ else
     // Render helpers for event cards
     private RenderFragment RenderEventCard(CalendarEvent evt, bool showDate) => __builder =>
     {
-        <div class="d-flex align-items-start p-3 border-bottom">
+        var isExternal = !string.IsNullOrEmpty(evt.Source) && evt.Source != "Manual";
+        <div class="d-flex align-items-start p-3 border-bottom @(isExternal ? "event-external" : "")">
             <div class="me-3 text-muted" style="min-width: 100px;">
                 @if (showDate)
                 {
@@ -1626,7 +1825,10 @@ else
                 <div class="small">@evt.EndTime.ToString("h:mm tt")</div>
             </div>
             <div class="flex-grow-1">
-                <h5 class="mb-1">@evt.Title</h5>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h5 class="mb-0">@evt.Title</h5>
+                    <EventSourceBadge Source="@evt.Source" Size="md" />
+                </div>
                 @if (!string.IsNullOrEmpty(evt.Location))
                 {
                     <small class="text-muted d-block">
@@ -1637,7 +1839,7 @@ else
                 {
                     <p class="mb-1 small">@evt.Description</p>
                 }
-                <div class="mt-2">
+                <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
                     <span class="badge bg-secondary">@evt.EffectiveCategory</span>
                     @if (evt.RequiresPrep)
                     {
@@ -1646,6 +1848,14 @@ else
                     @if (evt.RequiresFollowUp)
                     {
                         <span class="badge bg-warning text-dark">Needs Follow-up</span>
+                    }
+                    @if (evt.LinkedProjectId.HasValue || evt.LinkedGoalIds.Any() || evt.LinkedTaskIds.Any())
+                    {
+                        <LinkedEntityIndicator
+                            LinkedProject="@(evt.LinkedProjectId.HasValue && _projectsCache.TryGetValue(evt.LinkedProjectId.Value, out var p) ? p : null)"
+                            LinkedGoalCount="@evt.LinkedGoalIds.Count"
+                            LinkedTaskCount="@evt.LinkedTaskIds.Count"
+                            Size="md" />
                     }
                 </div>
             </div>
@@ -1662,9 +1872,13 @@ else
 
     private RenderFragment RenderEventCardCompact(CalendarEvent evt) => __builder =>
     {
-        <div class="event-card-compact p-2 mb-2 border rounded" style="cursor: pointer;" @onclick="() => EditEvent(evt)">
+        var isExternal = !string.IsNullOrEmpty(evt.Source) && evt.Source != "Manual";
+        <div class="event-card-compact p-2 mb-2 border rounded @(isExternal ? "event-external" : "")" style="cursor: pointer;" @onclick="() => EditEvent(evt)">
             <div class="d-flex justify-content-between align-items-start">
-                <div class="small fw-bold text-truncate" style="max-width: 140px;">@evt.Title</div>
+                <div class="d-flex align-items-center gap-1">
+                    <span class="small fw-bold text-truncate" style="max-width: 120px;">@evt.Title</span>
+                    <EventSourceBadge Source="@evt.Source" />
+                </div>
                 <button class="btn btn-sm btn-link p-0 text-danger" @onclick="() => DeleteEvent(evt)" @onclick:stopPropagation="true">
                     <span class="oi oi-x small"></span>
                 </button>
@@ -1678,8 +1892,15 @@ else
                     <span class="oi oi-map-marker me-1"></span>@evt.Location
                 </div>
             }
-            <div class="mt-1">
+            <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
                 <span class="badge bg-secondary small">@evt.EffectiveCategory</span>
+                @if (evt.LinkedProjectId.HasValue || evt.LinkedGoalIds.Any() || evt.LinkedTaskIds.Any())
+                {
+                    <LinkedEntityIndicator
+                        LinkedProject="@(evt.LinkedProjectId.HasValue && _projectsCache.TryGetValue(evt.LinkedProjectId.Value, out var p2) ? p2 : null)"
+                        LinkedGoalCount="@evt.LinkedGoalIds.Count"
+                        LinkedTaskCount="@evt.LinkedTaskIds.Count" />
+                }
             </div>
         </div>
     };
@@ -1709,13 +1930,22 @@ else
                 var taskLeftCalc = GetEventLeftPosition(dayIndex, daysCount, taskPos.Column, taskPos.TotalColumns);
                 var taskWidthCalc = GetEventWidth(daysCount, taskPos.TotalColumns);
 
+                // Look up project for color coding
+                var taskProject = scheduledTask.Task.ProjectId.HasValue
+                    ? _projectsCache.GetValueOrDefault(scheduledTask.Task.ProjectId.Value)
+                    : null;
+                var taskBorderColor = taskProject?.Color ?? "#10b981";
+                var taskBgColor = taskProject?.Color != null
+                    ? $"{taskProject.Color}18" // 18 is hex for ~9% opacity
+                    : "#d1fae5";
+
                 var taskClass = scheduledTask.BlockType == TimeBlockType.DeepWork ? "event-task-deep" : "event-task";
                 var taskSizeClass = taskHeightPx < 35 ? "event-compact" : taskHeightPx < 60 ? "event-small" : "";
 
                 var taskIdStr = scheduledTask.Task.Id.ToString();
                 var taskTooltip = $"{scheduledTask.Task.Title}\n{scheduledTask.StartTime:h:mm tt} - {scheduledTask.EndTime:h:mm tt}\nHold to drag, click to view";
                 <div class="timeline-event @taskClass @taskSizeClass draggable-item resizable"
-                     style="top: @(taskTopPx)px; height: @(taskHeightPx)px; left: @taskLeftCalc; width: calc(@taskWidthCalc - 4px); z-index: 1;"
+                     style="top: @(taskTopPx)px; height: @(taskHeightPx)px; left: @taskLeftCalc; width: calc(@taskWidthCalc - 4px); z-index: 1; border-color: @taskBorderColor; background-color: @taskBgColor;"
                      title="@taskTooltip"
                      draggable="true"
                      data-item-type="task"
@@ -1732,9 +1962,67 @@ else
                     {
                         <span class="badge bg-danger" style="font-size: 0.6rem;">High</span>
                     }
-                    @if (!string.IsNullOrEmpty(scheduledTask.Task.Category) && taskHeightPx > 40)
+
+                    @* Mini labels for context - shown when task is tall enough *@
+                    @if (taskHeightPx >= 50)
                     {
-                        <div class="event-location">@scheduledTask.Task.Category</div>
+                        <div class="event-mini-labels">
+                            @if (taskProject != null)
+                            {
+                                <span class="mini-label project-label"
+                                      style="background-color: @(taskProject.Color ?? "#6b7280")18; border-color: @(taskProject.Color ?? "#6b7280")"
+                                      title="Project: @taskProject.Name">
+                                    <span class="oi oi-folder"></span>
+                                    @TruncateLabel(taskProject.Name, 10)
+                                </span>
+                            }
+                            @if (scheduledTask.Task.GoalIds.Any())
+                            {
+                                var goalCount = scheduledTask.Task.GoalIds.Count;
+                                <span class="mini-label goal-label" title="@goalCount goal(s) linked">
+                                    <span class="oi oi-target"></span>
+                                    @goalCount
+                                </span>
+                            }
+                            @if (scheduledTask.Task.IsBlocked)
+                            {
+                                <span class="mini-label blocked-label" title="Blocked by other tasks">
+                                    <span class="oi oi-ban"></span>
+                                </span>
+                            }
+                            @if (scheduledTask.Task.HasSubtasks)
+                            {
+                                <span class="mini-label subtask-label" title="Has @scheduledTask.Task.SubtaskIds.Count subtask(s)">
+                                    <span class="oi oi-list"></span>
+                                    @scheduledTask.Task.SubtaskIds.Count
+                                </span>
+                            }
+                            @if (scheduledTask.Task.EnergyLevel.HasValue)
+                            {
+                                <span class="mini-label energy-label" title="Energy: @GetEnergyLabel(scheduledTask.Task.EnergyLevel.Value)">
+                                    <span class="oi oi-bolt"></span>
+                                    @scheduledTask.Task.EnergyLevel
+                                </span>
+                            }
+                        </div>
+                    }
+                    @* Compact view - icons only for smaller tasks *@
+                    else if (taskHeightPx >= 35)
+                    {
+                        <div class="event-icon-row">
+                            @if (taskProject != null)
+                            {
+                                <span class="oi oi-folder" style="color: @(taskProject.Color ?? "#6b7280")" title="@taskProject.Name"></span>
+                            }
+                            @if (scheduledTask.Task.GoalIds.Any())
+                            {
+                                <span class="oi oi-target" style="color: #6366f1" title="Goal linked"></span>
+                            }
+                            @if (scheduledTask.Task.IsBlocked)
+                            {
+                                <span class="oi oi-ban" style="color: #ef4444" title="Blocked"></span>
+                            }
+                        </div>
                     }
                 </div>
             }
@@ -1783,7 +2071,8 @@ else
             var eventTooltip = $"{evt.Title}\n{evt.StartTime:h:mm tt} - {evt.EndTime:h:mm tt}" + (isDraggableEvent ? "\nHold to drag, click to edit" : "");
             var eventIdStr = evt.Id.ToString();
             var sizeClass = heightPx < 35 ? "event-compact" : heightPx < 60 ? "event-small" : "";
-            <div class="timeline-event @categoryClass @sizeClass @(isDraggableEvent ? "draggable-item resizable" : "")"
+            var isExternalEvt = !string.IsNullOrEmpty(evt.Source) && evt.Source != "Manual";
+            <div class="timeline-event @categoryClass @sizeClass @(isDraggableEvent ? "draggable-item resizable" : "") @(isExternalEvt ? "event-synced" : "")"
                  style="top: @(topPx)px; height: @(heightPx)px; left: @leftCalc; width: calc(@widthCalc - 4px);"
                  @onmousedown='async (e) => { if (isDraggableEvent) await OnMouseDownItem(e, "event", eventIdStr); }'
                  @onmouseup="async (e) => await OnMouseUpItem(e)"
@@ -1795,11 +2084,21 @@ else
                  data-item-id="@eventIdStr"
                  @ondragstart="async (e) => { if (isDraggableEvent) await OnDragStartEvent(e, eventIdStr); }"
                  @ondragend="async (e) => await OnDragEnd(e)">
-                <div class="event-time">@evt.StartTime.ToString("h:mm tt")</div>
+                <div class="event-header d-flex align-items-center gap-1">
+                    <span class="event-time">@evt.StartTime.ToString("h:mm tt")</span>
+                    <EventSourceBadge Source="@evt.Source" />
+                </div>
                 <div class="event-title">@evt.Title</div>
                 @if (!string.IsNullOrEmpty(evt.Location) && heightPx > 50)
                 {
                     <div class="event-location">@evt.Location</div>
+                }
+                @if (heightPx > 60 && (evt.LinkedProjectId.HasValue || evt.LinkedGoalIds.Any() || evt.LinkedTaskIds.Any()))
+                {
+                    <LinkedEntityIndicator
+                        LinkedProject="@(evt.LinkedProjectId.HasValue && _projectsCache.TryGetValue(evt.LinkedProjectId.Value, out var p3) ? p3 : null)"
+                        LinkedGoalCount="@evt.LinkedGoalIds.Count"
+                        LinkedTaskCount="@evt.LinkedTaskIds.Count" />
                 }
                 @if (_showSmartBlocks && (evt.PrepTimeMinutes > 0 || evt.DecompressTimeMinutes > 0))
                 {
@@ -2200,6 +2499,24 @@ else
             await AutoScheduleTasks();
         }
     }
+
+    // Helper methods for mini-labels
+    private static string TruncateLabel(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+        return text.Substring(0, maxLength - 1) + "...";
+    }
+
+    private static string GetEnergyLabel(int level) => level switch
+    {
+        1 => "Low",
+        2 => "Medium-Low",
+        3 => "Medium",
+        4 => "Medium-High",
+        5 => "High",
+        _ => "Unknown"
+    };
 
     public void Dispose()
     {

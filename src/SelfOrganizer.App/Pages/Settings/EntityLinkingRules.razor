@@ -1,0 +1,554 @@
+@page "/settings/linking-rules"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services.Intelligence
+@using SelfOrganizer.App.Components.Shared
+@inject IEntityLinkingService EntityLinkingService
+@inject IProjectService ProjectService
+@inject IGoalService GoalService
+@inject IIdeaService IdeaService
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+                <li class="breadcrumb-item active">Entity Linking Rules</li>
+            </ol>
+        </nav>
+        <h3 class="mt-2">
+            <span class="oi oi-link-intact me-2"></span>Entity Linking Rules
+        </h3>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowAddModal">
+        <span class="oi oi-plus me-1"></span> New Rule
+    </button>
+</div>
+
+<p class="text-muted mb-4">
+    Define rules to automatically link calendar events to projects, goals, or ideas based on patterns in titles, descriptions, or attendees.
+</p>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-8">
+            @* Rule Testing *@
+            <div class="card mb-4">
+                <div class="card-header">
+                    <span class="oi oi-beaker me-2"></span>Test Rules
+                </div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Enter sample event title to test..."
+                               @bind="_testText" @bind:event="oninput" @onkeydown="HandleTestKeyDown" />
+                        <button class="btn btn-outline-primary" @onclick="TestRules" disabled="@string.IsNullOrWhiteSpace(_testText)">
+                            <span class="oi oi-play-circle me-1"></span> Test
+                        </button>
+                    </div>
+                    @if (_testResults != null)
+                    {
+                        @if (_testResults.Any())
+                        {
+                            <div class="alert alert-success py-2">
+                                <strong>@_testResults.Count() match(es) found:</strong>
+                                <ul class="mb-0 mt-2">
+                                    @foreach (var match in _testResults)
+                                    {
+                                        <li>
+                                            <span class="badge @GetTargetTypeBadgeClass(match.TargetType) me-1">@match.TargetType</span>
+                                            @match.TargetEntityName
+                                            <small class="text-muted">(@((match.Confidence * 100).ToString("0"))% confidence via "@match.RuleName")</small>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning py-2">
+                                <span class="oi oi-info me-1"></span> No matches found for this text.
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* Rules List *@
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><span class="oi oi-list me-2"></span>Rules (@_rules.Count)</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (!_rules.Any())
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <span class="oi oi-link-broken" style="font-size: 2rem;"></span>
+                            <p class="mt-2 mb-0">No linking rules defined yet.</p>
+                            <p class="small">Create rules to automatically link calendar events to your projects and goals.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var rule in _rules.OrderByDescending(r => r.Priority).ThenBy(r => r.Name))
+                            {
+                                <div class="list-group-item d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center flex-grow-1">
+                                        <div class="form-check form-switch me-3">
+                                            <input class="form-check-input" type="checkbox" checked="@rule.IsEnabled"
+                                                   @onchange="() => ToggleRuleEnabled(rule)" />
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold @(!rule.IsEnabled ? "text-muted" : "")">
+                                                @rule.Name
+                                                @if (rule.Priority > 0)
+                                                {
+                                                    <span class="badge bg-info ms-1" title="Priority">@rule.Priority</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">
+                                                <span class="badge @GetRuleTypeBadgeClass(rule.RuleType) me-1">@rule.RuleType</span>
+                                                <code class="bg-light px-1">@rule.Pattern</code>
+                                                <span class="oi oi-arrow-right mx-2"></span>
+                                                <span class="badge @GetTargetTypeBadgeClass(rule.TargetType)">@rule.TargetType</span>
+                                                @if (!string.IsNullOrEmpty(rule.TargetEntityName))
+                                                {
+                                                    <span class="ms-1">@rule.TargetEntityName</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                @if (rule.ApplyToTitle) { <span class="badge bg-secondary me-1">Title</span> }
+                                                @if (rule.ApplyToDescription) { <span class="badge bg-secondary me-1">Description</span> }
+                                                @if (rule.ApplyToAttendees) { <span class="badge bg-secondary me-1">Attendees</span> }
+                                                @if (rule.IsCaseSensitive) { <span class="badge bg-warning text-dark me-1">Case-sensitive</span> }
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditRule(rule)" title="Edit">
+                                            <span class="oi oi-pencil"></span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ShowDeleteConfirm(rule)" title="Delete">
+                                            <span class="oi oi-trash"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            @* Quick Stats *@
+            <div class="card mb-4">
+                <div class="card-header">Rule Statistics</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Total Rules:</span>
+                        <strong>@_rules.Count</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Active Rules:</span>
+                        <strong class="text-success">@_rules.Count(r => r.IsEnabled)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Project Rules:</span>
+                        <strong>@_rules.Count(r => r.TargetType == EntityLinkTargetType.Project)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Goal Rules:</span>
+                        <strong>@_rules.Count(r => r.TargetType == EntityLinkTargetType.Goal)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Idea Rules:</span>
+                        <strong>@_rules.Count(r => r.TargetType == EntityLinkTargetType.Idea)</strong>
+                    </div>
+                </div>
+            </div>
+
+            @* Help *@
+            <div class="card">
+                <div class="card-header">Pattern Help</div>
+                <div class="card-body small">
+                    <h6>String Match</h6>
+                    <p class="text-muted">Simple text matching. Enter a keyword that will be matched anywhere in the text.</p>
+
+                    <h6>Regex</h6>
+                    <p class="text-muted">Regular expression pattern for complex matching. Examples:</p>
+                    <ul class="text-muted">
+                        <li><code>\bproject\s+alpha\b</code> - Word boundaries</li>
+                        <li><code>standup|daily|sync</code> - Multiple options</li>
+                        <li><code>\[PROJ-\d+\]</code> - Project codes</li>
+                    </ul>
+
+                    <h6>Category Match</h6>
+                    <p class="text-muted">Match events with specific category labels from external calendars.</p>
+
+                    <h6>Attendee Match</h6>
+                    <p class="text-muted">Match based on email addresses or names in attendee list.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Add/Edit Rule Modal *@
+<Modal Title="@(_editingRule == null ? "New Rule" : "Edit Rule")" IsVisible="@_showRuleModal" OnClose="CloseRuleModal" Size="lg">
+    <ChildContent>
+        <div class="mb-3">
+            <label class="form-label">Rule Name</label>
+            <input type="text" class="form-control" @bind="_ruleName" placeholder="e.g., Project Alpha Meetings" />
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Rule Type</label>
+                <select class="form-select" @bind="_ruleType">
+                    <option value="@EntityLinkRuleType.StringMatch">String Match</option>
+                    <option value="@EntityLinkRuleType.Regex">Regex</option>
+                    <option value="@EntityLinkRuleType.CategoryMatch">Category Match</option>
+                    <option value="@EntityLinkRuleType.AttendeeMatch">Attendee Match</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Priority</label>
+                <input type="number" class="form-control" @bind="_rulePriority" min="0" max="100" />
+                <small class="text-muted">Higher priority rules are evaluated first</small>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Pattern</label>
+            <input type="text" class="form-control" @bind="_rulePattern"
+                   placeholder="@(_ruleType == EntityLinkRuleType.Regex ? "e.g., \\bproject\\s+alpha\\b" : "e.g., Project Alpha")" />
+            @if (_ruleType == EntityLinkRuleType.Regex && !string.IsNullOrEmpty(_rulePattern))
+            {
+                <small class="@(_isPatternValid ? "text-success" : "text-danger")">
+                    @(_isPatternValid ? "Valid regex pattern" : "Invalid regex pattern")
+                </small>
+            }
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label d-block">Apply To</label>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="applyToTitle" @bind="_applyToTitle" />
+                <label class="form-check-label" for="applyToTitle">Title</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="applyToDesc" @bind="_applyToDescription" />
+                <label class="form-check-label" for="applyToDesc">Description</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="applyToAttendees" @bind="_applyToAttendees" />
+                <label class="form-check-label" for="applyToAttendees">Attendees</label>
+            </div>
+            <div class="form-check form-check-inline ms-3">
+                <input class="form-check-input" type="checkbox" id="caseSensitive" @bind="_isCaseSensitive" />
+                <label class="form-check-label" for="caseSensitive">Case-sensitive</label>
+            </div>
+        </div>
+
+        <hr />
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Link To (Type)</label>
+                <select class="form-select" @bind="_targetType" @bind:after="OnTargetTypeChanged">
+                    <option value="@EntityLinkTargetType.Project">Project</option>
+                    <option value="@EntityLinkTargetType.Goal">Goal</option>
+                    <option value="@EntityLinkTargetType.Idea">Idea</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Target Entity</label>
+                <select class="form-select" @bind="_targetEntityId">
+                    <option value="">-- Select @_targetType --</option>
+                    @foreach (var entity in _availableTargets)
+                    {
+                        <option value="@entity.Id">@entity.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseRuleModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveRule" disabled="@(!CanSaveRule)">
+            <span class="oi oi-check me-1"></span> @(_editingRule == null ? "Create Rule" : "Save Changes")
+        </button>
+    </Footer>
+</Modal>
+
+@* Delete Confirmation *@
+<ConfirmDialog
+    Title="Delete Rule"
+    Message="@($"Are you sure you want to delete the rule '{_ruleToDelete?.Name}'?")"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false"
+    ConfirmText="Delete"
+    ConfirmButtonClass="btn-danger" />
+
+@code {
+    private bool _isLoading = true;
+    private List<EntityLinkRule> _rules = new();
+    private List<Project> _projects = new();
+    private List<Goal> _goals = new();
+    private List<Idea> _ideas = new();
+
+    // Test
+    private string _testText = "";
+    private IEnumerable<EntityLinkMatch>? _testResults;
+
+    // Add/Edit Modal
+    private bool _showRuleModal = false;
+    private EntityLinkRule? _editingRule;
+    private string _ruleName = "";
+    private EntityLinkRuleType _ruleType = EntityLinkRuleType.StringMatch;
+    private string _rulePattern = "";
+    private int _rulePriority = 0;
+    private bool _applyToTitle = true;
+    private bool _applyToDescription = false;
+    private bool _applyToAttendees = false;
+    private bool _isCaseSensitive = false;
+    private EntityLinkTargetType _targetType = EntityLinkTargetType.Project;
+    private Guid? _targetEntityId;
+    private List<(Guid Id, string Name)> _availableTargets = new();
+
+    // Delete
+    private bool _showDeleteConfirm = false;
+    private EntityLinkRule? _ruleToDelete;
+
+    private bool _isPatternValid => ValidatePattern();
+    private bool CanSaveRule => !string.IsNullOrWhiteSpace(_ruleName) &&
+                                 !string.IsNullOrWhiteSpace(_rulePattern) &&
+                                 _targetEntityId.HasValue &&
+                                 (_ruleType != EntityLinkRuleType.Regex || _isPatternValid);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var rulesTask = EntityLinkingService.GetRulesAsync();
+            var projectsTask = ProjectService.GetAllAsync();
+            var goalsTask = GoalService.GetAllAsync();
+            var ideasTask = IdeaService.GetAllAsync();
+
+            await Task.WhenAll(rulesTask, projectsTask, goalsTask, ideasTask);
+
+            _rules = (await rulesTask).ToList();
+            _projects = (await projectsTask).ToList();
+            _goals = (await goalsTask).ToList();
+            _ideas = (await ideasTask).ToList();
+
+            UpdateAvailableTargets();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void UpdateAvailableTargets()
+    {
+        _availableTargets = _targetType switch
+        {
+            EntityLinkTargetType.Project => _projects.Select(p => (p.Id, p.Name)).ToList(),
+            EntityLinkTargetType.Goal => _goals.Select(g => (g.Id, g.Title)).ToList(),
+            EntityLinkTargetType.Idea => _ideas.Select(i => (i.Id, i.Title)).ToList(),
+            _ => new List<(Guid, string)>()
+        };
+    }
+
+    private void OnTargetTypeChanged()
+    {
+        _targetEntityId = null;
+        UpdateAvailableTargets();
+    }
+
+    private bool ValidatePattern()
+    {
+        if (_ruleType != EntityLinkRuleType.Regex || string.IsNullOrWhiteSpace(_rulePattern))
+            return true;
+
+        try
+        {
+            _ = new System.Text.RegularExpressions.Regex(_rulePattern);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task TestRules()
+    {
+        if (string.IsNullOrWhiteSpace(_testText)) return;
+
+        // Create a fake event to test against
+        var testEvent = new CalendarEvent
+        {
+            Title = _testText,
+            Description = _testText
+        };
+
+        _testResults = await EntityLinkingService.GetPotentialLinksAsync(testEvent);
+    }
+
+    private async Task HandleTestKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await TestRules();
+        }
+    }
+
+    private void ShowAddModal()
+    {
+        _editingRule = null;
+        _ruleName = "";
+        _ruleType = EntityLinkRuleType.StringMatch;
+        _rulePattern = "";
+        _rulePriority = 0;
+        _applyToTitle = true;
+        _applyToDescription = false;
+        _applyToAttendees = false;
+        _isCaseSensitive = false;
+        _targetType = EntityLinkTargetType.Project;
+        _targetEntityId = null;
+        UpdateAvailableTargets();
+        _showRuleModal = true;
+    }
+
+    private void EditRule(EntityLinkRule rule)
+    {
+        _editingRule = rule;
+        _ruleName = rule.Name;
+        _ruleType = rule.RuleType;
+        _rulePattern = rule.Pattern;
+        _rulePriority = rule.Priority;
+        _applyToTitle = rule.ApplyToTitle;
+        _applyToDescription = rule.ApplyToDescription;
+        _applyToAttendees = rule.ApplyToAttendees;
+        _isCaseSensitive = rule.IsCaseSensitive;
+        _targetType = rule.TargetType;
+        _targetEntityId = rule.TargetEntityId;
+        UpdateAvailableTargets();
+        _showRuleModal = true;
+    }
+
+    private void CloseRuleModal()
+    {
+        _showRuleModal = false;
+        _editingRule = null;
+    }
+
+    private async Task SaveRule()
+    {
+        if (!CanSaveRule) return;
+
+        var targetName = _availableTargets.FirstOrDefault(t => t.Id == _targetEntityId).Name;
+
+        if (_editingRule == null)
+        {
+            // Create new rule
+            var newRule = new EntityLinkRule
+            {
+                Name = _ruleName,
+                RuleType = _ruleType,
+                Pattern = _rulePattern,
+                Priority = _rulePriority,
+                ApplyToTitle = _applyToTitle,
+                ApplyToDescription = _applyToDescription,
+                ApplyToAttendees = _applyToAttendees,
+                IsCaseSensitive = _isCaseSensitive,
+                TargetType = _targetType,
+                TargetEntityId = _targetEntityId,
+                TargetEntityName = targetName,
+                IsEnabled = true
+            };
+
+            await EntityLinkingService.CreateRuleAsync(newRule);
+        }
+        else
+        {
+            // Update existing rule
+            _editingRule.Name = _ruleName;
+            _editingRule.RuleType = _ruleType;
+            _editingRule.Pattern = _rulePattern;
+            _editingRule.Priority = _rulePriority;
+            _editingRule.ApplyToTitle = _applyToTitle;
+            _editingRule.ApplyToDescription = _applyToDescription;
+            _editingRule.ApplyToAttendees = _applyToAttendees;
+            _editingRule.IsCaseSensitive = _isCaseSensitive;
+            _editingRule.TargetType = _targetType;
+            _editingRule.TargetEntityId = _targetEntityId;
+            _editingRule.TargetEntityName = targetName;
+
+            await EntityLinkingService.UpdateRuleAsync(_editingRule);
+        }
+
+        CloseRuleModal();
+        await LoadData();
+    }
+
+    private async Task ToggleRuleEnabled(EntityLinkRule rule)
+    {
+        rule.IsEnabled = !rule.IsEnabled;
+        await EntityLinkingService.UpdateRuleAsync(rule);
+    }
+
+    private void ShowDeleteConfirm(EntityLinkRule rule)
+    {
+        _ruleToDelete = rule;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_ruleToDelete != null)
+        {
+            await EntityLinkingService.DeleteRuleAsync(_ruleToDelete.Id);
+            _showDeleteConfirm = false;
+            _ruleToDelete = null;
+            await LoadData();
+        }
+    }
+
+    private string GetRuleTypeBadgeClass(EntityLinkRuleType type) => type switch
+    {
+        EntityLinkRuleType.StringMatch => "bg-primary",
+        EntityLinkRuleType.Regex => "bg-warning text-dark",
+        EntityLinkRuleType.CategoryMatch => "bg-info",
+        EntityLinkRuleType.AttendeeMatch => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetTargetTypeBadgeClass(EntityLinkTargetType type) => type switch
+    {
+        EntityLinkTargetType.Project => "bg-success",
+        EntityLinkTargetType.Goal => "bg-primary",
+        EntityLinkTargetType.Task => "bg-info",
+        EntityLinkTargetType.Idea => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}

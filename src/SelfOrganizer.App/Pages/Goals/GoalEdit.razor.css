@@ -97,3 +97,38 @@ textarea.font-monospace {
         border-bottom: none;
     }
 }
+
+/* Balance Dimension Grid */
+.dimension-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+.dimension-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid;
+    background-color: transparent;
+    transition: all var(--transition-fast);
+    user-select: none;
+}
+
+.dimension-badge:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+}
+
+.dimension-badge.selected {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.dimension-badge .oi {
+    font-size: 0.65rem;
+}

@@ -427,17 +427,82 @@
                 <div class="card-body">
                     @if (_linkedTasks.Any())
                     {
+                        @* Show promotion hint if there are promotable tasks *@
+                        var promotableCount = _linkedTasks.Count(t => !t.ProjectId.HasValue && _linkedProjects.Any());
+                        @if (promotableCount > 0)
+                        {
+                            <div class="alert alert-info py-2 mb-3 small">
+                                <span class="oi oi-info me-1"></span>
+                                <strong>@promotableCount task@(promotableCount > 1 ? "s" : "")</strong> not assigned to a project.
+                                Click <span class="oi oi-arrow-right"></span> to promote.
+                            </div>
+                        }
                         <ul class="list-unstyled mb-0">
                             @foreach (var task in _linkedTasks.Take(10))
                             {
-                                <li class="linked-item d-flex justify-content-between align-items-center">
-                                    <a href="/tasks/@task.Id" class="text-decoration-none @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
-                                        <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-task") me-1"></span>
-                                        @task.Title
-                                    </a>
-                                    <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => UnlinkTask(task.Id)" title="Unlink task">
-                                        <span class="oi oi-x"></span>
-                                    </button>
+                                var isPromotable = !task.ProjectId.HasValue && _linkedProjects.Any();
+                                var isAssignedToLinkedProject = task.ProjectId.HasValue && _linkedProjects.Any(p => p.Id == task.ProjectId);
+                                <li class="linked-item d-flex justify-content-between align-items-center py-1">
+                                    <div class="d-flex align-items-center gap-2 flex-grow-1 min-width-0">
+                                        @if (isPromotable)
+                                        {
+                                            <span class="promotion-indicator" title="Not assigned to any project">
+                                                <span class="oi oi-circle-x text-warning"></span>
+                                            </span>
+                                        }
+                                        else if (isAssignedToLinkedProject)
+                                        {
+                                            var assignedProject = _linkedProjects.First(p => p.Id == task.ProjectId);
+                                            <span class="oi oi-circle-check text-success" title="Assigned to @assignedProject.Name"></span>
+                                        }
+                                        else if (task.ProjectId.HasValue)
+                                        {
+                                            <span class="oi oi-folder text-muted" title="Assigned to another project"></span>
+                                        }
+                                        <a href="/tasks/@task.Id" class="text-decoration-none text-truncate @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                            <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-task") me-1"></span>
+                                            @task.Title
+                                        </a>
+                                    </div>
+                                    <div class="d-flex gap-1 flex-shrink-0">
+                                        @if (isPromotable)
+                                        {
+                                            @if (_linkedProjects.Count == 1)
+                                            {
+                                                <button class="btn btn-sm btn-outline-success py-0 px-1"
+                                                        @onclick="() => PromoteTaskToProject(task.Id, _linkedProjects.First().Id)"
+                                                        title="Assign to @_linkedProjects.First().Name">
+                                                    <span class="oi oi-arrow-right"></span>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-success py-0 px-1 dropdown-toggle"
+                                                            type="button"
+                                                            data-bs-toggle="dropdown"
+                                                            aria-expanded="false"
+                                                            title="Assign to project">
+                                                        <span class="oi oi-arrow-right"></span>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end">
+                                                        @foreach (var project in _linkedProjects)
+                                                        {
+                                                            <li>
+                                                                <button class="dropdown-item" type="button" @onclick="() => PromoteTaskToProject(task.Id, project.Id)">
+                                                                    <span class="oi oi-folder me-1" style="color: @(project.Color ?? "#6b7280")"></span>
+                                                                    @project.Name
+                                                                </button>
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </div>
+                                            }
+                                        }
+                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => UnlinkTask(task.Id)" title="Unlink task">
+                                            <span class="oi oi-x"></span>
+                                        </button>
+                                    </div>
                                 </li>
                             }
                             @if (_linkedTasks.Count > 10)
@@ -1205,6 +1270,20 @@
         await LoadLinkedItems();
         await OnGoalUpdated.InvokeAsync();
         StateHasChanged();
+    }
+
+    private async Task PromoteTaskToProject(Guid taskId, Guid projectId)
+    {
+        var task = await TaskService.GetByIdAsync(taskId);
+        if (task != null)
+        {
+            task.ProjectId = projectId;
+            task.ModifiedAt = DateTime.UtcNow;
+            await TaskService.UpdateAsync(task);
+            await LoadLinkedItems();
+            await OnGoalUpdated.InvokeAsync();
+            StateHasChanged();
+        }
     }
 
     private void ShowNewTaskModal()

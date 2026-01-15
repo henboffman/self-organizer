@@ -1,0 +1,88 @@
+@* Displays a subtle badge indicating the source of a calendar event *@
+
+@if (!string.IsNullOrEmpty(Source) && Source != "Manual")
+{
+    <span class="event-source-badge @GetSourceClass()" title="@GetTooltip()">
+        <span class="oi @GetIcon()"></span>
+        @if (ShowLabel)
+        {
+            <span class="source-label">@GetLabel()</span>
+        }
+    </span>
+}
+
+@code {
+    /// <summary>
+    /// The source of the event (e.g., "Google", "Outlook", "Manual", "ICS")
+    /// </summary>
+    [Parameter]
+    public string? Source { get; set; }
+
+    /// <summary>
+    /// Whether to show the text label alongside the icon
+    /// </summary>
+    [Parameter]
+    public bool ShowLabel { get; set; } = false;
+
+    /// <summary>
+    /// Size variant: "sm" (default), "md", "lg"
+    /// </summary>
+    [Parameter]
+    public string Size { get; set; } = "sm";
+
+    private string GetSourceClass()
+    {
+        var sizeClass = Size switch
+        {
+            "md" => "source-md",
+            "lg" => "source-lg",
+            _ => "source-sm"
+        };
+
+        var providerClass = Source?.ToLowerInvariant() switch
+        {
+            "google" => "source-google",
+            "outlook" or "microsoftgraph" => "source-outlook",
+            "ics" => "source-ics",
+            _ => "source-other"
+        };
+
+        return $"{sizeClass} {providerClass}";
+    }
+
+    private string GetIcon()
+    {
+        return Source?.ToLowerInvariant() switch
+        {
+            "google" => "oi-globe",
+            "outlook" or "microsoftgraph" => "oi-envelope-closed",
+            "ics" => "oi-file",
+            "manual" => "oi-pencil",
+            _ => "oi-cloud"
+        };
+    }
+
+    private string GetLabel()
+    {
+        return Source?.ToLowerInvariant() switch
+        {
+            "google" => "Google",
+            "outlook" or "microsoftgraph" => "Outlook",
+            "ics" => "Import",
+            "manual" => "Manual",
+            _ => Source ?? "Unknown"
+        };
+    }
+
+    private string GetTooltip()
+    {
+        return Source?.ToLowerInvariant() switch
+        {
+            "google" => "Synced from Google Calendar",
+            "outlook" or "microsoftgraph" => "Synced from Outlook/Microsoft 365",
+            "ics" => "Imported from calendar file",
+            "manual" => "Created manually",
+            _ => $"Source: {Source}"
+        };
+    }
+}

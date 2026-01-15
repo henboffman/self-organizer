@@ -57,6 +57,15 @@ window.keyboardShortcuts = {
                 return;
             }
 
+            // Cmd+N for Quick Add (works even when typing)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnQuickAddShortcut');
+                }
+                return;
+            }
+
             // Cmd+Z for undo (works even when typing)
             if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'z') {
                 e.preventDefault();
@@ -91,6 +100,15 @@ window.keyboardShortcuts = {
             if (e.key === 'Escape') {
                 if (this._dotNetRef) {
                     this._dotNetRef.invokeMethodAsync('OnEscapeShortcut');
+                }
+                return;
+            }
+
+            // '/' for command palette / quick search (like VS Code)
+            if (e.key === '/' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnGlobalSearchShortcut');
                 }
                 return;
             }
@@ -135,6 +153,59 @@ window.keyboardShortcuts = {
             if (e.key === 'n') {
                 if (this._dotNetRef) {
                     this._dotNetRef.invokeMethodAsync('OnNewItemShortcut');
+                }
+                return;
+            }
+
+            // j/k for list navigation (vim-style)
+            if (e.key === 'j') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListNavigateShortcut', 'down');
+                }
+                return;
+            }
+
+            if (e.key === 'k') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListNavigateShortcut', 'up');
+                }
+                return;
+            }
+
+            // Enter to open selected item
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListSelectShortcut');
+                }
+                return;
+            }
+
+            // Space to toggle complete on selected item
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListToggleShortcut');
+                }
+                return;
+            }
+
+            // 'e' to edit selected item
+            if (e.key === 'e') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListEditShortcut');
+                }
+                return;
+            }
+
+            // 'd' to delete selected item (with confirmation)
+            if (e.key === 'd') {
+                e.preventDefault();
+                if (this._dotNetRef) {
+                    this._dotNetRef.invokeMethodAsync('OnListDeleteShortcut');
                 }
                 return;
             }

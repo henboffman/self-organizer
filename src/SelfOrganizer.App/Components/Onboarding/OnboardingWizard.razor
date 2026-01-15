@@ -1,11 +1,13 @@
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.Core.Interfaces
 @inject IRepository<UserPreferences> PreferencesRepository
+@inject IContextService ContextService
+@inject IBalanceDimensionService BalanceDimensionService
 
 @if (IsVisible)
 {
     <div class="onboarding-overlay">
-        <div class="onboarding-wizard">
+        <div class="onboarding-wizard @(_animationClass)">
             @* Progress Indicator *@
             <div class="progress-indicator mb-4">
                 @for (int i = 0; i < TotalSteps; i++)
@@ -29,43 +31,145 @@
             </div>
 
             @* Step Content *@
-            <div class="step-content">
+            <div class="step-content @(_stepAnimationClass)">
                 @switch (_currentStep)
                 {
                     case 0:
                         @* Welcome *@
-                        <div class="text-center">
+                        <div class="text-center animate-fade-in">
                             <div class="welcome-icon mb-3">
                                 <span class="oi oi-task" style="font-size: 4rem; color: var(--bs-primary);"></span>
                             </div>
                             <h2 class="mb-3">Welcome to Self Organizer</h2>
                             <p class="lead text-muted mb-4">
-                                A GTD-inspired task management app designed to help you capture, organize, and focus on what matters.
+                                A GTD-inspired productivity app designed to help you capture, organize, and focus on what matters most.
                             </p>
                             <div class="features-grid">
-                                <div class="feature-item">
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.1s">
                                     <span class="oi oi-inbox"></span>
                                     <span>Quick Capture</span>
                                 </div>
-                                <div class="feature-item">
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.2s">
                                     <span class="oi oi-calendar"></span>
                                     <span>Smart Scheduling</span>
                                 </div>
-                                <div class="feature-item">
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.3s">
                                     <span class="oi oi-target"></span>
-                                    <span>Focus Mode</span>
+                                    <span>Goal Tracking</span>
                                 </div>
-                                <div class="feature-item">
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.4s">
                                     <span class="oi oi-graph"></span>
-                                    <span>Progress Tracking</span>
+                                    <span>Life Balance</span>
                                 </div>
                             </div>
                         </div>
                         break;
 
                     case 1:
+                        @* App Mode Selection *@
+                        <div class="text-center animate-fade-in">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-dial" style="font-size: 3rem; color: var(--bs-primary);"></span>
+                            </div>
+                            <h2 class="mb-3">How Will You Use Self Organizer?</h2>
+                            <p class="text-muted mb-4">
+                                Choose your focus to personalize your experience with relevant contexts and balance dimensions.
+                            </p>
+                            <div class="mode-selection">
+                                <button class="mode-card @(_selectedMode == AppMode.Work ? "selected" : "")"
+                                        @onclick="() => SelectMode(AppMode.Work)">
+                                    <div class="mode-icon work-gradient">
+                                        <span class="oi oi-briefcase"></span>
+                                    </div>
+                                    <div class="mode-info">
+                                        <h4>Work Mode</h4>
+                                        <p>Career-focused contexts like deep work, meetings, and 1-on-1s. Track professional growth dimensions.</p>
+                                    </div>
+                                    @if (_selectedMode == AppMode.Work)
+                                    {
+                                        <span class="oi oi-check mode-check"></span>
+                                    }
+                                </button>
+                                <button class="mode-card @(_selectedMode == AppMode.Life ? "selected" : "")"
+                                        @onclick="() => SelectMode(AppMode.Life)">
+                                    <div class="mode-icon life-gradient">
+                                        <span class="oi oi-heart"></span>
+                                    </div>
+                                    <div class="mode-info">
+                                        <h4>Life Mode</h4>
+                                        <p>Personal contexts like home, errands, and weekends. Balance health, relationships, and recreation.</p>
+                                    </div>
+                                    @if (_selectedMode == AppMode.Life)
+                                    {
+                                        <span class="oi oi-check mode-check"></span>
+                                    }
+                                </button>
+                                <button class="mode-card @(_selectedMode == AppMode.Balanced ? "selected" : "")"
+                                        @onclick="() => SelectMode(AppMode.Balanced)">
+                                    <div class="mode-icon balanced-gradient">
+                                        <span class="oi oi-infinity"></span>
+                                    </div>
+                                    <div class="mode-info">
+                                        <h4>Balanced Mode</h4>
+                                        <p>Best of both worlds. A curated mix of work and life contexts with 10 key balance dimensions.</p>
+                                    </div>
+                                    @if (_selectedMode == AppMode.Balanced)
+                                    {
+                                        <span class="oi oi-check mode-check"></span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                        break;
+
+                    case 2:
+                        @* Mode Preview *@
+                        <div class="text-center animate-fade-in">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-eye" style="font-size: 3rem; color: var(--bs-info);"></span>
+                            </div>
+                            <h2 class="mb-3">Your @(_selectedMode) Setup</h2>
+                            <p class="text-muted mb-4">
+                                Here's what we'll set up for you. You can customize these later in Settings.
+                            </p>
+
+                            <div class="preview-section">
+                                <h5 class="preview-title">
+                                    <span class="oi oi-tag me-2"></span>Contexts
+                                </h5>
+                                <div class="context-preview-grid">
+                                    @foreach (var (name, icon, color) in _previewContexts.Take(8))
+                                    {
+                                        <span class="context-badge animate-pop-in" style="background-color: @color">
+                                            @name
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="preview-section mt-4">
+                                <h5 class="preview-title">
+                                    <span class="oi oi-pie-chart me-2"></span>Balance Dimensions
+                                </h5>
+                                <div class="dimension-preview-grid">
+                                    @foreach (var dim in _previewDimensions.Take(6))
+                                    {
+                                        <div class="dimension-preview-item animate-pop-in" style="border-left-color: @dim.Color">
+                                            <span class="dimension-name">@dim.Name</span>
+                                        </div>
+                                    }
+                                </div>
+                                @if (_previewDimensions.Count > 6)
+                                {
+                                    <p class="text-muted small mt-2">+ @(_previewDimensions.Count - 6) more dimensions</p>
+                                }
+                            </div>
+                        </div>
+                        break;
+
+                    case 3:
                         @* Capture Flow *@
-                        <div class="text-center">
+                        <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
                                 <span class="oi oi-inbox" style="font-size: 3rem; color: var(--bs-success);"></span>
                             </div>
@@ -74,7 +178,7 @@
                                 Get things out of your head and into your inbox. Quick capture lets you jot down thoughts, tasks, and ideas instantly.
                             </p>
                             <div class="workflow-steps">
-                                <div class="workflow-step">
+                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.1s">
                                     <div class="workflow-number">1</div>
                                     <div class="workflow-text">
                                         <strong>Capture</strong>
@@ -84,7 +188,7 @@
                                 <div class="workflow-arrow">
                                     <span class="oi oi-arrow-right"></span>
                                 </div>
-                                <div class="workflow-step">
+                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.2s">
                                     <div class="workflow-number">2</div>
                                     <div class="workflow-text">
                                         <strong>Clarify</strong>
@@ -94,7 +198,7 @@
                                 <div class="workflow-arrow">
                                     <span class="oi oi-arrow-right"></span>
                                 </div>
-                                <div class="workflow-step">
+                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.3s">
                                     <div class="workflow-number">3</div>
                                     <div class="workflow-text">
                                         <strong>Organize</strong>
@@ -105,15 +209,15 @@
                         </div>
                         break;
 
-                    case 2:
+                    case 4:
                         @* Calendar Provider *@
-                        <div class="text-center">
+                        <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
                                 <span class="oi oi-calendar" style="font-size: 3rem; color: var(--bs-info);"></span>
                             </div>
                             <h2 class="mb-3">Calendar Integration</h2>
                             <p class="text-muted mb-4">
-                                Choose your preferred calendar provider to sync meetings and schedule tasks around your existing commitments.
+                                Connect your calendar to sync meetings and schedule tasks around your existing commitments.
                             </p>
                             <div class="provider-selection">
                                 <button class="provider-option @(_selectedProvider == CalendarProvider.Google ? "selected" : "")"
@@ -147,39 +251,48 @@
                                 </button>
                             </div>
                             <p class="text-muted small mt-3">
-                                You can change this later in Settings.
+                                You can connect your calendar later in Settings.
                             </p>
                         </div>
                         break;
 
-                    case 3:
-                        @* Contexts *@
-                        <div class="text-center">
+                    case 5:
+                        @* Balance Areas Selection *@
+                        <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-tag" style="font-size: 3rem; color: var(--bs-warning);"></span>
+                                <span class="oi oi-pie-chart" style="font-size: 3rem; color: var(--bs-warning);"></span>
                             </div>
-                            <h2 class="mb-3">Work in Context</h2>
+                            <h2 class="mb-3">Track Your Balance</h2>
                             <p class="text-muted mb-4">
-                                Contexts help you filter tasks based on where you are or what tools you have available. Focus on what you can do right now.
+                                Select the life areas you want to track. These will appear in your Balance Wheel.
                             </p>
-                            <div class="context-examples">
-                                <span class="context-badge" style="background-color: #e83e8c;">home</span>
-                                <span class="context-badge" style="background-color: #17a2b8;">work</span>
-                                <span class="context-badge" style="background-color: #6610f2;">computer</span>
-                                <span class="context-badge" style="background-color: #dc3545;">call</span>
-                                <span class="context-badge" style="background-color: #20c997;">errand</span>
-                                <span class="context-badge" style="background-color: #fd7e14;">read</span>
+                            <div class="life-area-grid">
+                                @foreach (var dim in _previewDimensions)
+                                {
+                                    var isEnabled = _enabledDimensions.Contains(dim.Id);
+                                    <button class="life-area-item @(isEnabled ? "enabled" : "")"
+                                            @onclick="() => ToggleDimension(dim.Id)"
+                                            style="--dim-color: @dim.Color">
+                                        <div class="area-indicator" style="background-color: @dim.Color"></div>
+                                        <span class="area-name">@dim.Name</span>
+                                        @if (isEnabled)
+                                        {
+                                            <span class="oi oi-check area-check"></span>
+                                        }
+                                    </button>
+                                }
                             </div>
-                            <p class="text-muted small mt-4">
-                                You can create your own custom contexts in Settings.
+                            <p class="text-muted small mt-3">
+                                <span class="oi oi-info me-1"></span>
+                                @_enabledDimensions.Count of @_previewDimensions.Count selected
                             </p>
                         </div>
                         break;
 
-                    case 4:
+                    case 6:
                         @* Get Started *@
-                        <div class="text-center">
-                            <div class="step-icon mb-3">
+                        <div class="text-center animate-fade-in">
+                            <div class="step-icon mb-3 animate-bounce">
                                 <span class="oi oi-bolt" style="font-size: 3rem; color: var(--bs-success);"></span>
                             </div>
                             <h2 class="mb-3">You're All Set!</h2>
@@ -187,7 +300,12 @@
                                 Start by capturing your first thought or task. Remember: getting things out of your head is the first step to staying organized.
                             </p>
                             <div class="tip-box">
-                                <strong>Pro Tip:</strong> Use the keyboard shortcut <kbd>C</kbd> anywhere in the app to quickly capture a new item.
+                                <strong>Pro Tips:</strong>
+                                <ul class="tip-list">
+                                    <li>Press <kbd>C</kbd> anywhere to quickly capture a new item</li>
+                                    <li>Press <kbd>?</kbd> to see all keyboard shortcuts</li>
+                                    <li>Check your Balance Wheel regularly in Reports</li>
+                                </ul>
                             </div>
                         </div>
                         break;
@@ -215,8 +333,17 @@
                 }
                 else
                 {
-                    <button class="btn btn-success btn-lg" @onclick="CompleteOnboarding">
-                        <span class="oi oi-check me-1"></span> Get Started
+                    <button class="btn btn-success btn-lg" @onclick="CompleteOnboarding" disabled="@_isCompleting">
+                        @if (_isCompleting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Setting up...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>Get Started</span>
+                        }
                     </button>
                 }
             </div>
@@ -231,17 +358,31 @@
     [Parameter]
     public EventCallback OnCompleted { get; set; }
 
-    private const int TotalSteps = 5;
+    private const int TotalSteps = 7;
     private int _currentStep = 0;
     private CalendarProvider _selectedProvider = CalendarProvider.None;
+    private AppMode _selectedMode = AppMode.Balanced;
+    private List<(string Name, string Icon, string Color)> _previewContexts = new();
+    private List<BalanceDimension> _previewDimensions = new();
+    private HashSet<string> _enabledDimensions = new();
+    private bool _isCompleting = false;
+    private string _animationClass = "";
+    private string _stepAnimationClass = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdatePreviews();
+    }
 
     private string GetStepLabel(int step) => step switch
     {
         0 => "Welcome",
-        1 => "Capture",
-        2 => "Calendar",
-        3 => "Contexts",
-        4 => "Start",
+        1 => "Mode",
+        2 => "Preview",
+        3 => "Capture",
+        4 => "Calendar",
+        5 => "Balance",
+        6 => "Start",
         _ => ""
     };
 
@@ -253,19 +394,31 @@
         }
     }
 
-    private void NextStep()
+    private async Task NextStep()
     {
         if (_currentStep < TotalSteps - 1)
         {
+            _stepAnimationClass = "animate-slide-out";
+            await Task.Delay(150);
             _currentStep++;
+            _stepAnimationClass = "animate-slide-in";
+            StateHasChanged();
+            await Task.Delay(300);
+            _stepAnimationClass = "";
         }
     }
 
-    private void PreviousStep()
+    private async Task PreviousStep()
     {
         if (_currentStep > 0)
         {
+            _stepAnimationClass = "animate-slide-out-reverse";
+            await Task.Delay(150);
             _currentStep--;
+            _stepAnimationClass = "animate-slide-in-reverse";
+            StateHasChanged();
+            await Task.Delay(300);
+            _stepAnimationClass = "";
         }
     }
 
@@ -274,27 +427,81 @@
         _selectedProvider = provider;
     }
 
-    private async Task CompleteOnboarding()
+    private async Task SelectMode(AppMode mode)
     {
-        // Save preferences
-        var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
-        if (prefs == null)
-        {
-            prefs = new UserPreferences();
-        }
+        _selectedMode = mode;
+        await UpdatePreviews();
+    }
 
-        prefs.OnboardingCompleted = true;
-        prefs.PreferredCalendarProvider = _selectedProvider;
+    private async Task UpdatePreviews()
+    {
+        // Get contexts for selected mode
+        _previewContexts = ContextService.GetContextDefinitionsForMode(_selectedMode).ToList();
 
-        if (prefs.CreatedAt == default)
+        // Get balance dimensions for selected mode
+        _previewDimensions = (await BalanceDimensionService.GetDimensionsForModeAsync(_selectedMode)).ToList();
+
+        // Enable all dimensions by default
+        _enabledDimensions = _previewDimensions.Select(d => d.Id).ToHashSet();
+    }
+
+    private void ToggleDimension(string dimensionId)
+    {
+        if (_enabledDimensions.Contains(dimensionId))
         {
-            await PreferencesRepository.AddAsync(prefs);
+            // Don't allow deselecting all
+            if (_enabledDimensions.Count > 1)
+            {
+                _enabledDimensions.Remove(dimensionId);
+            }
         }
         else
         {
-            await PreferencesRepository.UpdateAsync(prefs);
+            _enabledDimensions.Add(dimensionId);
         }
+    }
 
-        await OnCompleted.InvokeAsync();
+    private async Task CompleteOnboarding()
+    {
+        _isCompleting = true;
+        StateHasChanged();
+
+        try
+        {
+            // Get or create preferences
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            if (prefs == null)
+            {
+                prefs = new UserPreferences();
+            }
+
+            // Save all preferences
+            prefs.OnboardingCompleted = true;
+            prefs.PreferredCalendarProvider = _selectedProvider;
+            prefs.AppMode = _selectedMode;
+            prefs.AppModeSetAt = DateTime.UtcNow;
+            prefs.EnabledBalanceDimensions = _enabledDimensions.ToList();
+
+            if (prefs.CreatedAt == default)
+            {
+                await PreferencesRepository.AddAsync(prefs);
+            }
+            else
+            {
+                await PreferencesRepository.UpdateAsync(prefs);
+            }
+
+            // Seed contexts for the selected mode
+            await ContextService.SeedContextsForModeAsync(_selectedMode);
+
+            // Small delay for visual feedback
+            await Task.Delay(500);
+
+            await OnCompleted.InvokeAsync();
+        }
+        finally
+        {
+            _isCompleting = false;
+        }
     }
 }

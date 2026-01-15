@@ -1,0 +1,315 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+@if (IsVisible)
+{
+    <div class="quick-add-overlay" @onclick="HandleOverlayClick">
+        <div class="quick-add-container" @onclick:stopPropagation="true">
+            <div class="quick-add-header">
+                <h5 class="m-0">Quick Add Task</h5>
+                <button class="btn btn-link text-muted p-0" @onclick="Close">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+
+            <div class="quick-add-body">
+                <input type="text"
+                       class="quick-add-input"
+                       placeholder="Add task... (e.g., 'Call mom tomorrow @@phone 30m !!')"
+                       @bind="_inputText"
+                       @bind:event="oninput"
+                       @onkeydown="HandleKeyDown"
+                       @ref="_inputRef" />
+
+                @if (!string.IsNullOrWhiteSpace(_inputText))
+                {
+                    <div class="parsed-preview">
+                        <div class="preview-title">@_parsedTitle</div>
+
+                        <div class="preview-badges">
+                            @if (_parsedDueDate.HasValue)
+                            {
+                                <span class="preview-badge due-date">
+                                    <span class="oi oi-calendar me-1"></span>@_parsedDueDate.Value.ToString("MMM d")
+                                </span>
+                            }
+                            @if (!string.IsNullOrEmpty(_parsedContext))
+                            {
+                                <span class="preview-badge context">
+                                    <span class="oi oi-location me-1"></span>@_parsedContext
+                                </span>
+                            }
+                            @if (_parsedEstimate > 0)
+                            {
+                                <span class="preview-badge estimate">
+                                    <span class="oi oi-clock me-1"></span>@(_parsedEstimate)m
+                                </span>
+                            }
+                            @if (_parsedPriority == 1)
+                            {
+                                <span class="preview-badge priority-high">
+                                    <span class="oi oi-star me-1"></span>High
+                                </span>
+                            }
+                            @foreach (var tag in _parsedTags.Take(3))
+                            {
+                                <span class="preview-badge tag">#@tag</span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="quick-add-hints">
+                    <span class="hint"><kbd>@@</kbd> context</span>
+                    <span class="hint"><kbd>#</kbd> tag</span>
+                    <span class="hint"><kbd>!</kbd> or <kbd>!!</kbd> priority</span>
+                    <span class="hint"><kbd>30m</kbd> <kbd>2h</kbd> time</span>
+                    <span class="hint"><kbd>tomorrow</kbd> <kbd>fri</kbd> <kbd>in 3d</kbd> due</span>
+                </div>
+            </div>
+
+            <div class="quick-add-footer">
+                <button class="btn btn-secondary btn-sm" @onclick="Close">Cancel</button>
+                <button class="btn btn-primary btn-sm" @onclick="CreateTask" disabled="@string.IsNullOrWhiteSpace(_parsedTitle)">
+                    <span class="oi oi-plus me-1"></span>Add Task
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private ElementReference _inputRef;
+    private string _inputText = string.Empty;
+
+    // Parsed fields
+    private string _parsedTitle = string.Empty;
+    private DateTime? _parsedDueDate;
+    private string _parsedContext = string.Empty;
+    private int _parsedEstimate;
+    private int _parsedPriority = 3;
+    private List<string> _parsedTags = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible)
+        {
+            _inputText = string.Empty;
+            ResetParsedFields();
+            await Task.Delay(50); // Small delay for DOM update
+            try
+            {
+                await _inputRef.FocusAsync();
+            }
+            catch { }
+        }
+    }
+
+    private void ResetParsedFields()
+    {
+        _parsedTitle = string.Empty;
+        _parsedDueDate = null;
+        _parsedContext = string.Empty;
+        _parsedEstimate = 0;
+        _parsedPriority = 3;
+        _parsedTags.Clear();
+    }
+
+    private void ParseInput()
+    {
+        ResetParsedFields();
+        if (string.IsNullOrWhiteSpace(_inputText)) return;
+
+        var text = _inputText;
+        var titleParts = new List<string>();
+
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var word in words)
+        {
+            // Check for context (@home, @work, etc.)
+            if (word.StartsWith("@") && word.Length > 1)
+            {
+                _parsedContext = word;
+                continue;
+            }
+
+            // Check for tags (#urgent, #followup)
+            if (word.StartsWith("#") && word.Length > 1)
+            {
+                _parsedTags.Add(word.TrimStart('#'));
+                continue;
+            }
+
+            // Check for priority (!, !!, !!!)
+            if (word == "!" || word == "!!" || word == "!!!" || word.ToLower() == "high")
+            {
+                _parsedPriority = 1;
+                continue;
+            }
+            if (word.ToLower() == "low")
+            {
+                _parsedPriority = 3;
+                continue;
+            }
+
+            // Check for time estimates (30m, 2h, 1h30m)
+            var timeMatch = System.Text.RegularExpressions.Regex.Match(word, @"^(\d+)(m|h|min|hour)s?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (timeMatch.Success)
+            {
+                var value = int.Parse(timeMatch.Groups[1].Value);
+                var unit = timeMatch.Groups[2].Value.ToLower();
+                _parsedEstimate = unit.StartsWith("h") ? value * 60 : value;
+                continue;
+            }
+
+            // Check for date keywords
+            var lowerWord = word.ToLower();
+            if (TryParseDateKeyword(lowerWord, out var date))
+            {
+                _parsedDueDate = date;
+                continue;
+            }
+
+            // Check for "in Xd" pattern (e.g., "in", "3d")
+            var daysMatch = System.Text.RegularExpressions.Regex.Match(word, @"^(\d+)d$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (daysMatch.Success)
+            {
+                var days = int.Parse(daysMatch.Groups[1].Value);
+                _parsedDueDate = DateTime.Today.AddDays(days);
+                continue;
+            }
+
+            // Regular word - add to title
+            titleParts.Add(word);
+        }
+
+        // Also check for "in X days" pattern
+        var inDaysMatch = System.Text.RegularExpressions.Regex.Match(text, @"\bin\s+(\d+)\s*(days?|d)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (inDaysMatch.Success && !_parsedDueDate.HasValue)
+        {
+            var days = int.Parse(inDaysMatch.Groups[1].Value);
+            _parsedDueDate = DateTime.Today.AddDays(days);
+            // Remove from title parts
+            var matchText = inDaysMatch.Value;
+            titleParts = titleParts.Where(w => !matchText.Contains(w, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        _parsedTitle = string.Join(" ", titleParts).Trim();
+    }
+
+    private bool TryParseDateKeyword(string word, out DateTime date)
+    {
+        date = DateTime.Today;
+
+        switch (word)
+        {
+            case "today":
+                date = DateTime.Today;
+                return true;
+            case "tomorrow":
+            case "tmr":
+            case "tom":
+                date = DateTime.Today.AddDays(1);
+                return true;
+            case "monday":
+            case "mon":
+                date = GetNextWeekday(DayOfWeek.Monday);
+                return true;
+            case "tuesday":
+            case "tue":
+            case "tues":
+                date = GetNextWeekday(DayOfWeek.Tuesday);
+                return true;
+            case "wednesday":
+            case "wed":
+                date = GetNextWeekday(DayOfWeek.Wednesday);
+                return true;
+            case "thursday":
+            case "thu":
+            case "thur":
+            case "thurs":
+                date = GetNextWeekday(DayOfWeek.Thursday);
+                return true;
+            case "friday":
+            case "fri":
+                date = GetNextWeekday(DayOfWeek.Friday);
+                return true;
+            case "saturday":
+            case "sat":
+                date = GetNextWeekday(DayOfWeek.Saturday);
+                return true;
+            case "sunday":
+            case "sun":
+                date = GetNextWeekday(DayOfWeek.Sunday);
+                return true;
+            case "nextweek":
+                date = DateTime.Today.AddDays(7);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private DateTime GetNextWeekday(DayOfWeek day)
+    {
+        var today = DateTime.Today;
+        var daysUntil = ((int)day - (int)today.DayOfWeek + 7) % 7;
+        if (daysUntil == 0) daysUntil = 7; // If today is that day, get next week
+        return today.AddDays(daysUntil);
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        ParseInput();
+
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_parsedTitle))
+        {
+            await CreateTask();
+        }
+        else if (e.Key == "Escape")
+        {
+            await Close();
+        }
+    }
+
+    private void HandleOverlayClick()
+    {
+        _ = Close();
+    }
+
+    private async Task CreateTask()
+    {
+        if (string.IsNullOrWhiteSpace(_parsedTitle)) return;
+
+        var task = new TodoTask
+        {
+            Title = _parsedTitle,
+            Status = TodoTaskStatus.NextAction,
+            Priority = _parsedPriority,
+            DueDate = _parsedDueDate,
+            EstimatedMinutes = _parsedEstimate,
+            Category = !string.IsNullOrEmpty(_parsedContext) ? _parsedContext : null,
+            Tags = _parsedTags.ToList(),
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        await TaskService.CreateAsync(task);
+        DataChangeNotification.NotifyDataChanged();
+
+        _inputText = string.Empty;
+        ResetParsedFields();
+        await Close();
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+}

@@ -1,0 +1,461 @@
+@page "/morning"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.IRepository<DailySnapshot> SnapshotRepository
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+
+<div class="morning-checkin">
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (_alreadyCompleted)
+    {
+        <div class="text-center py-5">
+            <div class="checkin-complete-icon">
+                <span class="oi oi-check"></span>
+            </div>
+            <h2 class="mt-4">Morning Check-in Complete!</h2>
+            <p class="text-muted">You've already set your intentions for today.</p>
+
+            <div class="mt-4 d-flex gap-3 justify-content-center">
+                <a href="/tasks" class="btn btn-primary">
+                    <span class="oi oi-task me-1"></span>View Tasks
+                </a>
+                <a href="/calendar" class="btn btn-outline-secondary">
+                    <span class="oi oi-calendar me-1"></span>Calendar
+                </a>
+                <button class="btn btn-outline-primary" @onclick="ResetCheckin">
+                    <span class="oi oi-reload me-1"></span>Redo Check-in
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="checkin-wizard">
+            @* Progress indicator *@
+            <div class="progress-steps">
+                @for (int i = 1; i <= 4; i++)
+                {
+                    var step = i;
+                    <div class="step @(step == _currentStep ? "active" : "") @(step < _currentStep ? "completed" : "")">
+                        <div class="step-number">@step</div>
+                        <div class="step-label">@GetStepLabel(step)</div>
+                    </div>
+                }
+            </div>
+
+            <div class="checkin-content">
+                @* Step 1: How are you feeling? *@
+                @if (_currentStep == 1)
+                {
+                    <div class="step-content">
+                        <h2>Good morning!</h2>
+                        <p class="lead text-muted">Let's start your day with intention.</p>
+
+                        <div class="feeling-section mt-5">
+                            <h5>How's your energy level today?</h5>
+                            <div class="rating-scale">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var level = i;
+                                    <button class="rating-btn @(_energyLevel == level ? "selected" : "")"
+                                            @onclick="() => _energyLevel = level">
+                                        <span class="rating-icon">@GetEnergyEmoji(level)</span>
+                                        <span class="rating-label">@GetEnergyLabel(level)</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="feeling-section mt-4">
+                            <h5>How's your mood?</h5>
+                            <div class="rating-scale">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var level = i;
+                                    <button class="rating-btn @(_moodLevel == level ? "selected" : "")"
+                                            @onclick="() => _moodLevel = level">
+                                        <span class="rating-icon">@GetMoodEmoji(level)</span>
+                                        <span class="rating-label">@GetMoodLabel(level)</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Step 2: Set intentions *@
+                @if (_currentStep == 2)
+                {
+                    <div class="step-content">
+                        <h2>Set Your Intention</h2>
+                        <p class="lead text-muted">What do you want to focus on today?</p>
+
+                        <div class="mt-4">
+                            <label class="form-label">Today's intention or theme</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   placeholder="e.g., Stay focused, Be patient, Ship the feature..."
+                                   @bind="_intention" />
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">One thing I'm grateful for</label>
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="What's something positive in your life right now?"
+                                   @bind="_gratitude" />
+                            <div class="form-text">Gratitude helps shift your mindset for the day.</div>
+                        </div>
+                    </div>
+                }
+
+                @* Step 3: Pick priorities *@
+                @if (_currentStep == 3)
+                {
+                    <div class="step-content">
+                        <h2>Today's Top Priorities</h2>
+                        <p class="lead text-muted">What are the 3 most important things to accomplish today?</p>
+
+                        @if (_availableTasks.Any())
+                        {
+                            <div class="priority-picker mt-4">
+                                <div class="selected-priorities mb-4">
+                                    <h6>Selected (@_selectedPriorityIds.Count/3)</h6>
+                                    @if (_selectedPriorityIds.Any())
+                                    {
+                                        <div class="list-group">
+                                            @foreach (var id in _selectedPriorityIds)
+                                            {
+                                                var task = _availableTasks.FirstOrDefault(t => t.Id == id);
+                                                if (task != null)
+                                                {
+                                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <span class="priority-number">@(_selectedPriorityIds.IndexOf(id) + 1).</span>
+                                                        <span class="flex-grow-1 ms-2">@task.Title</span>
+                                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemovePriority(id)">
+                                                            <span class="oi oi-x"></span>
+                                                        </button>
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-muted small">Select up to 3 tasks from below</div>
+                                    }
+                                </div>
+
+                                <h6>Available Tasks</h6>
+                                <div class="task-list">
+                                    @foreach (var task in _availableTasks.Where(t => !_selectedPriorityIds.Contains(t.Id)).Take(10))
+                                    {
+                                        <div class="task-item @(_selectedPriorityIds.Count >= 3 ? "disabled" : "")"
+                                             @onclick="() => AddPriority(task.Id)">
+                                            <span class="task-title">@task.Title</span>
+                                            @if (task.DueDate.HasValue)
+                                            {
+                                                <span class="badge bg-info ms-2">Due @task.DueDate.Value.ToString("MMM d")</span>
+                                            }
+                                            @if (task.Priority == 1)
+                                            {
+                                                <span class="badge bg-danger ms-2">High</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info mt-4">
+                                <span class="oi oi-info me-2"></span>
+                                No pending tasks found. You can skip this step or add some tasks first.
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* Step 4: Review & confirm *@
+                @if (_currentStep == 4)
+                {
+                    <div class="step-content">
+                        <h2>Review Your Check-in</h2>
+                        <p class="lead text-muted">Here's your plan for today:</p>
+
+                        <div class="review-card mt-4">
+                            <div class="review-section">
+                                <h6>How You're Feeling</h6>
+                                <div class="d-flex gap-4">
+                                    <div>
+                                        <span class="text-muted">Energy:</span>
+                                        <span class="ms-2">@GetEnergyEmoji(_energyLevel ?? 3) @GetEnergyLabel(_energyLevel ?? 3)</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-muted">Mood:</span>
+                                        <span class="ms-2">@GetMoodEmoji(_moodLevel ?? 3) @GetMoodLabel(_moodLevel ?? 3)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_intention))
+                            {
+                                <div class="review-section">
+                                    <h6>Today's Intention</h6>
+                                    <p class="mb-0">"@_intention"</p>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_gratitude))
+                            {
+                                <div class="review-section">
+                                    <h6>Gratitude</h6>
+                                    <p class="mb-0">@_gratitude</p>
+                                </div>
+                            }
+
+                            @if (_selectedPriorityIds.Any())
+                            {
+                                <div class="review-section">
+                                    <h6>Top Priorities</h6>
+                                    <ol class="mb-0">
+                                        @foreach (var id in _selectedPriorityIds)
+                                        {
+                                            var task = _availableTasks.FirstOrDefault(t => t.Id == id);
+                                            if (task != null)
+                                            {
+                                                <li>@task.Title</li>
+                                            }
+                                        }
+                                    </ol>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="text-center mt-5">
+                            <button class="btn btn-primary btn-lg" @onclick="CompleteCheckin">
+                                <span class="oi oi-check me-2"></span>Complete Check-in
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @* Navigation *@
+            <div class="checkin-nav">
+                @if (_currentStep > 1)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="PreviousStep">
+                        <span class="oi oi-arrow-left me-1"></span>Back
+                    </button>
+                }
+                else
+                {
+                    <div></div>
+                }
+
+                @if (_currentStep < 4)
+                {
+                    <button class="btn btn-primary" @onclick="NextStep" disabled="@(!CanProceed())">
+                        Next<span class="oi oi-arrow-right ms-1"></span>
+                    </button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _alreadyCompleted = false;
+    private int _currentStep = 1;
+    private DailySnapshot? _snapshot;
+
+    // Step 1: Feelings
+    private int? _energyLevel;
+    private int? _moodLevel;
+
+    // Step 2: Intentions
+    private string _intention = string.Empty;
+    private string _gratitude = string.Empty;
+
+    // Step 3: Priorities
+    private List<TodoTask> _availableTasks = new();
+    private List<Guid> _selectedPriorityIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+
+            // Check if already completed today
+            var snapshots = await SnapshotRepository.GetAllAsync();
+            _snapshot = snapshots.FirstOrDefault(s => s.Date == today);
+
+            if (_snapshot?.MorningCheckinCompleted == true)
+            {
+                _alreadyCompleted = true;
+            }
+            else
+            {
+                // Load available tasks
+                var allTasks = await TaskService.GetNextActionsAsync();
+                _availableTasks = allTasks
+                    .Where(t => t.Status == TodoTaskStatus.NextAction || t.Status == TodoTaskStatus.Scheduled)
+                    .OrderBy(t => t.Priority)
+                    .ThenBy(t => t.DueDate)
+                    .ToList();
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (_currentStep < 4 && CanProceed())
+        {
+            _currentStep++;
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (_currentStep > 1)
+        {
+            _currentStep--;
+        }
+    }
+
+    private bool CanProceed()
+    {
+        return _currentStep switch
+        {
+            1 => _energyLevel.HasValue && _moodLevel.HasValue,
+            2 => true, // Intention is optional
+            3 => true, // Priorities are optional
+            _ => true
+        };
+    }
+
+    private void AddPriority(Guid taskId)
+    {
+        if (_selectedPriorityIds.Count < 3 && !_selectedPriorityIds.Contains(taskId))
+        {
+            _selectedPriorityIds.Add(taskId);
+        }
+    }
+
+    private void RemovePriority(Guid taskId)
+    {
+        _selectedPriorityIds.Remove(taskId);
+    }
+
+    private async Task CompleteCheckin()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        if (_snapshot == null)
+        {
+            _snapshot = new DailySnapshot { Date = today };
+        }
+
+        _snapshot.MorningCheckinCompleted = true;
+        _snapshot.MorningCheckinTime = DateTime.UtcNow;
+        _snapshot.MorningEnergy = _energyLevel;
+        _snapshot.MorningMood = _moodLevel;
+        _snapshot.MorningIntention = _intention;
+        _snapshot.MorningGratitude = _gratitude;
+        _snapshot.TopPriorityTaskIds = _selectedPriorityIds.ToList();
+
+        if (_snapshot.Id == Guid.Empty)
+        {
+            await SnapshotRepository.AddAsync(_snapshot);
+        }
+        else
+        {
+            await SnapshotRepository.UpdateAsync(_snapshot);
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        _alreadyCompleted = true;
+    }
+
+    private void ResetCheckin()
+    {
+        _alreadyCompleted = false;
+        _currentStep = 1;
+        _energyLevel = null;
+        _moodLevel = null;
+        _intention = string.Empty;
+        _gratitude = string.Empty;
+        _selectedPriorityIds.Clear();
+    }
+
+    private string GetStepLabel(int step) => step switch
+    {
+        1 => "Feeling",
+        2 => "Intention",
+        3 => "Priorities",
+        4 => "Review",
+        _ => ""
+    };
+
+    private string GetEnergyEmoji(int level) => level switch
+    {
+        1 => "1",
+        2 => "2",
+        3 => "3",
+        4 => "4",
+        5 => "5",
+        _ => "3"
+    };
+
+    private string GetEnergyLabel(int level) => level switch
+    {
+        1 => "Very Low",
+        2 => "Low",
+        3 => "Moderate",
+        4 => "High",
+        5 => "Very High",
+        _ => "Moderate"
+    };
+
+    private string GetMoodEmoji(int level) => level switch
+    {
+        1 => "1",
+        2 => "2",
+        3 => "3",
+        4 => "4",
+        5 => "5",
+        _ => "3"
+    };
+
+    private string GetMoodLabel(int level) => level switch
+    {
+        1 => "Struggling",
+        2 => "Low",
+        3 => "Okay",
+        4 => "Good",
+        5 => "Great",
+        _ => "Okay"
+    };
+}

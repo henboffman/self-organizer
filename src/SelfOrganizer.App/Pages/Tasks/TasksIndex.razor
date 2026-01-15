@@ -7,6 +7,7 @@
 @inject IDataChangeNotificationService DataChangeNotification
 @inject NavigationManager NavigationManager
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject KeyboardNavigationService KeyboardNavigation
 @implements IDisposable
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -64,6 +65,21 @@
         </a>
     </li>
 </ul>
+
+@* Active Filter Banner *@
+@if (!string.IsNullOrEmpty(ActiveFilter))
+{
+    <div class="alert @GetFilterAlertClass() d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <span class="oi @GetFilterIcon() me-2"></span>
+            <strong>@GetFilterLabel()</strong>
+            <span class="ms-2">(@_filteredTasks.Count task@(_filteredTasks.Count != 1 ? "s" : ""))</span>
+        </div>
+        <a href="/tasks" class="btn btn-sm btn-outline-secondary">
+            <span class="oi oi-x me-1"></span>Clear Filter
+        </a>
+    </div>
+}
 
 @if (_isLoading)
 {
@@ -129,9 +145,13 @@ else
 
     @* Task List *@
     <div class="list-group">
-        @foreach (var task in GetDisplayTasks())
+        @{ var displayTasks = GetDisplayTasks().ToList(); }
+        @for (var i = 0; i < displayTasks.Count; i++)
         {
-            <div class="list-group-item list-group-item-action d-flex align-items-start @(_selectedTaskIds.Contains(task.Id) ? "list-group-item-info" : "")">
+            var task = displayTasks[i];
+            var index = i;
+            var isFocused = _keyboardFocusIndex == index;
+            <div class="list-group-item list-group-item-action d-flex align-items-start @(_selectedTaskIds.Contains(task.Id) ? "list-group-item-info" : "") @(isFocused ? "keyboard-focused" : "")">
                 @* Selection Checkbox *@
                 <div class="form-check me-2 mt-1">
                     <input class="form-check-input"
@@ -255,8 +275,10 @@ else
 
 @code {
     [Parameter] public string? Status { get; set; }
+    [SupplyParameterFromQuery(Name = "filter")] public string? FilterQuery { get; set; }
 
     private string CurrentStatus => Status?.ToLower() ?? "next";
+    private string? ActiveFilter => FilterQuery?.ToLower();
 
     private bool _isLoading = true;
     private List<TodoTask> _allTasks = new();
@@ -269,6 +291,12 @@ else
     private int _scheduledCount;
     private int _somedayCount;
 
+    // Special filter counts
+    private int _overdueCount;
+    private int _todayCount;
+    private int _blockedCount;
+    private int _noDateCount;
+
     private bool _showAddModal = false;
     private TodoTask _newTask = new();
 
@@ -276,9 +304,18 @@ else
     private HashSet<Guid> _selectedTaskIds = new();
     private bool _showBatchDeleteConfirm = false;
 
+    // Keyboard navigation state
+    private int _keyboardFocusIndex = -1;
+    private List<TodoTask> _cachedDisplayTasks = new();
+
     protected override async Task OnInitializedAsync()
     {
         DataChangeNotification.OnDataChanged += HandleDataChanged;
+        KeyboardNavigation.OnNavigate += HandleKeyboardNavigate;
+        KeyboardNavigation.OnSelect += HandleKeyboardSelect;
+        KeyboardNavigation.OnToggle += HandleKeyboardToggle;
+        KeyboardNavigation.OnEdit += HandleKeyboardEdit;
+        KeyboardNavigation.OnDelete += HandleKeyboardDelete;
         await LoadTasks();
     }
 
@@ -304,23 +341,46 @@ else
         try
         {
             _allTasks = (await TaskService.GetAllAsync()).ToList();
+            var today = DateTime.Today;
+            var activeTasks = _allTasks.Where(t => t.Status != TodoTaskStatus.Completed).ToList();
 
-            // Update counts
+            // Update status counts
             _nextCount = _allTasks.Count(t => t.Status == TodoTaskStatus.NextAction);
             _waitingCount = _allTasks.Count(t => t.Status == TodoTaskStatus.WaitingFor);
             _scheduledCount = _allTasks.Count(t => t.Status == TodoTaskStatus.Scheduled);
             _somedayCount = _allTasks.Count(t => t.Status == TodoTaskStatus.SomedayMaybe);
 
-            // Filter by current status
-            _filteredTasks = CurrentStatus switch
+            // Update special filter counts
+            _overdueCount = activeTasks.Count(t => t.DueDate.HasValue && t.DueDate.Value.Date < today);
+            _todayCount = activeTasks.Count(t => t.DueDate.HasValue && t.DueDate.Value.Date == today);
+            _blockedCount = activeTasks.Count(t => t.IsBlocked);
+            _noDateCount = activeTasks.Count(t => !t.DueDate.HasValue && t.Status == TodoTaskStatus.NextAction);
+
+            // Apply special filter if set (overrides status filter)
+            if (!string.IsNullOrEmpty(ActiveFilter))
             {
-                "next" => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList(),
-                "waiting" => _allTasks.Where(t => t.Status == TodoTaskStatus.WaitingFor).ToList(),
-                "scheduled" => _allTasks.Where(t => t.Status == TodoTaskStatus.Scheduled).ToList(),
-                "someday" => _allTasks.Where(t => t.Status == TodoTaskStatus.SomedayMaybe).ToList(),
-                "completed" => _allTasks.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.ModifiedAt).Take(50).ToList(),
-                _ => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList()
-            };
+                _filteredTasks = ActiveFilter switch
+                {
+                    "overdue" => activeTasks.Where(t => t.DueDate.HasValue && t.DueDate.Value.Date < today).ToList(),
+                    "today" => activeTasks.Where(t => t.DueDate.HasValue && t.DueDate.Value.Date == today).ToList(),
+                    "blocked" => activeTasks.Where(t => t.IsBlocked).ToList(),
+                    "no-date" => activeTasks.Where(t => !t.DueDate.HasValue && t.Status == TodoTaskStatus.NextAction).ToList(),
+                    _ => activeTasks.ToList()
+                };
+            }
+            else
+            {
+                // Filter by current status
+                _filteredTasks = CurrentStatus switch
+                {
+                    "next" => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList(),
+                    "waiting" => _allTasks.Where(t => t.Status == TodoTaskStatus.WaitingFor).ToList(),
+                    "scheduled" => _allTasks.Where(t => t.Status == TodoTaskStatus.Scheduled).ToList(),
+                    "someday" => _allTasks.Where(t => t.Status == TodoTaskStatus.SomedayMaybe).ToList(),
+                    "completed" => _allTasks.Where(t => t.Status == TodoTaskStatus.Completed).OrderByDescending(t => t.ModifiedAt).Take(50).ToList(),
+                    _ => _allTasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList()
+                };
+            }
         }
         finally
         {
@@ -353,45 +413,128 @@ else
         };
     }
 
-    private string GetStatusLabel() => CurrentStatus switch
+    private string GetStatusLabel()
     {
-        "next" => "next action",
-        "waiting" => "waiting for",
-        "scheduled" => "scheduled",
-        "someday" => "someday/maybe",
-        "completed" => "completed",
-        _ => ""
+        if (!string.IsNullOrEmpty(ActiveFilter))
+        {
+            return ActiveFilter switch
+            {
+                "overdue" => "overdue",
+                "today" => "due today",
+                "blocked" => "blocked",
+                "no-date" => "without due date",
+                _ => ""
+            };
+        }
+        return CurrentStatus switch
+        {
+            "next" => "next action",
+            "waiting" => "waiting for",
+            "scheduled" => "scheduled",
+            "someday" => "someday/maybe",
+            "completed" => "completed",
+            _ => ""
+        };
+    }
+
+    private string GetFilterLabel() => ActiveFilter switch
+    {
+        "overdue" => "Overdue Tasks",
+        "today" => "Due Today",
+        "blocked" => "Blocked Tasks",
+        "no-date" => "Tasks Without Due Date",
+        _ => "Filtered Tasks"
     };
 
-    private string GetEmptyMessage() => CurrentStatus switch
+    private string GetFilterAlertClass() => ActiveFilter switch
     {
-        "next" => "Process your inbox to identify next actions, or create a new task to get started.",
-        "waiting" => "Tasks you're waiting on others for will appear here.",
-        "scheduled" => "Schedule tasks for specific dates to see them here.",
-        "someday" => "Ideas and tasks without urgency go here for later review.",
-        "completed" => "Complete some tasks to see your achievements!",
-        _ => ""
+        "overdue" => "alert-danger",
+        "today" => "alert-warning",
+        "blocked" => "alert-secondary",
+        "no-date" => "alert-info",
+        _ => "alert-primary"
     };
 
-    private string GetEmptyIcon() => CurrentStatus switch
+    private string GetFilterIcon() => ActiveFilter switch
     {
-        "next" => "oi-task",
-        "waiting" => "oi-clock",
-        "scheduled" => "oi-calendar",
-        "someday" => "oi-star",
-        "completed" => "oi-check",
-        _ => "oi-task"
+        "overdue" => "oi-warning",
+        "today" => "oi-calendar",
+        "blocked" => "oi-ban",
+        "no-date" => "oi-question-mark",
+        _ => "oi-list"
     };
 
-    private string GetEmptyTheme() => CurrentStatus switch
+    private string GetEmptyMessage()
     {
-        "next" => "success",
-        "waiting" => "warning",
-        "scheduled" => "info",
-        "someday" => "default",
-        "completed" => "success",
-        _ => "default"
-    };
+        if (!string.IsNullOrEmpty(ActiveFilter))
+        {
+            return ActiveFilter switch
+            {
+                "overdue" => "Great job! You have no overdue tasks.",
+                "today" => "No tasks due today. Check your schedule or focus on next actions.",
+                "blocked" => "No blocked tasks. Everything is ready to proceed!",
+                "no-date" => "All your next actions have due dates assigned.",
+                _ => "No tasks match this filter."
+            };
+        }
+        return CurrentStatus switch
+        {
+            "next" => "Process your inbox to identify next actions, or create a new task to get started.",
+            "waiting" => "Tasks you're waiting on others for will appear here.",
+            "scheduled" => "Schedule tasks for specific dates to see them here.",
+            "someday" => "Ideas and tasks without urgency go here for later review.",
+            "completed" => "Complete some tasks to see your achievements!",
+            _ => ""
+        };
+    }
+
+    private string GetEmptyIcon()
+    {
+        if (!string.IsNullOrEmpty(ActiveFilter))
+        {
+            return ActiveFilter switch
+            {
+                "overdue" => "oi-check",
+                "today" => "oi-calendar",
+                "blocked" => "oi-circle-check",
+                "no-date" => "oi-calendar",
+                _ => "oi-list"
+            };
+        }
+        return CurrentStatus switch
+        {
+            "next" => "oi-task",
+            "waiting" => "oi-clock",
+            "scheduled" => "oi-calendar",
+            "someday" => "oi-star",
+            "completed" => "oi-check",
+            _ => "oi-task"
+        };
+    }
+
+    private string GetEmptyTheme()
+    {
+        if (!string.IsNullOrEmpty(ActiveFilter))
+        {
+            return ActiveFilter switch
+            {
+                "overdue" => "success",
+                "today" => "info",
+                "blocked" => "success",
+                "no-date" => "info",
+                _ => "default"
+            };
+        }
+        return CurrentStatus switch
+        {
+            "next" => "success",
+            "waiting" => "warning",
+            "scheduled" => "info",
+            "someday" => "default",
+            "completed" => "success",
+            _ => "default"
+        };
+    }
 
     private async Task ToggleComplete(TodoTask task)
     {
@@ -542,8 +685,92 @@ else
         }
     }
 
+    // Keyboard navigation handlers
+    private void HandleKeyboardNavigate(string direction)
+    {
+        _cachedDisplayTasks = GetDisplayTasks().ToList();
+        var maxIndex = _cachedDisplayTasks.Count - 1;
+
+        if (maxIndex < 0) return;
+
+        if (direction == "down")
+        {
+            _keyboardFocusIndex = Math.Min(_keyboardFocusIndex + 1, maxIndex);
+            if (_keyboardFocusIndex < 0) _keyboardFocusIndex = 0;
+        }
+        else if (direction == "up")
+        {
+            _keyboardFocusIndex = Math.Max(_keyboardFocusIndex - 1, 0);
+            if (_keyboardFocusIndex < 0) _keyboardFocusIndex = maxIndex;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleKeyboardSelect()
+    {
+        if (_keyboardFocusIndex >= 0)
+        {
+            _cachedDisplayTasks = GetDisplayTasks().ToList();
+            if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+            {
+                var task = _cachedDisplayTasks[_keyboardFocusIndex];
+                NavigationManager.NavigateTo($"/tasks/{task.Id}");
+            }
+        }
+    }
+
+    private async void HandleKeyboardToggle()
+    {
+        if (_keyboardFocusIndex >= 0)
+        {
+            _cachedDisplayTasks = GetDisplayTasks().ToList();
+            if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+            {
+                var task = _cachedDisplayTasks[_keyboardFocusIndex];
+                await ToggleComplete(task);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private void HandleKeyboardEdit()
+    {
+        if (_keyboardFocusIndex >= 0)
+        {
+            _cachedDisplayTasks = GetDisplayTasks().ToList();
+            if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+            {
+                var task = _cachedDisplayTasks[_keyboardFocusIndex];
+                NavigationManager.NavigateTo($"/tasks/{task.Id}");
+            }
+        }
+    }
+
+    private void HandleKeyboardDelete()
+    {
+        if (_keyboardFocusIndex >= 0)
+        {
+            _cachedDisplayTasks = GetDisplayTasks().ToList();
+            if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+            {
+                var task = _cachedDisplayTasks[_keyboardFocusIndex];
+                // Add to selection and show delete confirm
+                _selectedTaskIds.Clear();
+                _selectedTaskIds.Add(task.Id);
+                _showBatchDeleteConfirm = true;
+                InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
     public void Dispose()
     {
         DataChangeNotification.OnDataChanged -= HandleDataChanged;
+        KeyboardNavigation.OnNavigate -= HandleKeyboardNavigate;
+        KeyboardNavigation.OnSelect -= HandleKeyboardSelect;
+        KeyboardNavigation.OnToggle -= HandleKeyboardToggle;
+        KeyboardNavigation.OnEdit -= HandleKeyboardEdit;
+        KeyboardNavigation.OnDelete -= HandleKeyboardDelete;
     }
 }

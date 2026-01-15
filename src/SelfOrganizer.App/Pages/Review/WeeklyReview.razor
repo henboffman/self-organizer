@@ -1,139 +1,660 @@
 @page "/review/weekly"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject SelfOrganizer.Core.Interfaces.IRepository<WeeklySnapshot> WeeklySnapshotRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<DailySnapshot> DailySnapshotRepository
+@inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IRepository<Project> ProjectRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<Goal> GoalRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<Habit> HabitRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<HabitLog> HabitLogRepository
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
 
-<h3 class="mb-4">
-    <span class="oi oi-list-rich me-2"></span>Weekly Review
-</h3>
-
-<div class="alert alert-info">
-    <strong>Weekly Review</strong> - Follow the GTD weekly review process to get clear, current, and creative.
-</div>
-
-<div class="accordion" id="weeklyReviewAccordion">
-    @* Get Clear *@
-    <div class="accordion-item">
-        <h2 class="accordion-header">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#getClear">
-                <span class="oi oi-inbox me-2"></span>Get Clear
-            </button>
-        </h2>
-        <div id="getClear" class="accordion-collapse collapse show" data-bs-parent="#weeklyReviewAccordion">
-            <div class="accordion-body">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="clear1" />
-                    <label class="form-check-label" for="clear1">Process inbox to zero</label>
-                </div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="clear2" />
-                    <label class="form-check-label" for="clear2">Process all notes and captures</label>
-                </div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="clear3" />
-                    <label class="form-check-label" for="clear3">Review previous week's calendar</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="clear4" />
-                    <label class="form-check-label" for="clear4">Review upcoming week's calendar</label>
-                </div>
+<div class="weekly-review">
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
-    </div>
+    }
+    else if (_alreadyCompleted)
+    {
+        <div class="text-center py-5">
+            <div class="review-complete-icon">
+                <span class="oi oi-star"></span>
+            </div>
+            <h2 class="mt-4">Weekly Review Complete!</h2>
+            <p class="text-muted">You've reflected on your week. Great job staying intentional!</p>
 
-    @* Get Current *@
-    <div class="accordion-item">
-        <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#getCurrent">
-                <span class="oi oi-reload me-2"></span>Get Current
-            </button>
-        </h2>
-        <div id="getCurrent" class="accordion-collapse collapse" data-bs-parent="#weeklyReviewAccordion">
-            <div class="accordion-body">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="current1" />
-                    <label class="form-check-label" for="current1">
-                        <a href="/tasks/next">Review Next Actions list</a>
-                    </label>
-                </div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="current2" />
-                    <label class="form-check-label" for="current2">
-                        <a href="/projects">Review Projects list</a> (ensure each has a next action)
-                    </label>
-                </div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="current3" />
-                    <label class="form-check-label" for="current3">
-                        <a href="/tasks/waiting">Review Waiting For list</a>
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="current4" />
-                    <label class="form-check-label" for="current4">
-                        <a href="/tasks/someday">Review Someday/Maybe list</a>
-                    </label>
-                </div>
+            <div class="mt-4 d-flex gap-3 justify-content-center flex-wrap">
+                <a href="/tasks" class="btn btn-primary">
+                    <span class="oi oi-task me-1"></span>View Tasks
+                </a>
+                <a href="/goals" class="btn btn-outline-secondary">
+                    <span class="oi oi-target me-1"></span>Goals
+                </a>
+                <button class="btn btn-outline-primary" @onclick="ResetReview">
+                    <span class="oi oi-reload me-1"></span>Redo Review
+                </button>
             </div>
         </div>
-    </div>
-
-    @* Get Creative *@
-    <div class="accordion-item">
-        <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#getCreative">
-                <span class="oi oi-lightbulb me-2"></span>Get Creative
-            </button>
-        </h2>
-        <div id="getCreative" class="accordion-collapse collapse" data-bs-parent="#weeklyReviewAccordion">
-            <div class="accordion-body">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="creative1" />
-                    <label class="form-check-label" for="creative1">Any new projects to add?</label>
-                </div>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="creative2" />
-                    <label class="form-check-label" for="creative2">Any Someday/Maybe items to activate?</label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="creative3" />
-                    <label class="form-check-label" for="creative3">Anything else on your mind?</label>
-                </div>
-
-                <hr />
-
-                <h6>Trigger List</h6>
-                <p class="text-muted small">Review these areas to capture anything you might have missed:</p>
-                <div class="row">
-                    <div class="col-md-4">
-                        <ul class="small">
-                            <li>Projects started, not completed</li>
-                            <li>Projects needing to be started</li>
-                            <li>Commitments to others</li>
-                            <li>Communications to respond to</li>
-                        </ul>
+    }
+    else
+    {
+        <div class="review-wizard">
+            @* Progress indicator *@
+            <div class="progress-steps">
+                @for (int i = 1; i <= 6; i++)
+                {
+                    var step = i;
+                    <div class="step @(step == _currentStep ? "active" : "") @(step < _currentStep ? "completed" : "")">
+                        <div class="step-number">@step</div>
+                        <div class="step-label">@GetStepLabel(step)</div>
                     </div>
-                    <div class="col-md-4">
-                        <ul class="small">
-                            <li>Upcoming events</li>
-                            <li>Travel plans</li>
-                            <li>Financial items</li>
-                            <li>Administration</li>
-                        </ul>
+                }
+            </div>
+
+            <div class="review-content">
+                @* Step 1: Week Summary *@
+                @if (_currentStep == 1)
+                {
+                    <div class="step-content">
+                        <h2>Your Week in Review</h2>
+                        <p class="lead text-muted">@_weekStart.ToString("MMM d") - @_weekEnd.ToString("MMM d")</p>
+
+                        <div class="stats-grid mt-4">
+                            <div class="stat-card">
+                                <div class="stat-icon text-success">
+                                    <span class="oi oi-check"></span>
+                                </div>
+                                <div class="stat-value">@_weekStats.TasksCompleted</div>
+                                <div class="stat-label">Tasks Completed</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon text-primary">
+                                    <span class="oi oi-clock"></span>
+                                </div>
+                                <div class="stat-value">@FormatHours(_weekStats.TotalMinutesWorked)</div>
+                                <div class="stat-label">Hours Worked</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon text-warning">
+                                    <span class="oi oi-bolt"></span>
+                                </div>
+                                <div class="stat-value">@FormatHours(_weekStats.DeepWorkMinutes)</div>
+                                <div class="stat-label">Deep Work</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon text-info">
+                                    <span class="oi oi-sun"></span>
+                                </div>
+                                <div class="stat-value">@_weekStats.DaysWithMorningCheckin/7</div>
+                                <div class="stat-label">Morning Check-ins</div>
+                            </div>
+                        </div>
+
+                        @if (_completedTasks.Any())
+                        {
+                            <div class="mt-5">
+                                <h5>Completed This Week</h5>
+                                <div class="completed-list">
+                                    @foreach (var task in _completedTasks.Take(8))
+                                    {
+                                        <div class="completed-item">
+                                            <span class="oi oi-check text-success me-2"></span>
+                                            @task.Title
+                                        </div>
+                                    }
+                                    @if (_completedTasks.Count > 8)
+                                    {
+                                        <div class="text-muted small">...and @(_completedTasks.Count - 8) more</div>
+                                    }
+                                </div>
+                            </div>
+                        }
                     </div>
-                    <div class="col-md-4">
-                        <ul class="small">
-                            <li>Health & wellness</li>
-                            <li>Personal development</li>
-                            <li>Family & friends</li>
-                            <li>Creative projects</li>
-                        </ul>
+                }
+
+                @* Step 2: Wins & Accomplishments *@
+                @if (_currentStep == 2)
+                {
+                    <div class="step-content">
+                        <h2>Celebrate Your Wins</h2>
+                        <p class="lead text-muted">What went well this week?</p>
+
+                        <div class="mt-4">
+                            <label class="form-label">Your biggest win this week</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   placeholder="e.g., Shipped the new feature, Had a great presentation..."
+                                   @bind="_biggestWin" />
+                            <div class="form-text">Even small wins count!</div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">Other wins (optional)</label>
+                            <div class="other-wins">
+                                @for (int i = 0; i < 3; i++)
+                                {
+                                    var index = i;
+                                    <input type="text"
+                                           class="form-control mb-2"
+                                           placeholder="Another win..."
+                                           value="@GetOtherWin(index)"
+                                           @onchange="e => SetOtherWin(index, e.Value?.ToString())" />
+                                }
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">What are you grateful for this week?</label>
+                            <textarea class="form-control"
+                                      rows="2"
+                                      placeholder="Take a moment to appreciate what you have..."
+                                      @bind="_gratitudeReflection"></textarea>
+                        </div>
                     </div>
-                </div>
+                }
+
+                @* Step 3: Challenges & Lessons *@
+                @if (_currentStep == 3)
+                {
+                    <div class="step-content">
+                        <h2>Learn & Grow</h2>
+                        <p class="lead text-muted">Reflect on challenges to improve.</p>
+
+                        <div class="mt-4">
+                            <label class="form-label">What was your biggest challenge?</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   placeholder="e.g., Time management, interruptions, scope creep..."
+                                   @bind="_biggestChallenge" />
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">What did you learn this week?</label>
+                            <textarea class="form-control"
+                                      rows="3"
+                                      placeholder="Any insights, lessons, or things you'd do differently..."
+                                      @bind="_lessonsLearned"></textarea>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">Rate your week</label>
+                            <div class="rating-row">
+                                <div class="rating-item">
+                                    <span class="rating-label-sm">Work-Life Balance</span>
+                                    <div class="rating-buttons">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            var r = i;
+                                            <button class="rating-btn-sm @(_workLifeBalance == r ? "selected" : "")"
+                                                    @onclick="() => _workLifeBalance = r">@r</button>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="rating-item">
+                                    <span class="rating-label-sm">Productivity</span>
+                                    <div class="rating-buttons">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            var r = i;
+                                            <button class="rating-btn-sm @(_productivityRating == r ? "selected" : "")"
+                                                    @onclick="() => _productivityRating = r">@r</button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Step 4: GTD Review *@
+                @if (_currentStep == 4)
+                {
+                    <div class="step-content">
+                        <h2>GTD Weekly Review</h2>
+                        <p class="lead text-muted">Get clear, current, and creative.</p>
+
+                        <div class="gtd-sections">
+                            <div class="gtd-section">
+                                <h5><span class="oi oi-inbox me-2"></span>Get Clear</h5>
+                                <div class="gtd-checklist">
+                                    <label class="gtd-check">
+                                        <input type="checkbox" @bind="_inboxCleared" />
+                                        <span>Process inbox to zero</span>
+                                        <a href="/inbox" class="btn btn-sm btn-link">Go</a>
+                                    </label>
+                                    <label class="gtd-check">
+                                        <input type="checkbox" @bind="_calendarReviewed" />
+                                        <span>Review past & upcoming calendar</span>
+                                        <a href="/calendar" class="btn btn-sm btn-link">Go</a>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="gtd-section">
+                                <h5><span class="oi oi-reload me-2"></span>Get Current</h5>
+                                <div class="gtd-checklist">
+                                    <label class="gtd-check">
+                                        <input type="checkbox" @bind="_projectsReviewed" />
+                                        <span>Review all projects (@_activeProjects.Count active)</span>
+                                        <a href="/projects" class="btn btn-sm btn-link">Go</a>
+                                    </label>
+                                    <label class="gtd-check">
+                                        <input type="checkbox" @bind="_waitingForReviewed" />
+                                        <span>Review Waiting For items (@_waitingForCount)</span>
+                                        <a href="/tasks?filter=waiting" class="btn btn-sm btn-link">Go</a>
+                                    </label>
+                                    <label class="gtd-check">
+                                        <input type="checkbox" @bind="_somedayMaybeReviewed" />
+                                        <span>Review Someday/Maybe (@_somedayMaybeCount)</span>
+                                        <a href="/tasks?filter=someday" class="btn btn-sm btn-link">Go</a>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="gtd-section">
+                                <h5><span class="oi oi-lightbulb me-2"></span>Get Creative</h5>
+                                <p class="text-muted small mb-2">Consider these areas for new projects or actions:</p>
+                                <div class="trigger-list">
+                                    <span class="trigger-tag">Projects started, not completed</span>
+                                    <span class="trigger-tag">Commitments to others</span>
+                                    <span class="trigger-tag">Communications to respond to</span>
+                                    <span class="trigger-tag">Upcoming events</span>
+                                    <span class="trigger-tag">Financial items</span>
+                                    <span class="trigger-tag">Health & wellness</span>
+                                    <span class="trigger-tag">Personal development</span>
+                                    <span class="trigger-tag">Family & friends</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Step 5: Next Week Planning *@
+                @if (_currentStep == 5)
+                {
+                    <div class="step-content">
+                        <h2>Plan Next Week</h2>
+                        <p class="lead text-muted">Set yourself up for success.</p>
+
+                        <div class="mt-4">
+                            <label class="form-label">What's your focus for next week?</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   placeholder="e.g., Complete project X, improve testing, more deep work..."
+                                   @bind="_nextWeekFocus" />
+                            <div class="form-text">A single theme or intention for the week ahead.</div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="form-label">Top priorities for next week</label>
+                            <div class="next-week-priorities">
+                                @for (int i = 0; i < 3; i++)
+                                {
+                                    var index = i;
+                                    <div class="priority-input">
+                                        <span class="priority-num">@(i + 1).</span>
+                                        <input type="text"
+                                               class="form-control"
+                                               placeholder="Priority @(i + 1)..."
+                                               value="@GetNextPriority(index)"
+                                               @onchange="e => SetNextPriority(index, e.Value?.ToString())" />
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @if (_upcomingTasks.Any())
+                        {
+                            <div class="mt-4">
+                                <label class="form-label">Upcoming tasks to consider</label>
+                                <div class="upcoming-tasks">
+                                    @foreach (var task in _upcomingTasks.Take(5))
+                                    {
+                                        <div class="upcoming-task">
+                                            <span class="task-title">@task.Title</span>
+                                            @if (task.DueDate.HasValue)
+                                            {
+                                                <span class="badge bg-info ms-2">Due @task.DueDate.Value.ToString("MMM d")</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* Step 6: Final Review *@
+                @if (_currentStep == 6)
+                {
+                    <div class="step-content">
+                        <h2>Review Complete!</h2>
+                        <p class="lead text-muted">Here's your weekly reflection:</p>
+
+                        <div class="final-review-card mt-4">
+                            <div class="final-section">
+                                <h6>Week Stats</h6>
+                                <div class="mini-stats">
+                                    <span><strong>@_weekStats.TasksCompleted</strong> tasks</span>
+                                    <span><strong>@FormatHours(_weekStats.TotalMinutesWorked)</strong> hours</span>
+                                    <span><strong>@_weekStats.DaysWithMorningCheckin</strong> check-ins</span>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_biggestWin))
+                            {
+                                <div class="final-section">
+                                    <h6>Biggest Win</h6>
+                                    <p class="mb-0">"@_biggestWin"</p>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_biggestChallenge))
+                            {
+                                <div class="final-section">
+                                    <h6>Biggest Challenge</h6>
+                                    <p class="mb-0">@_biggestChallenge</p>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_nextWeekFocus))
+                            {
+                                <div class="final-section">
+                                    <h6>Next Week Focus</h6>
+                                    <p class="mb-0 text-primary fw-bold">@_nextWeekFocus</p>
+                                </div>
+                            }
+
+                            <div class="final-section">
+                                <h6>GTD Review Status</h6>
+                                <div class="gtd-status">
+                                    <span class="@(_inboxCleared ? "complete" : "pending")">
+                                        <span class="oi @(_inboxCleared ? "oi-check" : "oi-x") me-1"></span>Inbox
+                                    </span>
+                                    <span class="@(_projectsReviewed ? "complete" : "pending")">
+                                        <span class="oi @(_projectsReviewed ? "oi-check" : "oi-x") me-1"></span>Projects
+                                    </span>
+                                    <span class="@(_waitingForReviewed ? "complete" : "pending")">
+                                        <span class="oi @(_waitingForReviewed ? "oi-check" : "oi-x") me-1"></span>Waiting
+                                    </span>
+                                    <span class="@(_calendarReviewed ? "complete" : "pending")">
+                                        <span class="oi @(_calendarReviewed ? "oi-check" : "oi-x") me-1"></span>Calendar
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-5">
+                            <button class="btn btn-primary btn-lg" @onclick="CompleteReview">
+                                <span class="oi oi-star me-2"></span>Complete Weekly Review
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @* Navigation *@
+            <div class="review-nav">
+                @if (_currentStep > 1)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="PreviousStep">
+                        <span class="oi oi-arrow-left me-1"></span>Back
+                    </button>
+                }
+                else
+                {
+                    <div></div>
+                }
+
+                @if (_currentStep < 6)
+                {
+                    <button class="btn btn-primary" @onclick="NextStep">
+                        Next<span class="oi oi-arrow-right ms-1"></span>
+                    </button>
+                }
             </div>
         </div>
-    </div>
+    }
 </div>
 
-<div class="mt-4">
-    <a href="/capture" class="btn btn-primary btn-lg">
-        <span class="oi oi-bolt me-1"></span> Capture New Items
-    </a>
-</div>
+@code {
+    private bool _isLoading = true;
+    private bool _alreadyCompleted = false;
+    private int _currentStep = 1;
+    private WeeklySnapshot? _snapshot;
+
+    // Week info
+    private DateOnly _weekStart;
+    private DateOnly _weekEnd;
+    private WeekStats _weekStats = new();
+    private List<TodoTask> _completedTasks = new();
+    private List<TodoTask> _upcomingTasks = new();
+    private List<Project> _activeProjects = new();
+    private int _waitingForCount = 0;
+    private int _somedayMaybeCount = 0;
+
+    // Step 2: Wins
+    private string _biggestWin = string.Empty;
+    private List<string> _otherWins = new() { "", "", "" };
+    private string _gratitudeReflection = string.Empty;
+
+    // Step 3: Challenges
+    private string _biggestChallenge = string.Empty;
+    private string _lessonsLearned = string.Empty;
+    private int? _workLifeBalance;
+    private int? _productivityRating;
+
+    // Step 4: GTD Review
+    private bool _inboxCleared = false;
+    private bool _projectsReviewed = false;
+    private bool _waitingForReviewed = false;
+    private bool _somedayMaybeReviewed = false;
+    private bool _calendarReviewed = false;
+
+    // Step 5: Next Week
+    private string _nextWeekFocus = string.Empty;
+    private List<string> _nextWeekPriorities = new() { "", "", "" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            // Calculate week boundaries (Monday to Sunday)
+            var today = DateTime.Today;
+            var daysFromMonday = ((int)today.DayOfWeek - 1 + 7) % 7;
+            _weekStart = DateOnly.FromDateTime(today.AddDays(-daysFromMonday));
+            _weekEnd = _weekStart.AddDays(6);
+
+            // Check if already completed this week
+            var weeklySnapshots = await WeeklySnapshotRepository.GetAllAsync();
+            _snapshot = weeklySnapshots.FirstOrDefault(s => s.WeekStart == _weekStart);
+
+            if (_snapshot?.ReviewCompleted == true)
+            {
+                _alreadyCompleted = true;
+                return;
+            }
+
+            // Load week stats from daily snapshots
+            var dailySnapshots = await DailySnapshotRepository.GetAllAsync();
+            var weekDailies = dailySnapshots
+                .Where(d => d.Date >= _weekStart && d.Date <= _weekEnd)
+                .ToList();
+
+            _weekStats = new WeekStats
+            {
+                TasksCompleted = weekDailies.Sum(d => d.TasksCompleted),
+                TotalMinutesWorked = weekDailies.Sum(d => d.TotalMinutesWorked),
+                DeepWorkMinutes = weekDailies.Sum(d => d.DeepWorkMinutes),
+                DaysWithMorningCheckin = weekDailies.Count(d => d.MorningCheckinCompleted)
+            };
+
+            // Load tasks
+            var allTasks = (await TaskService.GetAllAsync()).ToList();
+            _completedTasks = allTasks
+                .Where(t => t.Status == TodoTaskStatus.Completed &&
+                           t.CompletedAt >= _weekStart.ToDateTime(TimeOnly.MinValue) &&
+                           t.CompletedAt <= _weekEnd.ToDateTime(TimeOnly.MaxValue))
+                .OrderByDescending(t => t.CompletedAt)
+                .ToList();
+
+            _upcomingTasks = allTasks
+                .Where(t => t.Status != TodoTaskStatus.Completed &&
+                           t.Status != TodoTaskStatus.Deleted &&
+                           t.DueDate.HasValue &&
+                           t.DueDate.Value > today)
+                .OrderBy(t => t.DueDate)
+                .ToList();
+
+            _waitingForCount = allTasks.Count(t => t.Status == TodoTaskStatus.WaitingFor);
+            _somedayMaybeCount = allTasks.Count(t => t.Status == TodoTaskStatus.SomedayMaybe);
+
+            // Load projects
+            _activeProjects = (await ProjectRepository.GetAllAsync())
+                .Where(p => p.Status == ProjectStatus.Active)
+                .ToList();
+
+            // Update task completed count in week stats
+            _weekStats.TasksCompleted = Math.Max(_weekStats.TasksCompleted, _completedTasks.Count);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void NextStep()
+    {
+        if (_currentStep < 6)
+        {
+            _currentStep++;
+        }
+    }
+
+    private void PreviousStep()
+    {
+        if (_currentStep > 1)
+        {
+            _currentStep--;
+        }
+    }
+
+    private string GetOtherWin(int index) => index < _otherWins.Count ? _otherWins[index] : "";
+    private void SetOtherWin(int index, string? value)
+    {
+        while (_otherWins.Count <= index) _otherWins.Add("");
+        _otherWins[index] = value ?? "";
+    }
+
+    private string GetNextPriority(int index) => index < _nextWeekPriorities.Count ? _nextWeekPriorities[index] : "";
+    private void SetNextPriority(int index, string? value)
+    {
+        while (_nextWeekPriorities.Count <= index) _nextWeekPriorities.Add("");
+        _nextWeekPriorities[index] = value ?? "";
+    }
+
+    private async Task CompleteReview()
+    {
+        if (_snapshot == null)
+        {
+            _snapshot = new WeeklySnapshot { WeekStart = _weekStart };
+        }
+
+        // Stats
+        _snapshot.TotalTasksCompleted = _weekStats.TasksCompleted;
+        _snapshot.TotalMinutesWorked = _weekStats.TotalMinutesWorked;
+        _snapshot.TotalDeepWorkMinutes = _weekStats.DeepWorkMinutes;
+        _snapshot.DaysWithMorningCheckin = _weekStats.DaysWithMorningCheckin;
+
+        // Wins
+        _snapshot.BiggestWin = _biggestWin;
+        _snapshot.OtherWins = _otherWins.Where(w => !string.IsNullOrWhiteSpace(w)).ToList();
+        _snapshot.GratitudeReflection = _gratitudeReflection;
+
+        // Challenges
+        _snapshot.BiggestChallenge = _biggestChallenge;
+        _snapshot.LessonsLearned = _lessonsLearned;
+        _snapshot.WorkLifeBalanceRating = _workLifeBalance;
+        _snapshot.ProductivityRating = _productivityRating;
+
+        // GTD
+        _snapshot.InboxCleared = _inboxCleared;
+        _snapshot.ProjectsReviewed = _projectsReviewed;
+        _snapshot.WaitingForReviewed = _waitingForReviewed;
+        _snapshot.SomedayMaybeReviewed = _somedayMaybeReviewed;
+        _snapshot.CalendarReviewed = _calendarReviewed;
+
+        // Next Week
+        _snapshot.NextWeekFocus = _nextWeekFocus;
+        _snapshot.NextWeekPriorities = _nextWeekPriorities.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+
+        // Completion
+        _snapshot.ReviewCompleted = true;
+        _snapshot.CompletedAt = DateTime.UtcNow;
+
+        if (_snapshot.Id == Guid.Empty)
+        {
+            await WeeklySnapshotRepository.AddAsync(_snapshot);
+        }
+        else
+        {
+            await WeeklySnapshotRepository.UpdateAsync(_snapshot);
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        _alreadyCompleted = true;
+    }
+
+    private void ResetReview()
+    {
+        _alreadyCompleted = false;
+        _currentStep = 1;
+        _biggestWin = string.Empty;
+        _otherWins = new() { "", "", "" };
+        _gratitudeReflection = string.Empty;
+        _biggestChallenge = string.Empty;
+        _lessonsLearned = string.Empty;
+        _workLifeBalance = null;
+        _productivityRating = null;
+        _inboxCleared = false;
+        _projectsReviewed = false;
+        _waitingForReviewed = false;
+        _somedayMaybeReviewed = false;
+        _calendarReviewed = false;
+        _nextWeekFocus = string.Empty;
+        _nextWeekPriorities = new() { "", "", "" };
+    }
+
+    private string GetStepLabel(int step) => step switch
+    {
+        1 => "Summary",
+        2 => "Wins",
+        3 => "Learn",
+        4 => "GTD",
+        5 => "Plan",
+        6 => "Finish",
+        _ => ""
+    };
+
+    private string FormatHours(int minutes) => minutes >= 60 ? $"{minutes / 60}h" : $"{minutes}m";
+
+    private class WeekStats
+    {
+        public int TasksCompleted { get; set; }
+        public int TotalMinutesWorked { get; set; }
+        public int DeepWorkMinutes { get; set; }
+        public int DaysWithMorningCheckin { get; set; }
+    }
+}

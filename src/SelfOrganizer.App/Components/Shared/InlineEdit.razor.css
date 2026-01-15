@@ -1,0 +1,62 @@
+/* ===========================================
+   InlineEdit Component - Scoped Styles
+   =========================================== */
+
+.inline-edit-container {
+    display: inline-block;
+    min-width: 50px;
+    position: relative;
+}
+
+.inline-edit-display {
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm, 4px);
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    display: inline-block;
+}
+
+.inline-edit-display:hover {
+    background-color: var(--bg-tertiary, #f5f5f5);
+    border-color: var(--border-default, #e0e0e0);
+}
+
+.inline-edit-input {
+    width: 100%;
+    min-width: 150px;
+    padding: 2px 4px;
+    border: 1px solid var(--color-primary, #3b82f6);
+    border-radius: var(--radius-sm, 4px);
+    background-color: var(--bg-primary, #fff);
+    color: var(--text-primary, #333);
+    font-size: inherit;
+    font-family: inherit;
+    font-weight: inherit;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.inline-edit-input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.inline-edit-container.editing {
+    z-index: 10;
+}
+
+/* Animation for edit mode */
+.inline-edit-container.editing .inline-edit-input {
+    animation: inline-edit-focus 0.2s ease;
+}
+
+@keyframes inline-edit-focus {
+    0% {
+        transform: scale(0.98);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

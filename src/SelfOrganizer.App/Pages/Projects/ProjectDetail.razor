@@ -354,6 +354,32 @@ else
             <input type="text" class="form-control" @bind="_editTags" placeholder="Use #hashtags separated by spaces" />
         </div>
         <div class="mb-3">
+            <label class="form-label">Project Color</label>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                @foreach (var color in _projectColors)
+                {
+                    <button type="button"
+                            class="color-swatch @(_editColor == color ? "selected" : "")"
+                            style="background-color: @color"
+                            @onclick="() => _editColor = color"
+                            title="@color">
+                    </button>
+                }
+                <input type="color"
+                       class="form-control form-control-color"
+                       value="@(_editColor ?? "#3b82f6")"
+                       @onchange="OnCustomColorSelected"
+                       title="Custom color" />
+                @if (!string.IsNullOrEmpty(_editColor))
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _editColor = null" title="Clear color">
+                        <span class="oi oi-x"></span>
+                    </button>
+                }
+            </div>
+            <small class="text-muted">Used in calendar to identify this project's tasks</small>
+        </div>
+        <div class="mb-3">
             <label class="form-label">External URL</label>
             <input type="url" class="form-control" @bind="_editUrl" placeholder="https://..." />
         </div>
@@ -544,6 +570,22 @@ else
     private DateTime? _editDueDate;
     private string _editTags = string.Empty;
     private string? _editUrl;
+    private string? _editColor;
+
+    // Predefined project colors
+    private static readonly string[] _projectColors = new[]
+    {
+        "#3b82f6", // Blue
+        "#10b981", // Green
+        "#f59e0b", // Amber
+        "#8b5cf6", // Purple
+        "#ec4899", // Pink
+        "#06b6d4", // Cyan
+        "#f97316", // Orange
+        "#6366f1", // Indigo
+        "#14b8a6", // Teal
+        "#84cc16"  // Lime
+    };
 
     // New task fields
     private string _newTaskTitle = string.Empty;
@@ -606,6 +648,7 @@ else
                 _editDueDate = _project.DueDate;
                 _editTags = _project.Tags.Any() ? string.Join(" ", _project.Tags.Select(t => $"#{t}")) : string.Empty;
                 _editUrl = _project.Url;
+                _editColor = _project.Color;
             }
         }
         finally
@@ -635,10 +678,16 @@ else
             _project.DueDate = _editDueDate;
             _project.Tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_editTags);
             _project.Url = string.IsNullOrWhiteSpace(_editUrl) ? null : _editUrl;
+            _project.Color = _editColor;
             await ProjectService.UpdateAsync(_project);
             _isEditing = false;
             await LoadProject();
         }
+    }
+
+    private void OnCustomColorSelected(ChangeEventArgs e)
+    {
+        _editColor = e.Value?.ToString();
     }
 
     private async Task ConfirmDelete()
