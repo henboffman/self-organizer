@@ -1,0 +1,211 @@
+@using SelfOrganizer.Core.Models
+
+<div class="quick-start-presets">
+    <p class="text-muted small mb-3">
+        Choose a preset to quickly configure settings for your needs. You can always customize individual settings afterward.
+    </p>
+
+    @foreach (var category in SettingsPresets.GetCategories())
+    {
+        <div class="preset-category mb-4">
+            <h6 class="preset-category-title text-muted mb-2">@category</h6>
+            <div class="preset-grid">
+                @foreach (var preset in SettingsPresets.GetByCategory(category))
+                {
+                    <div class="preset-card @(SelectedPresetId == preset.Id ? "selected" : "")"
+                         @onclick="() => SelectPreset(preset)">
+                        <div class="preset-header">
+                            <span class="oi oi-@preset.Icon preset-icon"></span>
+                            <span class="preset-name">@preset.Name</span>
+                        </div>
+                        <p class="preset-description">@preset.Description</p>
+                        @if (SelectedPresetId == preset.Id)
+                        {
+                            <div class="preset-selected-indicator">
+                                <span class="oi oi-check"></span> Selected
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_selectedPreset != null)
+    {
+        <div class="preset-actions mt-3 p-3 bg-light rounded">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <strong>@_selectedPreset.Name</strong>
+                    <br /><small class="text-muted">Ready to apply this preset?</small>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary me-2" @onclick="ClearSelection">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" @onclick="ApplySelectedPreset" disabled="@_isApplying">
+                        @if (_isApplying)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-check me-1"></span>
+                        }
+                        Apply Preset
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_applySuccess)
+    {
+        <div class="alert alert-success mt-3 py-2">
+            <span class="oi oi-check me-1"></span>
+            Preset applied successfully! Your settings have been updated.
+        </div>
+    }
+</div>
+
+<style>
+    .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .preset-card {
+        border: 2px solid var(--border-default, #dee2e6);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: var(--bg-elevated, #fff);
+    }
+
+    .preset-card:hover {
+        border-color: var(--color-primary, #7c3aed);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .preset-card.selected {
+        border-color: var(--color-primary, #7c3aed);
+        background: var(--color-primary-subtle, rgba(124, 58, 237, 0.1));
+    }
+
+    .preset-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .preset-icon {
+        color: var(--color-primary, #7c3aed);
+        font-size: 1.1rem;
+    }
+
+    .preset-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .preset-description {
+        font-size: 0.85rem;
+        color: var(--text-muted, #6c757d);
+        margin-bottom: 0;
+        line-height: 1.4;
+    }
+
+    .preset-selected-indicator {
+        margin-top: 0.75rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border-default, #dee2e6);
+        color: var(--color-primary, #7c3aed);
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .preset-category-title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border-default, #dee2e6);
+        padding-bottom: 0.5rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public UserPreferences? Preferences { get; set; }
+
+    [Parameter]
+    public AccessibilitySettings? Accessibility { get; set; }
+
+    [Parameter]
+    public EventCallback<UserPreferences> PreferencesChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<AccessibilitySettings> AccessibilityChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnPresetApplied { get; set; }
+
+    public string? SelectedPresetId { get; private set; }
+
+    private SettingsPreset? _selectedPreset;
+    private bool _isApplying;
+    private bool _applySuccess;
+
+    private void SelectPreset(SettingsPreset preset)
+    {
+        if (SelectedPresetId == preset.Id)
+        {
+            // Deselect if clicking the same one
+            ClearSelection();
+            return;
+        }
+
+        SelectedPresetId = preset.Id;
+        _selectedPreset = preset;
+        _applySuccess = false;
+    }
+
+    private void ClearSelection()
+    {
+        SelectedPresetId = null;
+        _selectedPreset = null;
+    }
+
+    private async Task ApplySelectedPreset()
+    {
+        if (_selectedPreset == null || Preferences == null || Accessibility == null)
+            return;
+
+        _isApplying = true;
+        _applySuccess = false;
+        StateHasChanged();
+
+        try
+        {
+            // Apply preset to preferences
+            _selectedPreset.ApplyToPreferences(Preferences);
+
+            // Apply preset to accessibility
+            _selectedPreset.ApplyToAccessibility(Accessibility);
+
+            // Notify parent components
+            await PreferencesChanged.InvokeAsync(Preferences);
+            await AccessibilityChanged.InvokeAsync(Accessibility);
+            await OnPresetApplied.InvokeAsync();
+
+            _applySuccess = true;
+            ClearSelection();
+        }
+        finally
+        {
+            _isApplying = false;
+        }
+    }
+}

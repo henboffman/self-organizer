@@ -102,3 +102,28 @@ public enum AppMode
     /// <summary>Hybrid mode - curated mix of both work and life dimensions</summary>
     Balanced
 }
+
+/// <summary>
+/// Types of ambient focus sounds for concentration
+/// </summary>
+public enum FocusSoundType
+{
+    /// <summary>No ambient sound</summary>
+    None,
+    /// <summary>White noise</summary>
+    WhiteNoise,
+    /// <summary>Brown noise (deeper, less harsh than white)</summary>
+    BrownNoise,
+    /// <summary>Pink noise (balanced frequency)</summary>
+    PinkNoise,
+    /// <summary>Rain sounds</summary>
+    Rain,
+    /// <summary>Ocean waves</summary>
+    Ocean,
+    /// <summary>Forest ambience</summary>
+    Forest,
+    /// <summary>Coffee shop background</summary>
+    CoffeeShop,
+    /// <summary>Fireplace crackling</summary>
+    Fireplace
+}

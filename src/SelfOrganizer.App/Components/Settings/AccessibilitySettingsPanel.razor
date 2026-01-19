@@ -1,0 +1,258 @@
+@using SelfOrganizer.Core.Models
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div class="accessibility-settings">
+    @* Vision Section *@
+    <div class="settings-section mb-4">
+        <h6 class="settings-section-title">
+            <span class="oi oi-eye me-2"></span>Vision
+        </h6>
+        <p class="text-muted small mb-3">
+            Adjust colors and contrast to suit your visual needs.
+        </p>
+
+        <div class="mb-3">
+            <label class="form-label">Color Blindness Mode</label>
+            <select class="form-select" @bind="Settings.ColorBlindnessMode" @bind:after="OnSettingChanged">
+                <option value="@ColorBlindnessMode.None">None</option>
+                <option value="@ColorBlindnessMode.Protanopia">Protanopia (Red-blind)</option>
+                <option value="@ColorBlindnessMode.Deuteranopia">Deuteranopia (Green-blind)</option>
+                <option value="@ColorBlindnessMode.Tritanopia">Tritanopia (Blue-blind)</option>
+                <option value="@ColorBlindnessMode.Achromatopsia">Achromatopsia (Grayscale)</option>
+            </select>
+            <small class="text-muted">Adjusts colors to be distinguishable for different types of color vision.</small>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="highContrast"
+                       @bind="Settings.HighContrastMode" @bind:after="OnSettingChanged" />
+                <label class="form-check-label" for="highContrast">
+                    <strong>High Contrast Mode</strong>
+                    <br /><small class="text-muted">Increases contrast for better visibility (WCAG AAA compliant)</small>
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label d-flex justify-content-between">
+                <span>Text Scaling</span>
+                <span class="badge bg-secondary">@(Settings.TextScalingPercent)%</span>
+            </label>
+            <input type="range" class="form-range" min="100" max="200" step="10"
+                   @bind="Settings.TextScalingPercent" @bind:after="OnSettingChanged" />
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">100%</small>
+                <small class="text-muted">200%</small>
+            </div>
+        </div>
+    </div>
+
+    @* Reading Section *@
+    <div class="settings-section mb-4">
+        <h6 class="settings-section-title">
+            <span class="oi oi-book me-2"></span>Reading
+        </h6>
+        <p class="text-muted small mb-3">
+            Settings to improve text readability and reduce reading strain.
+        </p>
+
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="dyslexicFont"
+                       @bind="Settings.DyslexiaFriendlyFont" @bind:after="OnSettingChanged" />
+                <label class="form-check-label" for="dyslexicFont">
+                    <strong>Dyslexia-Friendly Font</strong>
+                    <br /><small class="text-muted">Uses OpenDyslexic font designed to improve readability for dyslexic readers</small>
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label d-flex justify-content-between">
+                <span>Line Height</span>
+                <span class="badge bg-secondary">@(Settings.LineHeightMultiplier.ToString("F1"))x</span>
+            </label>
+            <input type="range" class="form-range" min="1.0" max="2.0" step="0.1"
+                   @bind="Settings.LineHeightMultiplier" @bind:after="OnSettingChanged" />
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">Compact (1.0x)</small>
+                <small class="text-muted">Spacious (2.0x)</small>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label d-flex justify-content-between">
+                <span>Letter Spacing</span>
+                <span class="badge bg-secondary">@(Settings.LetterSpacing.ToString("F2")) em</span>
+            </label>
+            <input type="range" class="form-range" min="0" max="0.2" step="0.02"
+                   @bind="Settings.LetterSpacing" @bind:after="OnSettingChanged" />
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">Normal (0)</small>
+                <small class="text-muted">Wide (0.2em)</small>
+            </div>
+        </div>
+    </div>
+
+    @* Motion Section *@
+    <div class="settings-section mb-4">
+        <h6 class="settings-section-title">
+            <span class="oi oi-media-play me-2"></span>Motion
+        </h6>
+        <p class="text-muted small mb-3">
+            Control animations and transitions for vestibular comfort.
+        </p>
+
+        <div class="mb-3">
+            <label class="form-label">Reduced Motion</label>
+            <select class="form-select" @bind="Settings.ReducedMotionMode" @bind:after="OnSettingChanged">
+                <option value="@ReducedMotionMode.RespectSystem">Respect System Setting</option>
+                <option value="@ReducedMotionMode.AlwaysReduce">Always Reduce Motion</option>
+                <option value="@ReducedMotionMode.NeverReduce">Never Reduce Motion</option>
+            </select>
+            <small class="text-muted">
+                @if (_systemReducedMotion)
+                {
+                    <span>Your system prefers reduced motion.</span>
+                }
+                else
+                {
+                    <span>Your system allows motion.</span>
+                }
+            </small>
+        </div>
+    </div>
+
+    @* Interaction Section *@
+    <div class="settings-section mb-4">
+        <h6 class="settings-section-title">
+            <span class="oi oi-cursor me-2"></span>Interaction
+        </h6>
+        <p class="text-muted small mb-3">
+            Customize how you interact with the application.
+        </p>
+
+        <div class="mb-3">
+            <label class="form-label d-flex justify-content-between">
+                <span>Focus Indicator Size</span>
+                <span class="badge bg-secondary">@(Settings.FocusIndicatorSize)px</span>
+            </label>
+            <input type="range" class="form-range" min="2" max="4" step="1"
+                   @bind="Settings.FocusIndicatorSize" @bind:after="OnSettingChanged" />
+            <small class="text-muted">Size of the focus outline when navigating with keyboard.</small>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="largerTargets"
+                       @bind="Settings.LargerClickTargets" @bind:after="OnSettingChanged" />
+                <label class="form-check-label" for="largerTargets">
+                    <strong>Larger Click Targets</strong>
+                    <br /><small class="text-muted">Increases button and link sizes for easier clicking (WCAG 44x44px minimum)</small>
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="linkUnderlines"
+                       @bind="Settings.AlwaysShowLinkUnderlines" @bind:after="OnSettingChanged" />
+                <label class="form-check-label" for="linkUnderlines">
+                    <strong>Always Show Link Underlines</strong>
+                    <br /><small class="text-muted">Makes links easier to identify without relying on color alone</small>
+                </label>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label d-flex justify-content-between">
+                <span>Tooltip Delay</span>
+                <span class="badge bg-secondary">@(Settings.TooltipDelayMs)ms</span>
+            </label>
+            <input type="range" class="form-range" min="0" max="2000" step="100"
+                   @bind="Settings.TooltipDelayMs" @bind:after="OnSettingChanged" />
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">Instant (0ms)</small>
+                <small class="text-muted">Slow (2000ms)</small>
+            </div>
+        </div>
+    </div>
+
+    @* Reset Button *@
+    <div class="d-flex justify-content-end">
+        <button class="btn btn-outline-secondary" @onclick="ResetToDefaults">
+            <span class="oi oi-reload me-1"></span> Reset to Defaults
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public AccessibilitySettings Settings { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<AccessibilitySettings> SettingsChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private bool _systemReducedMotion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _systemReducedMotion = await JSRuntime.InvokeAsync<bool>("accessibilityInterop.getSystemReducedMotion");
+        }
+        catch
+        {
+            _systemReducedMotion = false;
+        }
+    }
+
+    private async Task OnSettingChanged()
+    {
+        // Apply settings via JS interop immediately for live preview
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("accessibilityInterop.applyAccessibilitySettings", Settings);
+        }
+        catch
+        {
+            // Silently fail if JS interop not available
+        }
+
+        await SettingsChanged.InvokeAsync(Settings);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ResetToDefaults()
+    {
+        Settings.ColorBlindnessMode = ColorBlindnessMode.None;
+        Settings.HighContrastMode = false;
+        Settings.MinContrastRatio = 4.5;
+        Settings.DyslexiaFriendlyFont = false;
+        Settings.TextScalingPercent = 100;
+        Settings.LineHeightMultiplier = 1.5;
+        Settings.LetterSpacing = 0;
+        Settings.ReducedMotionMode = ReducedMotionMode.RespectSystem;
+        Settings.FocusIndicatorSize = 2;
+        Settings.LargerClickTargets = false;
+        Settings.TooltipDelayMs = 500;
+        Settings.AlwaysShowLinkUnderlines = true;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("accessibilityInterop.resetAccessibilitySettings");
+        }
+        catch
+        {
+            // Silently fail
+        }
+
+        await SettingsChanged.InvokeAsync(Settings);
+        await OnChanged.InvokeAsync();
+    }
+}

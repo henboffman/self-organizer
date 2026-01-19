@@ -90,6 +90,7 @@ builder.Services.AddScoped<IPlatformService, PlatformService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
+builder.Services.AddScoped<ISettingsExportService, SettingsExportService>();
 
 // Google Calendar Services
 builder.Services.AddScoped<IGoogleCalendarAuthService, GoogleCalendarAuthService>();

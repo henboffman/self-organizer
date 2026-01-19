@@ -4,6 +4,8 @@
 @using SelfOrganizer.App.Services
 @using SelfOrganizer.App.Services.Intelligence
 @using SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.App.Components.Settings
+@using Microsoft.JSInterop
 @inject IRepository<UserPreferences> PreferencesRepository
 @inject SelfOrganizer.App.Services.Data.IIndexedDbService DbService
 @inject IExportService ExportService
@@ -11,10 +13,36 @@
 @inject IContextService ContextService
 @inject ILlmService LlmService
 @inject IBalanceDimensionService BalanceDimensionService
+@inject ISettingsExportService SettingsExportService
+@inject IJSRuntime JSRuntime
 
 <h3 class="mb-4">
     <span class="oi oi-cog me-2"></span>Settings
 </h3>
+
+@* Quick Start Presets *@
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><span class="oi oi-bolt me-2"></span>Quick Start Presets</span>
+        <button class="btn btn-sm btn-link p-0" @onclick="() => _presetsExpanded = !_presetsExpanded">
+            <span class="oi @(_presetsExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+        </button>
+    </div>
+    @if (_presetsExpanded)
+    {
+        <div class="card-body">
+            @if (_preferences != null)
+            {
+                <QuickStartPresetsPanel
+                    Preferences="@_preferences"
+                    Accessibility="@_accessibilitySettings"
+                    PreferencesChanged="@OnPreferencesChanged"
+                    AccessibilityChanged="@OnAccessibilitySettingsChanged"
+                    OnPresetApplied="@OnPresetApplied" />
+            }
+        </div>
+    }
+</div>
 
 <div class="row">
     <div class="col-lg-8">
@@ -166,36 +194,51 @@
             </div>
         </div>
 
-        @* ADHD & Focus Accommodations *@
+        @* Accessibility Settings *@
         <div class="card mb-4">
-            <div class="card-header">
-                <span class="oi oi-target me-2"></span>ADHD & Focus Accommodations
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-contrast me-2"></span>Accessibility</span>
+                <button class="btn btn-sm btn-link p-0" @onclick="() => _accessibilityExpanded = !_accessibilityExpanded">
+                    <span class="oi @(_accessibilityExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                </button>
             </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Features to help with decision fatigue and provide positive reinforcement during planning and task completion.
-                </p>
-
-                <div class="mb-3">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="celebrationEffects" @bind="_enableCelebrationEffects" />
-                        <label class="form-check-label" for="celebrationEffects">
-                            <strong>Celebration Effects</strong>
-                            <br /><small class="text-muted">Show confetti and animations when you complete tasks (dopamine hits!)</small>
-                        </label>
-                    </div>
+            @if (_accessibilityExpanded)
+            {
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Vision, reading, motion, and interaction settings for improved accessibility.
+                    </p>
+                    <AccessibilitySettingsPanel
+                        Settings="@_accessibilitySettings"
+                        SettingsChanged="@OnAccessibilitySettingsChanged"
+                        OnChanged="@MarkDirty" />
                 </div>
+            }
+        </div>
 
-                <div class="mb-0">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="pickForMe" @bind="_enablePickForMe" />
-                        <label class="form-check-label" for="pickForMe">
-                            <strong>"Pick For Me" Button</strong>
-                            <br /><small class="text-muted">Reduces decision fatigue by randomly selecting your next task from available options</small>
-                        </label>
-                    </div>
-                </div>
+        @* ADHD & Neurodivergent Accommodations *@
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-target me-2"></span>ADHD & Neurodivergent Accommodations</span>
+                <button class="btn btn-sm btn-link p-0" @onclick="() => _adhdExpanded = !_adhdExpanded">
+                    <span class="oi @(_adhdExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                </button>
             </div>
+            @if (_adhdExpanded)
+            {
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Comprehensive settings for focus, time perception, motivation, and executive function support.
+                    </p>
+                    @if (_preferences != null)
+                    {
+                        <NeurodivergentSettingsPanel
+                            Preferences="@_preferences"
+                            PreferencesChanged="@OnPreferencesChanged"
+                            OnSettingsChanged="@MarkDirty" />
+                    }
+                </div>
+            }
         </div>
 
         @* Context Management *@
@@ -531,7 +574,46 @@
         <div class="card mb-4">
             <div class="card-header">Data Management</div>
             <div class="card-body">
-                <h6 class="mb-2">Export Data</h6>
+                <h6 class="mb-2">Export Settings</h6>
+                <p class="text-muted small mb-2">
+                    Export your settings to restore on another device or as a backup.
+                </p>
+                <div class="d-grid gap-2 mb-3">
+                    <button class="btn btn-outline-success" @onclick="ExportSettingsJson" disabled="@_isExportingSettings">
+                        @if (_isExportingSettings)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-cog me-1"></span>
+                        }
+                        Export Settings (JSON)
+                    </button>
+                </div>
+
+                @if (_settingsExportResult != null)
+                {
+                    <div class="alert @(_settingsExportResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
+                        @if (_settingsExportResult.Success)
+                        {
+                            <span class="oi oi-check me-1"></span>
+                            <span>Exported to @_settingsExportResult.Filename</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-warning me-1"></span>
+                            <span>@_settingsExportResult.ErrorMessage</span>
+                        }
+                    </div>
+                }
+
+                <hr />
+
+                <h6 class="mb-2">Export All Data</h6>
+                <p class="text-muted small mb-2">
+                    Export your entire database including tasks, projects, and settings.
+                </p>
                 <div class="d-grid gap-2 mb-3">
                     <button class="btn btn-outline-primary" @onclick="ExportAllJson" disabled="@_isExporting">
                         @if (_isExporting)
@@ -542,7 +624,7 @@
                         {
                             <span class="oi oi-data-transfer-download me-1"></span>
                         }
-                        Export All (JSON)
+                        Export All Data (JSON)
                     </button>
                 </div>
 
@@ -622,10 +704,19 @@
         <div class="card">
             <div class="card-header">About</div>
             <div class="card-body">
-                <p class="mb-1"><strong>Self Organizer</strong></p>
-                <p class="text-muted small mb-0">GTD-inspired task management with smart scheduling.</p>
+                <p class="mb-1"><strong>Self Organizer</strong> <span class="badge bg-primary">v2.0</span></p>
+                <p class="text-muted small mb-2">GTD-inspired task management with smart scheduling, designed with comprehensive accessibility and neurodivergent accommodations.</p>
+                <p class="text-muted small mb-0">
+                    <span class="oi oi-contrast me-1"></span>Accessibility settings for vision, reading, and motor accommodations
+                </p>
+                <p class="text-muted small mb-0">
+                    <span class="oi oi-target me-1"></span>ADHD, anxiety, autism, and depression-friendly presets
+                </p>
                 <hr />
-                <p class="small text-muted mb-0">Built with Blazor WebAssembly and .NET 9</p>
+                <p class="small text-muted mb-2">Built with Blazor WebAssembly and .NET 9</p>
+                <a href="/release-notes" class="small">
+                    <span class="oi oi-document me-1"></span>View Release Notes
+                </a>
             </div>
         </div>
     </div>
@@ -660,10 +751,13 @@
     private bool _showClearConfirm = false;
     private bool _showImportModal = false;
     private UserPreferences? _preferences;
+    private bool _isDirty = false;
 
     // Export/Import state
     private bool _isExporting;
+    private bool _isExportingSettings;
     private ExportResult? _exportResult;
+    private ExportResult? _settingsExportResult;
     private ImportResultInfo? _importResult;
 
     private class ImportResultInfo
@@ -677,9 +771,13 @@
     private AppMode? _pendingModeChange;
     private bool _isSwitchingMode;
 
-    // ADHD Accommodation settings
-    private bool _enableCelebrationEffects = true;
-    private bool _enablePickForMe = true;
+    // Section expansion state
+    private bool _presetsExpanded = true;
+    private bool _accessibilityExpanded = false;
+    private bool _adhdExpanded = false;
+
+    // Accessibility settings
+    private AccessibilitySettings _accessibilitySettings = new();
 
     // Context management
     private List<Context>? _contexts;
@@ -714,16 +812,58 @@
             _dailyReviewHour = _preferences.DailyReviewReminderHour;
             _weeklyReviewDay = _preferences.WeeklyReviewDay;
 
-            // ADHD accommodations
-            _enableCelebrationEffects = _preferences.EnableCelebrationEffects;
-            _enablePickForMe = _preferences.EnablePickForMe;
+            // Load accessibility settings
+            _accessibilitySettings = _preferences.Accessibility ?? new AccessibilitySettings();
         }
+
+        // Apply accessibility settings on load
+        await ApplyAccessibilitySettings();
 
         // Load contexts
         await LoadContexts();
 
         // Load LLM settings
         await LoadLlmSettings();
+    }
+
+    private async Task ApplyAccessibilitySettings()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("accessibilityInterop.applyAccessibilitySettings", _accessibilitySettings);
+        }
+        catch
+        {
+            // Silently fail if JS interop not available yet
+        }
+    }
+
+    private void OnAccessibilitySettingsChanged(AccessibilitySettings settings)
+    {
+        _accessibilitySettings = settings;
+        if (_preferences != null)
+        {
+            _preferences.Accessibility = settings;
+        }
+    }
+
+    private void OnPreferencesChanged(UserPreferences preferences)
+    {
+        _preferences = preferences;
+    }
+
+    private void MarkDirty()
+    {
+        _isDirty = true;
+    }
+
+    private async Task OnPresetApplied()
+    {
+        // Apply accessibility settings immediately
+        await ApplyAccessibilitySettings();
+
+        // Auto-save after preset is applied
+        await SaveSettings();
     }
 
     private void SelectMode(AppMode mode)
@@ -830,9 +970,8 @@
         _preferences.DailyReviewReminderHour = _dailyReviewHour;
         _preferences.WeeklyReviewDay = _weeklyReviewDay;
 
-        // ADHD accommodations
-        _preferences.EnableCelebrationEffects = _enableCelebrationEffects;
-        _preferences.EnablePickForMe = _enablePickForMe;
+        // Accessibility settings
+        _preferences.Accessibility = _accessibilitySettings;
 
         // Save LLM settings
         await SaveLlmSettings();
@@ -847,6 +986,27 @@
         }
 
         _saveSuccess = true;
+        _isDirty = false;
+    }
+
+    private async Task ExportSettingsJson()
+    {
+        _isExportingSettings = true;
+        _settingsExportResult = null;
+        StateHasChanged();
+
+        try
+        {
+            _settingsExportResult = await SettingsExportService.ExportAndDownloadSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            _settingsExportResult = ExportResult.Failed($"Export failed: {ex.Message}");
+        }
+        finally
+        {
+            _isExportingSettings = false;
+        }
     }
 
     private async Task ExportAllJson()

@@ -1,0 +1,469 @@
+/* ===========================================
+   Self Organizer - Accessibility Styles
+   Comprehensive accessibility features including:
+   - Color blindness accommodations
+   - High contrast mode
+   - Dyslexia-friendly fonts
+   - Text scaling
+   - Reduced motion
+   - Focus indicators
+   - Larger click targets
+   =========================================== */
+
+/* ----------------------------------------
+   Dyslexia-Friendly Font Imports
+   ---------------------------------------- */
+@import url('https://fonts.cdnfonts.com/css/opendyslexic');
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+
+/* ----------------------------------------
+   Accessibility CSS Variables
+   ---------------------------------------- */
+:root {
+    /* Text Scaling (100% default) */
+    --accessibility-text-scale: 1;
+
+    /* Line Height (1.5 default) */
+    --accessibility-line-height: 1.5;
+
+    /* Letter Spacing (0 default) */
+    --accessibility-letter-spacing: 0em;
+
+    /* Focus Indicator Size (2px default) */
+    --accessibility-focus-size: 2px;
+
+    /* Tooltip Delay (500ms default) */
+    --accessibility-tooltip-delay: 500ms;
+}
+
+/* ----------------------------------------
+   Text Scaling
+   Applied to root element for global effect
+   ---------------------------------------- */
+html.text-scaled {
+    font-size: calc(16px * var(--accessibility-text-scale));
+}
+
+/* Ensure readable line heights and spacing */
+.accessibility-text-settings {
+    line-height: var(--accessibility-line-height) !important;
+    letter-spacing: var(--accessibility-letter-spacing) !important;
+}
+
+body.accessibility-text-settings,
+body.accessibility-text-settings * {
+    line-height: var(--accessibility-line-height);
+    letter-spacing: var(--accessibility-letter-spacing);
+}
+
+/* ----------------------------------------
+   Dyslexia-Friendly Font Mode
+   ---------------------------------------- */
+body.dyslexic-font,
+body.dyslexic-font * {
+    font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+body.dyslexic-font code,
+body.dyslexic-font pre,
+body.dyslexic-font .font-mono {
+    font-family: 'OpenDyslexic Mono', 'JetBrains Mono', monospace !important;
+}
+
+/* Atkinson Hyperlegible variant (less stylized) */
+body.dyslexic-font-atkinson,
+body.dyslexic-font-atkinson * {
+    font-family: 'Atkinson Hyperlegible', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* ----------------------------------------
+   High Contrast Mode
+   WCAG AAA compliant contrast ratios
+   ---------------------------------------- */
+body.high-contrast {
+    /* Maximize contrast for light mode */
+    --bg-primary: #ffffff;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f0f0f0;
+    --bg-elevated: #ffffff;
+
+    --text-primary: #000000;
+    --text-secondary: #1a1a1a;
+    --text-muted: #333333;
+
+    --border-default: #000000;
+    --border-muted: #333333;
+    --border-strong: #000000;
+
+    --color-primary: #5b21b6;
+    --color-primary-hover: #7c3aed;
+    --color-primary-subtle: rgba(91, 33, 182, 0.2);
+
+    --card-border: #000000;
+    --input-border: #000000;
+}
+
+[data-theme="dark"] body.high-contrast,
+body.high-contrast[data-theme="dark"] {
+    /* Maximize contrast for dark mode */
+    --bg-primary: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #1a1a1a;
+    --bg-elevated: #1a1a1a;
+
+    --text-primary: #ffffff;
+    --text-secondary: #f0f0f0;
+    --text-muted: #cccccc;
+
+    --border-default: #ffffff;
+    --border-muted: #cccccc;
+    --border-strong: #ffffff;
+
+    --color-primary: #d8b4fe;
+    --color-primary-hover: #e9d5ff;
+    --color-primary-subtle: rgba(216, 180, 254, 0.3);
+
+    --card-border: #ffffff;
+    --input-border: #ffffff;
+}
+
+/* High contrast specific overrides */
+body.high-contrast .card,
+body.high-contrast .btn,
+body.high-contrast input,
+body.high-contrast select,
+body.high-contrast textarea {
+    border-width: 2px;
+}
+
+body.high-contrast a {
+    text-decoration: underline !important;
+    text-decoration-thickness: 2px !important;
+}
+
+/* ----------------------------------------
+   Color Blindness Accommodations
+   Using patterns and symbols in addition to color
+   ---------------------------------------- */
+
+/* Protanopia (Red-blind) - Blue/Yellow safe palette */
+body.colorblind-protanopia {
+    --color-success: #0077b6;
+    --color-success-light: #00b4d8;
+    --color-success-bg: rgba(0, 119, 182, 0.1);
+    --color-success-border: rgba(0, 119, 182, 0.3);
+
+    --color-warning: #fb8500;
+    --color-warning-light: #ffb703;
+    --color-warning-bg: rgba(251, 133, 0, 0.1);
+    --color-warning-border: rgba(251, 133, 0, 0.3);
+
+    --color-danger: #023047;
+    --color-danger-light: #219ebc;
+    --color-danger-bg: rgba(2, 48, 71, 0.1);
+    --color-danger-border: rgba(2, 48, 71, 0.3);
+
+    --priority-high: #023047;
+    --priority-normal: #0077b6;
+    --priority-low: #8ecae6;
+
+    --status-completed: #0077b6;
+    --status-in-progress: #fb8500;
+}
+
+/* Deuteranopia (Green-blind) - Blue/Yellow safe palette */
+body.colorblind-deuteranopia {
+    --color-success: #0077b6;
+    --color-success-light: #00b4d8;
+    --color-success-bg: rgba(0, 119, 182, 0.1);
+    --color-success-border: rgba(0, 119, 182, 0.3);
+
+    --color-warning: #fb8500;
+    --color-warning-light: #ffb703;
+    --color-warning-bg: rgba(251, 133, 0, 0.1);
+    --color-warning-border: rgba(251, 133, 0, 0.3);
+
+    --color-danger: #6a040f;
+    --color-danger-light: #9d0208;
+    --color-danger-bg: rgba(106, 4, 15, 0.1);
+    --color-danger-border: rgba(106, 4, 15, 0.3);
+
+    --priority-high: #6a040f;
+    --priority-normal: #0077b6;
+    --priority-low: #8ecae6;
+
+    --status-completed: #0077b6;
+    --status-in-progress: #fb8500;
+}
+
+/* Tritanopia (Blue-blind) - Red/Green distinguishable palette */
+body.colorblind-tritanopia {
+    --color-success: #2d6a4f;
+    --color-success-light: #40916c;
+    --color-success-bg: rgba(45, 106, 79, 0.1);
+    --color-success-border: rgba(45, 106, 79, 0.3);
+
+    --color-warning: #e76f51;
+    --color-warning-light: #f4a261;
+    --color-warning-bg: rgba(231, 111, 81, 0.1);
+    --color-warning-border: rgba(231, 111, 81, 0.3);
+
+    --color-danger: #9b2226;
+    --color-danger-light: #bb3e03;
+    --color-danger-bg: rgba(155, 34, 38, 0.1);
+    --color-danger-border: rgba(155, 34, 38, 0.3);
+
+    --color-primary: #e76f51;
+    --color-primary-hover: #f4a261;
+    --color-primary-subtle: rgba(231, 111, 81, 0.15);
+
+    --priority-high: #9b2226;
+    --priority-normal: #e76f51;
+    --priority-low: #40916c;
+
+    --status-completed: #2d6a4f;
+    --status-in-progress: #e76f51;
+}
+
+/* Achromatopsia (Complete color blindness) - Grayscale with patterns */
+body.colorblind-achromatopsia {
+    --color-success: #2f2f2f;
+    --color-success-light: #4a4a4a;
+    --color-success-bg: rgba(47, 47, 47, 0.1);
+    --color-success-border: rgba(47, 47, 47, 0.3);
+
+    --color-warning: #6b6b6b;
+    --color-warning-light: #8a8a8a;
+    --color-warning-bg: rgba(107, 107, 107, 0.1);
+    --color-warning-border: rgba(107, 107, 107, 0.3);
+
+    --color-danger: #1a1a1a;
+    --color-danger-light: #333333;
+    --color-danger-bg: rgba(26, 26, 26, 0.1);
+    --color-danger-border: rgba(26, 26, 26, 0.3);
+
+    --color-primary: #4a4a4a;
+    --color-primary-hover: #6b6b6b;
+    --color-primary-subtle: rgba(74, 74, 74, 0.15);
+
+    --priority-high: #1a1a1a;
+    --priority-normal: #4a4a4a;
+    --priority-low: #8a8a8a;
+
+    --status-completed: #2f2f2f;
+    --status-in-progress: #6b6b6b;
+}
+
+/* Use patterns/icons for color blind modes */
+body[class*="colorblind-"] .priority-indicator::before,
+body[class*="colorblind-"] .status-indicator::before {
+    margin-right: 0.25rem;
+}
+
+body[class*="colorblind-"] .priority-high::before {
+    content: "!!!";
+}
+
+body[class*="colorblind-"] .priority-normal::before {
+    content: "!!";
+}
+
+body[class*="colorblind-"] .priority-low::before {
+    content: "!";
+}
+
+/* ----------------------------------------
+   Reduced Motion Modes
+   ---------------------------------------- */
+
+/* Always reduce motion */
+body.reduce-motion,
+body.reduce-motion * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+}
+
+body.reduce-motion {
+    --transition-fast: 0s;
+    --transition-normal: 0s;
+    --transition-slow: 0s;
+    --transition-bounce: 0s;
+}
+
+/* Never reduce motion (override system preference) */
+body.allow-motion {
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.allow-motion,
+    body.allow-motion * {
+        animation-duration: 0.25s !important;
+        transition-duration: 0.25s !important;
+    }
+}
+
+/* ----------------------------------------
+   Focus Indicator Customization
+   ---------------------------------------- */
+
+/* Enhanced focus indicators */
+body.focus-enhanced *:focus-visible {
+    outline: var(--accessibility-focus-size) solid var(--color-primary) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 calc(var(--accessibility-focus-size) + 2px) rgba(167, 139, 250, 0.3) !important;
+}
+
+body.focus-enhanced button:focus-visible,
+body.focus-enhanced a:focus-visible,
+body.focus-enhanced input:focus-visible,
+body.focus-enhanced select:focus-visible,
+body.focus-enhanced textarea:focus-visible {
+    outline: var(--accessibility-focus-size) solid var(--color-primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ----------------------------------------
+   Larger Click Targets
+   Minimum 44x44px touch targets (WCAG)
+   ---------------------------------------- */
+body.larger-targets button,
+body.larger-targets a,
+body.larger-targets input[type="checkbox"],
+body.larger-targets input[type="radio"],
+body.larger-targets .clickable {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+body.larger-targets .btn {
+    padding: 0.75rem 1.25rem;
+    min-height: 48px;
+}
+
+body.larger-targets input[type="checkbox"],
+body.larger-targets input[type="radio"] {
+    width: 24px;
+    height: 24px;
+}
+
+body.larger-targets input[type="text"],
+body.larger-targets input[type="email"],
+body.larger-targets input[type="password"],
+body.larger-targets input[type="number"],
+body.larger-targets input[type="date"],
+body.larger-targets input[type="time"],
+body.larger-targets select,
+body.larger-targets textarea {
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+}
+
+/* Larger dropdown and menu items */
+body.larger-targets .dropdown-item,
+body.larger-targets .menu-item,
+body.larger-targets .list-item {
+    padding: 0.875rem 1rem;
+    min-height: 48px;
+}
+
+/* ----------------------------------------
+   Link Underlines
+   Always visible for accessibility
+   ---------------------------------------- */
+body.show-link-underlines a {
+    text-decoration: underline !important;
+}
+
+body.show-link-underlines a:hover {
+    text-decoration-thickness: 2px !important;
+}
+
+/* Skip navigation links but keep functional links underlined */
+body.show-link-underlines .btn,
+body.show-link-underlines .nav-link,
+body.show-link-underlines .no-underline {
+    text-decoration: none !important;
+}
+
+/* ----------------------------------------
+   Tooltip Delay Customization
+   ---------------------------------------- */
+[title] {
+    transition-delay: var(--accessibility-tooltip-delay);
+}
+
+/* ----------------------------------------
+   Screen Reader Only Content
+   Visually hidden but accessible to assistive tech
+   ---------------------------------------- */
+.sr-only,
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Allow focus on hidden skip links */
+.sr-only-focusable:focus,
+.visually-hidden-focusable:focus {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0.5rem 1rem !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+}
+
+/* ----------------------------------------
+   Skip Navigation Link
+   ---------------------------------------- */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-primary);
+    color: var(--text-on-primary);
+    padding: 1rem 2rem;
+    border-radius: var(--radius-md);
+    z-index: calc(var(--z-tooltip) + 1);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 1rem;
+}
+
+/* ----------------------------------------
+   Print Styles for Accessibility
+   ---------------------------------------- */
+@media print {
+    body * {
+        color: #000 !important;
+        background: #fff !important;
+    }
+
+    a {
+        text-decoration: underline !important;
+    }
+
+    a[href]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.875em;
+    }
+}

@@ -1,0 +1,821 @@
+@using SelfOrganizer.Core.Models
+
+<div class="neurodivergent-settings">
+    @* Focus Timer Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _focusTimerExpanded = !_focusTimerExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-clock me-2"></span>Focus Timer</span>
+                <span class="oi @(_focusTimerExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_focusTimerExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Pomodoro-style focus sessions with breaks. Customize timing and notifications.
+                </p>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Focus Session Duration</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.FocusTimerMinutes" @bind:after="OnChanged" min="5" max="120" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Break Duration</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.BreakReminderMinutes" @bind:after="OnChanged" min="1" max="30" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Long Break Duration</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.LongBreakMinutes" @bind:after="OnChanged" min="5" max="60" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Sessions Before Long Break</label>
+                        <input type="number" class="form-control" @bind="Preferences.SessionsBeforeLongBreak" @bind:after="OnChanged" min="2" max="8" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="sessionIntention" @bind="Preferences.ShowSessionIntentionPrompt" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="sessionIntention">
+                            <strong>Session Intention Prompt</strong>
+                            <br /><small class="text-muted">Ask "What will you accomplish?" before starting</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="postReflection" @bind="Preferences.ShowPostSessionReflection" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="postReflection">
+                            <strong>Post-Session Reflection</strong>
+                            <br /><small class="text-muted">Rate focus quality and note distractions after sessions</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="trackDistractions" @bind="Preferences.TrackDistractions" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="trackDistractions">
+                            <strong>Track Distractions</strong>
+                            <br /><small class="text-muted">Count distractions during focus sessions for self-awareness</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="focusStreaks" @bind="Preferences.EnableFocusStreaks" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="focusStreaks">
+                            <strong>Focus Streaks</strong>
+                            <br /><small class="text-muted">Track consecutive completed focus sessions for motivation</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoStartBreak" @bind="Preferences.AutoStartBreakTimer" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="autoStartBreak">
+                            <strong>Auto-Start Break Timer</strong>
+                            <br /><small class="text-muted">Automatically begin break countdown when focus ends</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pauseOnBlur" @bind="Preferences.PauseTimerOnWindowBlur" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="pauseOnBlur">
+                            <strong>Pause When Switching Windows</strong>
+                            <br /><small class="text-muted">Pause timer when you leave the app (accountability mode)</small>
+                        </label>
+                    </div>
+                </div>
+
+                <h6 class="mt-4 mb-3">Focus Sounds</h6>
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="focusSounds" @bind="Preferences.EnableFocusSounds" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="focusSounds">
+                            <strong>Enable Focus Sounds</strong>
+                            <br /><small class="text-muted">Play ambient sounds during focus sessions</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableFocusSounds)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Preferred Sound</label>
+                        <select class="form-select" @bind="Preferences.PreferredFocusSound" @bind:after="OnChanged">
+                            <option value="@FocusSoundType.None">None</option>
+                            <option value="@FocusSoundType.WhiteNoise">White Noise</option>
+                            <option value="@FocusSoundType.BrownNoise">Brown Noise</option>
+                            <option value="@FocusSoundType.PinkNoise">Pink Noise</option>
+                            <option value="@FocusSoundType.Rain">Rain</option>
+                            <option value="@FocusSoundType.Ocean">Ocean Waves</option>
+                            <option value="@FocusSoundType.Forest">Forest</option>
+                            <option value="@FocusSoundType.CoffeeShop">Coffee Shop</option>
+                            <option value="@FocusSoundType.Fireplace">Fireplace</option>
+                        </select>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Task Presentation Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _taskPresentationExpanded = !_taskPresentationExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-list me-2"></span>Task Presentation</span>
+                <span class="oi @(_taskPresentationExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_taskPresentationExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Reduce overwhelm by controlling how many tasks you see and what information is displayed.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Maximum Visible Tasks</span>
+                        <span class="badge bg-secondary">@Preferences.MaxVisibleTasks</span>
+                    </label>
+                    <input type="range" class="form-range" min="3" max="25" step="1"
+                           @bind="Preferences.MaxVisibleTasks" @bind:after="OnChanged" />
+                    <small class="text-muted">Limit tasks shown to reduce overwhelm. More tasks are always accessible.</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="oneTaskMode" @bind="Preferences.OneTaskAtATimeMode" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="oneTaskMode">
+                            <strong>One Task at a Time Mode</strong>
+                            <br /><small class="text-muted">Show only your current task to eliminate distraction</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="hideTaskCounts" @bind="Preferences.HideTaskCounts" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="hideTaskCounts">
+                            <strong>Hide Task Counts</strong>
+                            <br /><small class="text-muted">Don't show "X tasks remaining" to reduce anxiety</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="hideDueDates" @bind="Preferences.HideDueDatesOnCards" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="hideDueDates">
+                            <strong>Hide Due Dates on Cards</strong>
+                            <br /><small class="text-muted">Show due dates only in detail view, not on task cards</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="simplifiedView" @bind="Preferences.SimplifiedTaskView" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="simplifiedView">
+                            <strong>Simplified Task View</strong>
+                            <br /><small class="text-muted">Show only task title and completion checkbox</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="encouragingMessages" @bind="Preferences.ShowEncouragingMessages" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="encouragingMessages">
+                            <strong>Encouraging Messages</strong>
+                            <br /><small class="text-muted">Show positive affirmations and motivational messages</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="minimalMode" @bind="Preferences.EnableMinimalMode" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="minimalMode">
+                            <strong>Minimal Mode</strong>
+                            <br /><small class="text-muted">Hide non-essential UI elements for a cleaner interface</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Time Perception Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _timePerceptionExpanded = !_timePerceptionExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-timer me-2"></span>Time Perception</span>
+                <span class="oi @(_timePerceptionExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_timePerceptionExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Combat time blindness with visual time cues and reminders.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="timeBlindnessHelpers" @bind="Preferences.EnableTimeBlindnessHelpers" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="timeBlindnessHelpers">
+                            <strong>Time Blindness Helpers</strong>
+                            <br /><small class="text-muted">Show time-related visual cues throughout the app</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showElapsedTime" @bind="Preferences.ShowElapsedTime" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="showElapsedTime">
+                            <strong>Show Elapsed Time</strong>
+                            <br /><small class="text-muted">Display how long you've been working on active tasks</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showEstimatedCompletion" @bind="Preferences.ShowEstimatedCompletion" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="showEstimatedCompletion">
+                            <strong>Show Estimated Completion</strong>
+                            <br /><small class="text-muted">Display "Done by 3:30 PM" based on estimated duration</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="showTimeRemaining" @bind="Preferences.ShowTimeRemainingInBlock" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="showTimeRemaining">
+                            <strong>Show Time Remaining in Block</strong>
+                            <br /><small class="text-muted">Display countdown of remaining time in current work block</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="timeSinceBreak" @bind="Preferences.ShowTimeSinceLastBreak" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="timeSinceBreak">
+                            <strong>Show Time Since Last Break</strong>
+                            <br /><small class="text-muted">Track how long since you took a break</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="ambientTimeDisplay" @bind="Preferences.EnableAmbientTimeDisplay" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="ambientTimeDisplay">
+                            <strong>Ambient Time Display</strong>
+                            <br /><small class="text-muted">Always-visible subtle clock or progress indicator</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Time Awareness Interval</span>
+                        <span class="badge bg-secondary">@Preferences.TimeAwarenessIntervalMinutes min</span>
+                    </label>
+                    <input type="range" class="form-range" min="15" max="120" step="15"
+                           @bind="Preferences.TimeAwarenessIntervalMinutes" @bind:after="OnChanged" />
+                    <small class="text-muted">How often to show time awareness notifications</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="hyperfocusAlerts" @bind="Preferences.EnableHyperfocusAlerts" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="hyperfocusAlerts">
+                            <strong>Hyperfocus Alerts</strong>
+                            <br /><small class="text-muted">Remind you to take breaks during extended work sessions</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableHyperfocusAlerts)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Alert After</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.HyperfocusAlertMinutes" @bind:after="OnChanged" min="30" max="180" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Motivation & Rewards Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _motivationExpanded = !_motivationExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-star me-2"></span>Motivation & Rewards</span>
+                <span class="oi @(_motivationExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_motivationExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Dopamine-driven rewards and progress tracking for sustained motivation.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="celebrationEffects" @bind="Preferences.EnableCelebrationEffects" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="celebrationEffects">
+                            <strong>Celebration Effects</strong>
+                            <br /><small class="text-muted">Confetti and animations when completing tasks</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableCelebrationEffects)
+                {
+                    <div class="mb-3">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Celebration Intensity</span>
+                            <span class="badge bg-secondary">@GetCelebrationLabel(Preferences.CelebrationIntensity)</span>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="3" step="1"
+                               @bind="Preferences.CelebrationIntensity" @bind:after="OnChanged" />
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">None</small>
+                            <small class="text-muted">Subtle</small>
+                            <small class="text-muted">Normal</small>
+                            <small class="text-muted">Extra!</small>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="microRewards" @bind="Preferences.EnableMicroRewards" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="microRewards">
+                            <strong>Micro-Rewards</strong>
+                            <br /><small class="text-muted">Small celebrations for completing subtasks and checkpoints</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="progressVisualization" @bind="Preferences.EnableProgressVisualization" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="progressVisualization">
+                            <strong>Progress Visualization</strong>
+                            <br /><small class="text-muted">Show visual progress bars for tasks and projects</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="dailyGoalSetting" @bind="Preferences.EnableDailyGoalSetting" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="dailyGoalSetting">
+                            <strong>Daily Goal Setting</strong>
+                            <br /><small class="text-muted">Set a daily task completion goal each morning</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableDailyGoalSetting)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Daily Task Goal</label>
+                            <input type="number" class="form-control" @bind="Preferences.DailyTaskGoal" @bind:after="OnChanged" min="1" max="20" />
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="showDailyProgress" @bind="Preferences.ShowDailyProgressBar" @bind:after="OnChanged" />
+                                <label class="form-check-label" for="showDailyProgress">Show Progress Bar</label>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="weeklySummary" @bind="Preferences.EnableWeeklySummary" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="weeklySummary">
+                            <strong>Weekly Summary</strong>
+                            <br /><small class="text-muted">Show achievements and stats at the end of each week</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Executive Function Support Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _executiveFunctionExpanded = !_executiveFunctionExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-lightbulb me-2"></span>Executive Function Support</span>
+                <span class="oi @(_executiveFunctionExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_executiveFunctionExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Tools to help with planning, task initiation, and breaking down overwhelming tasks.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pickForMe" @bind="Preferences.EnablePickForMe" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="pickForMe">
+                            <strong>"Pick For Me" Button</strong>
+                            <br /><small class="text-muted">Reduces decision fatigue by randomly selecting your next task</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="taskChunking" @bind="Preferences.EnableTaskChunking" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="taskChunking">
+                            <strong>Auto Task Chunking</strong>
+                            <br /><small class="text-muted">Automatically break long tasks into smaller chunks</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableTaskChunking)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Maximum Chunk Size</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.MaxTaskChunkMinutes" @bind:after="OnChanged" min="10" max="60" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="suggestBreakdown" @bind="Preferences.SuggestTaskBreakdown" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="suggestBreakdown">
+                            <strong>Suggest Task Breakdown</strong>
+                            <br /><small class="text-muted">Prompt to break down tasks that exceed a time threshold</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.SuggestTaskBreakdown)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Breakdown Threshold</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.TaskBreakdownThresholdMinutes" @bind:after="OnChanged" min="30" max="180" />
+                            <span class="input-group-text">minutes</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="blockerPrompts" @bind="Preferences.EnableBlockerPrompts" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="blockerPrompts">
+                            <strong>Blocker Prompts</strong>
+                            <br /><small class="text-muted">Ask "What's blocking you?" for tasks you haven't started</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableBlockerPrompts)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Prompt After</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="Preferences.StaleTakPromptDays" @bind:after="OnChanged" min="1" max="14" />
+                            <span class="input-group-text">days</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="quickCapture" @bind="Preferences.EnableQuickCaptureMode" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="quickCapture">
+                            <strong>Quick Capture Mode</strong>
+                            <br /><small class="text-muted">Minimal fields for fast task entry without friction</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoExpandNextActions" @bind="Preferences.AutoExpandNextActions" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="autoExpandNextActions">
+                            <strong>Auto-Expand Next Actions</strong>
+                            <br /><small class="text-muted">Automatically show next actions when selecting a project</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Task Transitions & Context Switching *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _transitionsExpanded = !_transitionsExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-loop-circular me-2"></span>Task Transitions</span>
+                <span class="oi @(_transitionsExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_transitionsExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Smooth transitions between tasks and warnings about context switching.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="taskTransitions" @bind="Preferences.EnableTaskTransitions" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="taskTransitions">
+                            <strong>Task Transition Prompts</strong>
+                            <br /><small class="text-muted">Guide through finishing one task and starting the next</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Transition Buffer</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" @bind="Preferences.TransitionBufferMinutes" @bind:after="OnChanged" min="0" max="15" />
+                        <span class="input-group-text">minutes</span>
+                    </div>
+                    <small class="text-muted">Buffer time between tasks for mental reset</small>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="contextSwitchWarnings" @bind="Preferences.EnableContextSwitchWarnings" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="contextSwitchWarnings">
+                            <strong>Context Switch Warnings</strong>
+                            <br /><small class="text-muted">Warn when switching between very different types of tasks</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Task Start Grace Period</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" @bind="Preferences.TaskStartGracePeriod" @bind:after="OnChanged" min="0" max="15" />
+                        <span class="input-group-text">minutes</span>
+                    </div>
+                    <small class="text-muted">Time before a task is marked as "late" starting</small>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Accountability & Structure Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _accountabilityExpanded = !_accountabilityExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-check me-2"></span>Accountability & Structure</span>
+                <span class="oi @(_accountabilityExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_accountabilityExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    External structure and accountability features for maintaining routines.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="morningPlanning" @bind="Preferences.EnableMorningPlanningPrompt" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="morningPlanning">
+                            <strong>Morning Planning Prompt</strong>
+                            <br /><small class="text-muted">Daily planning reminder to set intentions</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableMorningPlanningPrompt)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Morning Planning Time</label>
+                        <select class="form-select" @bind="Preferences.MorningPlanningHour" @bind:after="OnChanged">
+                            @for (int i = 5; i <= 12; i++)
+                            {
+                                var hour = i == 12 ? 12 : i;
+                                var ampm = i < 12 ? "AM" : "PM";
+                                <option value="@i">@hour:00 @ampm</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="eveningWindDown" @bind="Preferences.EnableEveningWindDown" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="eveningWindDown">
+                            <strong>Evening Wind-Down</strong>
+                            <br /><small class="text-muted">End-of-day reminder to wrap up and plan tomorrow</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableEveningWindDown)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Wind-Down Time</label>
+                        <select class="form-select" @bind="Preferences.EveningWindDownHour" @bind:after="OnChanged">
+                            @for (int i = 15; i <= 22; i++)
+                            {
+                                var hour = i > 12 ? i - 12 : i;
+                                <option value="@i">@hour:00 PM</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="gentleReminders" @bind="Preferences.EnableGentleReminders" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="gentleReminders">
+                            <strong>Gentle Reminders</strong>
+                            <br /><small class="text-muted">Non-intrusive nudges rather than urgent notifications</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="bodyDoubling" @bind="Preferences.EnableBodyDoubling" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="bodyDoubling">
+                            <strong>Virtual Body Doubling</strong>
+                            <br /><small class="text-muted">Show co-working presence indicator for accountability</small>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="commitmentMode" @bind="Preferences.EnableCommitmentMode" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="commitmentMode">
+                            <strong>Commitment Mode</strong>
+                            <br /><small class="text-muted">Started tasks must be completed or explicitly abandoned</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (Preferences.EnableCommitmentMode)
+                {
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="requireAbandonReason" @bind="Preferences.RequireAbandonReason" @bind:after="OnChanged" />
+                            <label class="form-check-label" for="requireAbandonReason">
+                                <strong>Require Abandon Reason</strong>
+                                <br /><small class="text-muted">Must explain why when abandoning a task</small>
+                            </label>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* Sound & Notifications Section *@
+    <div class="settings-section mb-4">
+        <button class="btn btn-link settings-section-toggle p-0 w-100 text-start" @onclick="() => _soundsExpanded = !_soundsExpanded">
+            <h6 class="settings-section-title d-flex justify-content-between align-items-center mb-0">
+                <span><span class="oi oi-volume-high me-2"></span>Sound & Notifications</span>
+                <span class="oi @(_soundsExpanded ? "oi-chevron-top" : "oi-chevron-bottom") text-muted"></span>
+            </h6>
+        </button>
+
+        @if (_soundsExpanded)
+        {
+            <div class="mt-3">
+                <p class="text-muted small mb-3">
+                    Control sounds and notification preferences for sensory comfort.
+                </p>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="muteAllSounds" @bind="Preferences.MuteAllSounds" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="muteAllSounds">
+                            <strong>Mute All Sounds</strong>
+                            <br /><small class="text-muted">Disable all app sounds</small>
+                        </label>
+                    </div>
+                </div>
+
+                @if (!Preferences.MuteAllSounds)
+                {
+                    <div class="mb-3">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Sound Volume</span>
+                            <span class="badge bg-secondary">@Preferences.SoundVolume%</span>
+                        </label>
+                        <input type="range" class="form-range" min="0" max="100" step="10"
+                               @bind="Preferences.SoundVolume" @bind:after="OnChanged" />
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="timerCompletionSound" @bind="Preferences.PlayTimerCompletionSound" @bind:after="OnChanged" />
+                            <label class="form-check-label" for="timerCompletionSound">
+                                <strong>Timer Completion Sound</strong>
+                                <br /><small class="text-muted">Play sound when focus timer completes</small>
+                            </label>
+                        </div>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="timerNotification" @bind="Preferences.ShowTimerNotification" @bind:after="OnChanged" />
+                        <label class="form-check-label" for="timerNotification">
+                            <strong>Desktop Notifications</strong>
+                            <br /><small class="text-muted">Show system notifications for timer events</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public UserPreferences Preferences { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<UserPreferences> PreferencesChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnSettingsChanged { get; set; }
+
+    // Section expansion state
+    private bool _focusTimerExpanded = true;
+    private bool _taskPresentationExpanded = false;
+    private bool _timePerceptionExpanded = false;
+    private bool _motivationExpanded = false;
+    private bool _executiveFunctionExpanded = false;
+    private bool _transitionsExpanded = false;
+    private bool _accountabilityExpanded = false;
+    private bool _soundsExpanded = false;
+
+    private async Task OnChanged()
+    {
+        await PreferencesChanged.InvokeAsync(Preferences);
+        await OnSettingsChanged.InvokeAsync();
+    }
+
+    private static string GetCelebrationLabel(int intensity) => intensity switch
+    {
+        0 => "None",
+        1 => "Subtle",
+        2 => "Normal",
+        3 => "Extra!",
+        _ => "Normal"
+    };
+}
