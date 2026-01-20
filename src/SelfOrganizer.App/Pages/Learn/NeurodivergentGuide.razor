@@ -1,0 +1,683 @@
+@page "/learn"
+@using SelfOrganizer.Core.Models
+@inject NavigationManager Navigation
+
+<div class="learn-page">
+    @* Hero Section *@
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">Understanding Your Brain</h1>
+            <p class="hero-subtitle">
+                Learn about neurodivergence and discover how Self-Organizer's features
+                can work with your unique brain, not against it.
+            </p>
+            <div class="hero-cta">
+                <button class="btn btn-light btn-lg" @onclick='() => Navigation.NavigateTo("/settings#quick-start")'>
+                    <span class="oi oi-bolt me-2"></span>Find Your Preset
+                </button>
+            </div>
+        </div>
+    </section>
+
+    @* Condition Profiles Section *@
+    <section class="conditions-section">
+        <div class="section-header">
+            <h2>Neurodivergent Profiles</h2>
+            <p class="text-muted">Tap any card to learn more about how these conditions affect productivity and what helps.</p>
+        </div>
+
+        <div class="conditions-grid">
+            @foreach (var condition in _conditions)
+            {
+                <div class="condition-card @(condition.IsExpanded ? "expanded" : "")"
+                     style="--condition-color: @condition.Color;"
+                     @onclick="() => ToggleCondition(condition)">
+                    <div class="condition-header">
+                        <div class="condition-icon">
+                            <span class="oi @condition.Icon"></span>
+                        </div>
+                        <div class="condition-title-area">
+                            <h3 class="condition-name">@condition.Name</h3>
+                            <p class="condition-tagline">@condition.Tagline</p>
+                        </div>
+                        <span class="expand-icon oi @(condition.IsExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                    </div>
+
+                    @if (condition.IsExpanded)
+                    {
+                        <div class="condition-content" @onclick:stopPropagation="true">
+                            <div class="condition-description">
+                                @condition.Description
+                            </div>
+
+                            <div class="challenges-section">
+                                <h4>Common Challenges</h4>
+                                <ul class="challenge-list">
+                                    @foreach (var challenge in condition.Challenges)
+                                    {
+                                        <li>@challenge</li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="helps-section">
+                                <h4>What Helps</h4>
+                                <ul class="helps-list">
+                                    @foreach (var help in condition.WhatHelps)
+                                    {
+                                        <li>@help</li>
+                                    }
+                                </ul>
+                            </div>
+
+                            <div class="condition-cta">
+                                <button class="btn btn-sm btn-outline-primary"
+                                        @onclick='() => Navigation.NavigateTo($"/settings#quick-start")'>
+                                    View @condition.Name Presets
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    @* Strategies Section *@
+    <section class="strategies-section">
+        <div class="section-header">
+            <h2>Productivity Strategies</h2>
+            <p class="text-muted">Evidence-based techniques that Self-Organizer uses to support different minds.</p>
+        </div>
+
+        <div class="strategies-grid">
+            @foreach (var strategy in _strategies)
+            {
+                <details class="strategy-card">
+                    <summary class="strategy-header">
+                        <span class="strategy-icon oi @strategy.Icon"></span>
+                        <span class="strategy-name">@strategy.Name</span>
+                    </summary>
+                    <div class="strategy-content">
+                        <div class="strategy-what">
+                            <h4>What is it?</h4>
+                            <p>@strategy.WhatIsIt</p>
+                        </div>
+                        <div class="strategy-why">
+                            <h4>Why it works</h4>
+                            <p>@strategy.WhyItWorks</p>
+                        </div>
+                        <div class="strategy-inapp">
+                            <h4>In Self-Organizer</h4>
+                            <p>@strategy.InApp</p>
+                        </div>
+                    </div>
+                </details>
+            }
+        </div>
+    </section>
+
+    @* CTA Section *@
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Ready to Get Started?</h2>
+            <p>Find a preset that matches your needs, or customize your own experience.</p>
+            <div class="cta-buttons">
+                <button class="btn btn-primary btn-lg" @onclick='() => Navigation.NavigateTo("/settings#quick-start")'>
+                    <span class="oi oi-bolt me-2"></span>Browse Presets
+                </button>
+                <button class="btn btn-outline-primary btn-lg" @onclick='() => Navigation.NavigateTo("/settings")'>
+                    <span class="oi oi-cog me-2"></span>All Settings
+                </button>
+            </div>
+        </div>
+    </section>
+</div>
+
+<style>
+    .learn-page {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, var(--color-primary, #7c3aed) 0%, var(--color-secondary, #3b82f6) 100%);
+        border-radius: var(--radius-xl, 20px);
+        padding: 3rem 2rem;
+        margin-bottom: 3rem;
+        text-align: center;
+        color: white;
+    }
+
+    .hero-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .hero-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.95;
+        max-width: 600px;
+        margin: 0 auto 2rem;
+        line-height: 1.6;
+    }
+
+    .hero-cta .btn {
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+    }
+
+    /* Section Headers */
+    .section-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .section-header h2 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Conditions Section */
+    .conditions-section {
+        margin-bottom: 3rem;
+    }
+
+    .conditions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .condition-card {
+        background: var(--bg-elevated, #fff);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg, 14px);
+        overflow: hidden;
+        cursor: pointer;
+        transition: all var(--transition-normal);
+    }
+
+    .condition-card:hover {
+        border-color: var(--condition-color);
+        box-shadow: var(--shadow-md), 0 0 20px color-mix(in srgb, var(--condition-color) 20%, transparent);
+    }
+
+    .condition-card.expanded {
+        border-color: var(--condition-color);
+    }
+
+    .condition-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .condition-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: var(--condition-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .condition-title-area {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .condition-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-primary);
+    }
+
+    .condition-tagline {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    .expand-icon {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
+    .condition-content {
+        padding: 0 1.25rem 1.25rem;
+        border-top: 1px solid var(--border-muted);
+        animation: slideDown 0.2s ease-out;
+    }
+
+    .condition-description {
+        padding: 1rem 0;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    .challenges-section, .helps-section {
+        margin-bottom: 1rem;
+    }
+
+    .challenges-section h4, .helps-section h4 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .challenge-list, .helps-list {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .challenge-list li, .helps-list li {
+        margin-bottom: 0.25rem;
+    }
+
+    .condition-cta {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-muted);
+    }
+
+    /* Strategies Section */
+    .strategies-section {
+        margin-bottom: 3rem;
+    }
+
+    .strategies-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .strategy-card {
+        background: var(--bg-elevated, #fff);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg, 14px);
+        overflow: hidden;
+    }
+
+    .strategy-card[open] {
+        border-color: var(--color-primary);
+    }
+
+    .strategy-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        list-style: none;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .strategy-header::-webkit-details-marker {
+        display: none;
+    }
+
+    .strategy-header::after {
+        content: "\e080";
+        font-family: "Icons";
+        margin-left: auto;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        transition: transform 0.2s;
+    }
+
+    .strategy-card[open] .strategy-header::after {
+        transform: rotate(180deg);
+    }
+
+    .strategy-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: var(--color-primary-subtle, rgba(124, 58, 237, 0.1));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-primary);
+    }
+
+    .strategy-content {
+        padding: 0 1.25rem 1.25rem;
+        border-top: 1px solid var(--border-muted);
+    }
+
+    .strategy-what, .strategy-why, .strategy-inapp {
+        padding: 0.75rem 0;
+    }
+
+    .strategy-content h4 {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .strategy-content p {
+        margin: 0;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    /* CTA Section */
+    .cta-section {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-xl, 20px);
+        padding: 3rem 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .cta-content h2 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+
+    .cta-content p {
+        color: var(--text-secondary);
+        margin-bottom: 1.5rem;
+    }
+
+    .cta-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    /* Animations */
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            max-height: 0;
+        }
+        to {
+            opacity: 1;
+            max-height: 1000px;
+        }
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .hero-section {
+            padding: 2rem 1.5rem;
+        }
+
+        .hero-title {
+            font-size: 1.75rem;
+        }
+
+        .conditions-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .cta-buttons {
+            flex-direction: column;
+        }
+
+        .cta-buttons .btn {
+            width: 100%;
+        }
+    }
+
+    /* Dark mode */
+    :root[data-theme="dark"] .hero-section {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.8) 0%, rgba(59, 130, 246, 0.8) 100%);
+    }
+</style>
+
+@code {
+    private List<ConditionProfile> _conditions = new();
+    private List<StrategyInfo> _strategies = new();
+
+    protected override void OnInitialized()
+    {
+        InitializeConditions();
+        InitializeStrategies();
+    }
+
+    private void ToggleCondition(ConditionProfile condition)
+    {
+        condition.IsExpanded = !condition.IsExpanded;
+    }
+
+    private void InitializeConditions()
+    {
+        _conditions = new List<ConditionProfile>
+        {
+            new ConditionProfile
+            {
+                Name = "ADHD",
+                Icon = "oi-target",
+                Color = "#7c3aed",
+                Tagline = "Attention, focus, and executive function",
+                Description = "ADHD (Attention-Deficit/Hyperactivity Disorder) affects executive functions like attention regulation, impulse control, and working memory. It's not a lack of attention, but difficulty regulating where attention goes.",
+                Challenges = new[]
+                {
+                    "Difficulty starting tasks, especially boring ones",
+                    "Time blindness—trouble perceiving time accurately",
+                    "Hyperfocus on interesting tasks, difficulty switching",
+                    "Decision paralysis when facing many options",
+                    "Forgetting tasks that aren't immediately visible"
+                },
+                WhatHelps = new[]
+                {
+                    "External timers and time cues",
+                    "Breaking large tasks into small, concrete steps",
+                    "Immediate rewards for completing tasks",
+                    "Reducing visible options to prevent overwhelm",
+                    "Body doubling (working alongside others)"
+                }
+            },
+            new ConditionProfile
+            {
+                Name = "Anxiety",
+                Icon = "oi-cloud",
+                Color = "#3b82f6",
+                Tagline = "Worry, uncertainty, and overwhelm",
+                Description = "Anxiety involves persistent worry and apprehension that can interfere with daily activities. In productivity contexts, it often manifests as perfectionism, decision paralysis, or avoidance of tasks that feel overwhelming.",
+                Challenges = new[]
+                {
+                    "Overwhelm from seeing large task lists",
+                    "Perfectionism leading to procrastination",
+                    "Decision anxiety—fear of choosing wrong",
+                    "Physical stress symptoms affecting focus",
+                    "Catastrophizing about missed deadlines"
+                },
+                WhatHelps = new[]
+                {
+                    "Hiding task counts and due dates",
+                    "Gentle, non-judgmental reminders",
+                    "Forgiving grace periods for 'late' tasks",
+                    "Reduced visual stimulation and calm interfaces",
+                    "Predictable routines that reduce uncertainty"
+                }
+            },
+            new ConditionProfile
+            {
+                Name = "Depression",
+                Icon = "oi-heart",
+                Color = "#ec4899",
+                Tagline = "Energy, motivation, and small wins",
+                Description = "Depression can significantly impact energy, motivation, and the brain's reward systems. Tasks that once felt manageable may seem insurmountable, and internal satisfaction from accomplishments may be muted.",
+                Challenges = new[]
+                {
+                    "Low energy making any task feel enormous",
+                    "Reduced motivation even for enjoyable activities",
+                    "Muted internal reward signals",
+                    "Difficulty with decision-making",
+                    "Negative self-talk about productivity"
+                },
+                WhatHelps = new[]
+                {
+                    "Very small, achievable goals (even just one task)",
+                    "Extra celebration for any accomplishment",
+                    "External encouragement and validation",
+                    "Removing pressure and shame-inducing elements",
+                    "Making starting as easy as possible"
+                }
+            },
+            new ConditionProfile
+            {
+                Name = "Autism",
+                Icon = "oi-puzzle-piece",
+                Color = "#14b8a6",
+                Tagline = "Sensory processing, routines, and predictability",
+                Description = "Autism affects how the brain processes sensory information, social cues, and change. Many autistic individuals thrive with clear routines, explicit information, and environments that respect sensory needs.",
+                Challenges = new[]
+                {
+                    "Sensory overload from busy interfaces",
+                    "Difficulty with unexpected changes or interruptions",
+                    "Transitions between activities requiring extra effort",
+                    "Ambiguous instructions causing confusion",
+                    "Need for explicit time and structure information"
+                },
+                WhatHelps = new[]
+                {
+                    "Calm, minimal interfaces with reduced stimulation",
+                    "Predictable routines and structures",
+                    "Clear transition warnings and buffer time",
+                    "Explicit time displays and schedules",
+                    "Consistent, expected app behavior"
+                }
+            },
+            new ConditionProfile
+            {
+                Name = "Dyslexia",
+                Icon = "oi-book",
+                Color = "#f59e0b",
+                Tagline = "Reading, visual processing, and alternative formats",
+                Description = "Dyslexia affects how the brain processes written language. It's not about intelligence—many dyslexic individuals excel in creative and spatial thinking. Reading-heavy interfaces can create unnecessary barriers.",
+                Challenges = new[]
+                {
+                    "Processing dense text takes more effort",
+                    "Letters appearing to move or blur",
+                    "Difficulty tracking across lines of text",
+                    "Crowded text feeling overwhelming",
+                    "Relying more on context clues than reading"
+                },
+                WhatHelps = new[]
+                {
+                    "Dyslexia-friendly fonts with distinct letters",
+                    "Increased line and letter spacing",
+                    "Visual progress indicators instead of text",
+                    "Audio cues as alternatives to reading",
+                    "Simplified interfaces with less text"
+                }
+            }
+        };
+    }
+
+    private void InitializeStrategies()
+    {
+        _strategies = new List<StrategyInfo>
+        {
+            new StrategyInfo
+            {
+                Name = "Pomodoro Technique",
+                Icon = "oi-timer",
+                WhatIsIt = "A time management method using focused work intervals (typically 25 minutes) followed by short breaks (5 minutes), with longer breaks after several sessions.",
+                WhyItWorks = "External time structure helps when internal time perception is unreliable. The defined endpoint makes starting easier, and regular breaks prevent mental fatigue and maintain focus quality.",
+                InApp = "The Focus Timer implements Pomodoro with customizable durations, automatic break timers, and streak tracking to build momentum."
+            },
+            new StrategyInfo
+            {
+                Name = "Body Doubling",
+                Icon = "oi-people",
+                WhatIsIt = "Working alongside another person—physically or virtually—even when doing completely different tasks. The presence of another person provides accountability and focus support.",
+                WhyItWorks = "The social contract of working 'together' activates external accountability systems. Your brain 'borrows' focus from the shared context, and the gentle awareness of another person helps maintain attention.",
+                InApp = "The Body Doubling feature shows virtual presence indicators and tracks shared focus sessions, creating accountability even when working remotely."
+            },
+            new StrategyInfo
+            {
+                Name = "Task Chunking",
+                Icon = "oi-layers",
+                WhatIsIt = "Breaking large tasks into smaller, concrete subtasks that can each be completed in one sitting (ideally under 25 minutes).",
+                WhyItWorks = "Large tasks feel overwhelming and trigger avoidance. Smaller chunks feel achievable, reveal a clear first step, and provide more frequent opportunities for completion rewards.",
+                InApp = "Self-Organizer can suggest breaking down tasks estimated over a threshold, helping you transform 'Write report' into actionable steps like 'Outline main points' and 'Draft introduction.'"
+            },
+            new StrategyInfo
+            {
+                Name = "Time Blindness Support",
+                Icon = "oi-clock",
+                WhatIsIt = "External cues that compensate for difficulty perceiving time passing—elapsed time displays, completion estimates, and alerts for extended sessions.",
+                WhyItWorks = "When internal time sense is unreliable, external cues act as a 'prosthetic' for time awareness. You don't have to wonder how long something took or when to stop—the information is always visible.",
+                InApp = "Time Blindness Helpers show elapsed time, estimated completion, time since last break, and hyperfocus alerts after configurable periods."
+            },
+            new StrategyInfo
+            {
+                Name = "Pick For Me",
+                Icon = "oi-random",
+                WhatIsIt = "Delegating task selection to an external system when you can't decide what to work on. Removes the burden of choice entirely.",
+                WhyItWorks = "Decision paralysis is a real barrier to starting. When all tasks feel equally important (or equally unappealing), any task picked at random is better than spending 20 minutes deciding.",
+                InApp = "The 'Pick For Me' button randomly selects from your available tasks, giving you a starting point without the agony of choosing."
+            },
+            new StrategyInfo
+            {
+                Name = "Gentle Accountability",
+                Icon = "oi-heart",
+                WhatIsIt = "Supportive reminders and tracking that encourage progress without shame. Language matters—'invitation' instead of 'demand,' 'what helped' instead of 'what went wrong.'",
+                WhyItWorks = "Harsh accountability triggers shame, which triggers avoidance. Gentle approaches maintain motivation while still providing structure. You're more likely to engage with a system that feels supportive.",
+                InApp = "Reminders use compassionate language, grace periods prevent immediate 'overdue' shame, and reflections focus on learning rather than failure."
+            },
+            new StrategyInfo
+            {
+                Name = "Celebration & Rewards",
+                Icon = "oi-star",
+                WhatIsIt = "External positive feedback for completing tasks—visual effects, encouraging messages, streak tracking, and progress visualization.",
+                WhyItWorks = "When internal reward signals are muted or inconsistent, external rewards bridge the gap. Your brain might not celebrate, but the app will—and that feedback still registers as positive reinforcement.",
+                InApp = "Customizable celebrations from subtle to extra, micro-rewards for progress, focus streaks, and daily/weekly achievement summaries."
+            },
+            new StrategyInfo
+            {
+                Name = "Reduced Stimulation",
+                Icon = "oi-moon",
+                WhatIsIt = "Minimizing sensory input through muted sounds, reduced animations, simplified interfaces, and hidden information that isn't immediately needed.",
+                WhyItWorks = "Every element on screen requires some cognitive processing. For sensory-sensitive individuals, reducing stimulation preserves mental energy for the actual work.",
+                InApp = "Reduced motion mode, muted sounds, minimal interfaces, hidden counts and dates, and one-task-at-a-time mode all reduce cognitive and sensory load."
+            }
+        };
+    }
+
+    private class ConditionProfile
+    {
+        public string Name { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+        public string Tagline { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string[] Challenges { get; set; } = Array.Empty<string>();
+        public string[] WhatHelps { get; set; } = Array.Empty<string>();
+        public bool IsExpanded { get; set; }
+    }
+
+    private class StrategyInfo
+    {
+        public string Name { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string WhatIsIt { get; set; } = "";
+        public string WhyItWorks { get; set; } = "";
+        public string InApp { get; set; } = "";
+    }
+}

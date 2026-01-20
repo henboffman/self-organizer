@@ -1,9 +1,13 @@
 @using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Components.Shared
 
 <div class="quick-start-presets">
-    <p class="text-muted small mb-3">
-        Choose a preset to quickly configure settings for your needs. You can always customize individual settings afterward.
-    </p>
+    <div class="presets-intro">
+        <p class="intro-text">
+            Choose a preset optimized for your needs. Each preset configures multiple settings to work together.
+            <a href="/learn" class="learn-link">Learn about neurodivergence <span class="oi oi-arrow-right"></span></a>
+        </p>
+    </div>
 
     @* Search Box *@
     <div class="preset-search mb-4">
@@ -48,39 +52,107 @@
         @foreach (var category in categories)
         {
             <div class="preset-category mb-4">
-                <h6 class="preset-category-title text-muted mb-2">@category</h6>
-                <div class="preset-grid">
+                <div class="category-header">
+                    <span class="category-icon @GetCategoryClass(category)">
+                        <span class="oi oi-@GetCategoryIcon(category)"></span>
+                    </span>
+                    <h6 class="preset-category-title">@category</h6>
+                </div>
+                <div class="preset-list">
                     @foreach (var preset in filteredPresets.Where(p => p.Category == category))
                     {
-                        <div class="preset-card @(SelectedPresetId == preset.Id ? "selected" : "")"
-                             @onclick="() => SelectPreset(preset)">
-                            <div class="preset-header">
-                                <span class="oi oi-@preset.Icon preset-icon"></span>
-                                <span class="preset-name">@preset.Name</span>
+                        var isExpanded = _expandedPresetId == preset.Id;
+                        <div class="preset-card @(isExpanded ? "expanded" : "") @GetCategoryClass(category)">
+                            <div class="preset-card-header" @onclick="() => TogglePreset(preset)">
+                                <div class="preset-header-content">
+                                    <div class="preset-icon-wrapper @GetCategoryClass(category)">
+                                        <span class="oi oi-@preset.Icon"></span>
+                                    </div>
+                                    <div class="preset-title-area">
+                                        <span class="preset-name">@preset.Name</span>
+                                        <span class="preset-description">@preset.Description</span>
+                                    </div>
+                                </div>
+                                <div class="preset-header-actions">
+                                    <span class="settings-count">@preset.Changes.Count settings</span>
+                                    <span class="expand-icon oi @(isExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                                </div>
                             </div>
-                            <p class="preset-description">@preset.Description</p>
-                            @if (preset.Changes.Any())
+
+                            @* Preview when collapsed *@
+                            @if (!isExpanded && preset.Changes.Any())
                             {
-                                <div class="preset-changes-preview">
-                                    @foreach (var change in preset.Changes.Take(5))
+                                <div class="preset-preview">
+                                    @foreach (var change in preset.Changes.Take(3))
                                     {
-                                        <div class="preset-change-item">
-                                            <span class="change-name">@change.Setting</span>
-                                            <span class="change-value-preview">@change.NewValue</span>
+                                        <div class="preview-item">
+                                            <span class="preview-setting">@change.Setting</span>
+                                            <span class="preview-value">@change.NewValue</span>
                                         </div>
                                     }
-                                    @if (preset.Changes.Count > 5)
+                                    @if (preset.Changes.Count > 3)
                                     {
-                                        <div class="preset-change-more">
-                                            +@(preset.Changes.Count - 5) more settings...
+                                        <div class="preview-more">
+                                            <span class="oi oi-ellipses"></span> @(preset.Changes.Count - 3) more
                                         </div>
                                     }
                                 </div>
                             }
-                            @if (SelectedPresetId == preset.Id)
+
+                            @* Full content when expanded *@
+                            @if (isExpanded)
                             {
-                                <div class="preset-selected-indicator">
-                                    <span class="oi oi-check"></span> Selected
+                                <div class="preset-expanded-content">
+                                    <div class="changes-full-list">
+                                        @foreach (var group in preset.Changes.GroupBy(c => c.Category))
+                                        {
+                                            <div class="change-group">
+                                                <div class="change-group-header">
+                                                    <span class="group-name">@group.Key</span>
+                                                    <span class="group-count">@group.Count()</span>
+                                                </div>
+                                                <div class="change-group-items">
+                                                    @foreach (var change in group)
+                                                    {
+                                                        <div class="change-row">
+                                                            <div class="change-main">
+                                                                <span class="change-setting-name">@change.Setting</span>
+                                                                <span class="change-arrow">→</span>
+                                                                <span class="change-new-value">@change.NewValue</span>
+                                                                @if (!string.IsNullOrEmpty(change.Tooltip) || !string.IsNullOrEmpty(change.WhyItHelps))
+                                                                {
+                                                                    <InfoTooltip Title="@change.Setting"
+                                                                                 Description="@(change.Tooltip ?? change.Description)"
+                                                                                 WhyItHelps="@change.WhyItHelps" />
+                                                                }
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(change.Description))
+                                                            {
+                                                                <div class="change-description">@change.Description</div>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="preset-actions">
+                                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => TogglePreset(preset)" @onclick:stopPropagation="true">
+                                            Collapse
+                                        </button>
+                                        <button class="btn btn-primary btn-sm" @onclick="() => ApplyPreset(preset)" @onclick:stopPropagation="true" disabled="@_isApplying">
+                                            @if (_isApplying && _applyingPresetId == preset.Id)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                            }
+                                            else
+                                            {
+                                                <span class="oi oi-check me-1"></span>
+                                            }
+                                            Apply This Preset
+                                        </button>
+                                    </div>
                                 </div>
                             }
                         </div>
@@ -90,84 +162,55 @@
         }
     }
 
-    @* Selected Preset Details & Changes Preview *@
-    @if (_selectedPreset != null)
-    {
-        <div class="preset-details">
-            <div class="preset-details-header">
-                <div class="preset-details-title">
-                    <span class="oi oi-@_selectedPreset.Icon"></span>
-                    <h5>@_selectedPreset.Name</h5>
-                </div>
-                <button class="btn-close-preset" @onclick="ClearSelection" title="Close">
-                    <span class="oi oi-x"></span>
-                </button>
-            </div>
-
-            <p class="preset-details-description">@_selectedPreset.Description</p>
-
-            @if (_selectedPreset.Changes.Any())
-            {
-                <div class="changes-preview">
-                    <h6 class="changes-title">
-                        <span class="oi oi-list"></span>
-                        What this preset changes (@_selectedPreset.Changes.Count settings)
-                    </h6>
-
-                    <div class="changes-list">
-                        @foreach (var group in _selectedPreset.Changes.GroupBy(c => c.Category))
-                        {
-                            <div class="change-category">
-                                <span class="change-category-name">@group.Key</span>
-                                <ul class="change-items">
-                                    @foreach (var change in group)
-                                    {
-                                        <li class="change-item">
-                                            <span class="change-setting">@change.Setting</span>
-                                            <span class="change-arrow">→</span>
-                                            <span class="change-value">@change.NewValue</span>
-                                            @if (!string.IsNullOrEmpty(change.Description))
-                                            {
-                                                <span class="change-description">@change.Description</span>
-                                            }
-                                        </li>
-                                    }
-                                </ul>
-                            </div>
-                        }
-                    </div>
-                </div>
-            }
-
-            <div class="preset-actions">
-                <button class="btn btn-outline-secondary" @onclick="ClearSelection">
-                    Cancel
-                </button>
-                <button class="btn btn-primary" @onclick="ApplySelectedPreset" disabled="@_isApplying">
-                    @if (_isApplying)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1"></span>
-                    }
-                    else
-                    {
-                        <span class="oi oi-check me-1"></span>
-                    }
-                    Apply Preset
-                </button>
-            </div>
-        </div>
-    }
-
     @if (_applySuccess)
     {
-        <div class="alert alert-success mt-3 py-2">
-            <span class="oi oi-check me-1"></span>
-            Preset applied successfully! Your settings have been updated.
+        <div class="alert alert-success mt-3 d-flex align-items-center gap-2">
+            <span class="oi oi-check"></span>
+            <span>Preset applied successfully! Your settings have been updated.</span>
+            <button type="button" class="btn-close ms-auto" @onclick="() => _applySuccess = false"></button>
         </div>
     }
 </div>
 
 <style>
+    .quick-start-presets {
+        padding: 0;
+    }
+
+    .presets-intro {
+        margin-bottom: 1.5rem;
+    }
+
+    .intro-text {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    .learn-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--color-primary);
+        text-decoration: none;
+        font-weight: 500;
+        margin-left: 4px;
+    }
+
+    .learn-link:hover {
+        text-decoration: underline;
+    }
+
+    .learn-link .oi {
+        font-size: 0.7rem;
+        transition: transform 0.2s;
+    }
+
+    .learn-link:hover .oi {
+        transform: translateX(2px);
+    }
+
     /* Search */
     .preset-search {
         position: relative;
@@ -181,23 +224,31 @@
 
     .search-icon {
         position: absolute;
-        left: 12px;
+        left: 14px;
         color: var(--text-muted);
         font-size: 0.9rem;
         pointer-events: none;
     }
 
     .preset-search input {
-        padding-left: 38px;
-        padding-right: 38px;
+        padding-left: 42px;
+        padding-right: 42px;
+        border-radius: var(--radius-lg);
+        border: 2px solid var(--border-default);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .preset-search input:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-subtle);
     }
 
     .search-clear {
         position: absolute;
-        right: 8px;
+        right: 10px;
         background: none;
         border: none;
-        padding: 4px 8px;
+        padding: 6px 10px;
         color: var(--text-muted);
         cursor: pointer;
         border-radius: var(--radius-sm);
@@ -216,265 +267,303 @@
 
     .no-results {
         text-align: center;
-        padding: 2rem;
+        padding: 3rem;
         color: var(--text-muted);
-    }
-
-    .no-results .oi {
-        font-size: 2rem;
-        margin-bottom: 1rem;
-        display: block;
-    }
-
-    /* Preset Grid */
-    .preset-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1rem;
-    }
-
-    .preset-card {
-        border: 2px solid var(--border-default, #dee2e6);
-        border-radius: var(--radius-md);
-        padding: 1rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        background: var(--bg-elevated, #fff);
-    }
-
-    .preset-card:hover {
-        border-color: var(--color-primary, #7c3aed);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .preset-card.selected {
-        border-color: var(--color-primary, #7c3aed);
-        background: var(--color-primary-subtle, rgba(124, 58, 237, 0.1));
-    }
-
-    .preset-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .preset-icon {
-        color: var(--color-primary, #7c3aed);
-        font-size: 1.1rem;
-    }
-
-    .preset-name {
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-
-    .preset-description {
-        font-size: 0.85rem;
-        color: var(--text-muted, #6c757d);
-        margin-bottom: 0.5rem;
-        line-height: 1.4;
-    }
-
-    .preset-changes-preview {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-bottom: 0.5rem;
-        padding: 8px;
-        background: var(--bg-tertiary);
-        border-radius: var(--radius-sm);
-        font-size: 0.75rem;
-    }
-
-    .preset-change-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 8px;
-    }
-
-    .change-name {
-        color: var(--text-secondary);
-        flex-shrink: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .change-value-preview {
-        color: var(--color-success, #059669);
-        font-weight: 500;
-        flex-shrink: 0;
-        text-align: right;
-    }
-
-    .preset-change-more {
-        color: var(--text-muted);
-        font-style: italic;
-        text-align: center;
-        padding-top: 4px;
-        border-top: 1px solid var(--border-muted);
-        margin-top: 4px;
-    }
-
-    .preset-selected-indicator {
-        margin-top: 0.5rem;
-        padding-top: 0.5rem;
-        border-top: 1px solid var(--border-default, #dee2e6);
-        color: var(--color-primary, #7c3aed);
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-
-    .preset-category-title {
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        border-bottom: 1px solid var(--border-default, #dee2e6);
-        padding-bottom: 0.5rem;
-    }
-
-    /* Preset Details Panel */
-    .preset-details {
-        margin-top: 1.5rem;
-        padding: 1.5rem;
         background: var(--bg-secondary);
-        border: 1px solid var(--border-default);
         border-radius: var(--radius-lg);
     }
 
-    .preset-details-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 0.75rem;
+    .no-results .oi {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        display: block;
+        opacity: 0.5;
     }
 
-    .preset-details-title {
+    /* Category Styling */
+    .category-header {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-    }
-
-    .preset-details-title .oi {
-        font-size: 1.25rem;
-        color: var(--color-primary);
-    }
-
-    .preset-details-title h5 {
-        margin: 0;
-        font-size: 1.1rem;
-    }
-
-    .btn-close-preset {
-        background: none;
-        border: none;
-        padding: 4px 8px;
-        color: var(--text-muted);
-        cursor: pointer;
-        border-radius: var(--radius-sm);
-    }
-
-    .btn-close-preset:hover {
-        background: var(--bg-tertiary);
-        color: var(--text-primary);
-    }
-
-    .preset-details-description {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
+        gap: 0.75rem;
         margin-bottom: 1rem;
     }
 
-    /* Changes Preview */
-    .changes-preview {
-        background: var(--bg-tertiary);
+    .category-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
         border-radius: var(--radius-md);
-        padding: 1rem;
-        margin-bottom: 1rem;
-        max-height: 300px;
-        overflow-y: auto;
+        font-size: 0.9rem;
     }
 
-    .changes-title {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+    .category-icon.category-adhd { background: rgba(124, 58, 237, 0.15); color: #7c3aed; }
+    .category-icon.category-anxiety { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .category-icon.category-depression { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+    .category-icon.category-autism { background: rgba(20, 184, 166, 0.15); color: #14b8a6; }
+    .category-icon.category-dyslexia { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+    .category-icon.category-vision { background: rgba(99, 102, 241, 0.15); color: #6366f1; }
+    .category-icon.category-motor { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .category-icon.category-general { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+
+    .preset-category-title {
         font-size: 0.85rem;
         font-weight: 600;
-        color: var(--text-primary);
-        margin: 0 0 0.75rem 0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin: 0;
     }
 
-    .changes-title .oi {
-        color: var(--color-primary);
-    }
-
-    .changes-list {
+    /* Preset Cards */
+    .preset-list {
         display: flex;
         flex-direction: column;
         gap: 0.75rem;
     }
 
-    .change-category {
+    .preset-card {
+        border: 2px solid var(--border-default);
+        border-radius: var(--radius-lg);
+        background: var(--bg-elevated);
+        overflow: hidden;
+        transition: all 0.25s ease;
+    }
+
+    .preset-card:hover {
+        border-color: var(--border-hover, #c4b5fd);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .preset-card.expanded {
+        border-color: var(--color-primary);
+        box-shadow: 0 8px 24px rgba(124, 58, 237, 0.15);
+    }
+
+    .preset-card.category-adhd.expanded { border-color: #7c3aed; box-shadow: 0 8px 24px rgba(124, 58, 237, 0.15); }
+    .preset-card.category-anxiety.expanded { border-color: #3b82f6; box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15); }
+    .preset-card.category-depression.expanded { border-color: #ec4899; box-shadow: 0 8px 24px rgba(236, 72, 153, 0.15); }
+    .preset-card.category-autism.expanded { border-color: #14b8a6; box-shadow: 0 8px 24px rgba(20, 184, 166, 0.15); }
+    .preset-card.category-dyslexia.expanded { border-color: #f97316; box-shadow: 0 8px 24px rgba(249, 115, 22, 0.15); }
+
+    .preset-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .preset-header-content {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .preset-icon-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .preset-icon-wrapper.category-adhd { background: linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%); color: #7c3aed; }
+    .preset-icon-wrapper.category-anxiety { background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(96, 165, 250, 0.1) 100%); color: #3b82f6; }
+    .preset-icon-wrapper.category-depression { background: linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(244, 114, 182, 0.1) 100%); color: #ec4899; }
+    .preset-icon-wrapper.category-autism { background: linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(45, 212, 191, 0.1) 100%); color: #14b8a6; }
+    .preset-icon-wrapper.category-dyslexia { background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%); color: #f97316; }
+    .preset-icon-wrapper.category-vision { background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(129, 140, 248, 0.1) 100%); color: #6366f1; }
+    .preset-icon-wrapper.category-motor { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.1) 100%); color: #22c55e; }
+    .preset-icon-wrapper.category-general { background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(156, 163, 175, 0.1) 100%); color: #6b7280; }
+
+    .preset-title-area {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .preset-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+    }
+
+    .preset-description {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .preset-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-shrink: 0;
+    }
+
+    .settings-count {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        padding: 4px 10px;
+        border-radius: var(--radius-full);
+    }
+
+    .expand-icon {
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+
+    .preset-card.expanded .expand-icon {
+        color: var(--color-primary);
+    }
+
+    /* Preview (collapsed) */
+    .preset-preview {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 1.25rem 1rem;
+    }
+
+    .preview-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-full);
+    }
+
+    .preview-setting {
+        color: var(--text-secondary);
+    }
+
+    .preview-value {
+        color: var(--color-success);
+        font-weight: 500;
+    }
+
+    .preview-more {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        padding: 4px 10px;
+    }
+
+    /* Expanded Content */
+    .preset-expanded-content {
+        border-top: 1px solid var(--border-default);
+        animation: expand-in 0.3s ease-out;
+    }
+
+    @@keyframes expand-in {
+        from {
+            opacity: 0;
+            max-height: 0;
+        }
+        to {
+            opacity: 1;
+            max-height: 2000px;
+        }
+    }
+
+    .changes-full-list {
+        padding: 1.25rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .change-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .change-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .change-group-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
         padding-bottom: 0.5rem;
         border-bottom: 1px solid var(--border-muted);
     }
 
-    .change-category:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-
-    .change-category-name {
+    .group-name {
         font-size: 0.75rem;
         font-weight: 600;
-        color: var(--color-primary);
         text-transform: uppercase;
-        letter-spacing: 0.03em;
-        display: block;
-        margin-bottom: 0.5rem;
+        letter-spacing: 0.04em;
+        color: var(--color-primary);
     }
 
-    .change-items {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+    .group-count {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        padding: 2px 8px;
+        border-radius: var(--radius-full);
+    }
+
+    .change-group-items {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
+        gap: 0.5rem;
     }
 
-    .change-item {
+    .change-row {
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-secondary);
+        border-radius: var(--radius-sm);
+        transition: background 0.15s;
+    }
+
+    .change-row:hover {
+        background: var(--bg-tertiary);
+    }
+
+    .change-main {
         display: flex;
+        align-items: center;
+        gap: 0.5rem;
         flex-wrap: wrap;
-        align-items: baseline;
-        gap: 0.35rem;
-        font-size: 0.8rem;
-        line-height: 1.4;
     }
 
-    .change-setting {
-        color: var(--text-primary);
+    .change-setting-name {
+        font-size: 0.85rem;
         font-weight: 500;
+        color: var(--text-primary);
     }
 
     .change-arrow {
         color: var(--text-muted);
+        font-size: 0.8rem;
     }
 
-    .change-value {
-        color: var(--color-success, #059669);
-        font-weight: 500;
+    .change-new-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--color-success);
     }
 
     .change-description {
-        flex-basis: 100%;
         font-size: 0.75rem;
         color: var(--text-muted);
-        padding-left: 0.5rem;
+        margin-top: 4px;
+        padding-left: 0;
     }
 
     /* Actions */
@@ -482,11 +571,33 @@
         display: flex;
         justify-content: flex-end;
         gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-muted);
     }
 
     @@media (max-width: 768px) {
-        .preset-grid {
-            grid-template-columns: 1fr;
+        .preset-card-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .preset-header-actions {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .preset-description {
+            white-space: normal;
+        }
+
+        .preset-preview {
+            flex-direction: column;
+        }
+
+        .preview-item {
+            width: fit-content;
         }
 
         .preset-actions {
@@ -515,9 +626,8 @@
     [Parameter]
     public EventCallback OnPresetApplied { get; set; }
 
-    public string? SelectedPresetId { get; private set; }
-
-    private SettingsPreset? _selectedPreset;
+    private string? _expandedPresetId;
+    private string? _applyingPresetId;
     private bool _isApplying;
     private bool _applySuccess;
     private string _searchQuery = "";
@@ -532,42 +642,36 @@
         _searchQuery = "";
     }
 
-    private void SelectPreset(SettingsPreset preset)
+    private void TogglePreset(SettingsPreset preset)
     {
-        if (SelectedPresetId == preset.Id)
+        if (_expandedPresetId == preset.Id)
         {
-            // Deselect if clicking the same one
-            ClearSelection();
-            return;
+            _expandedPresetId = null;
         }
-
-        SelectedPresetId = preset.Id;
-        _selectedPreset = preset;
+        else
+        {
+            _expandedPresetId = preset.Id;
+        }
         _applySuccess = false;
     }
 
-    private void ClearSelection()
+    private async Task ApplyPreset(SettingsPreset preset)
     {
-        SelectedPresetId = null;
-        _selectedPreset = null;
-    }
-
-    private async Task ApplySelectedPreset()
-    {
-        if (_selectedPreset == null || Preferences == null || Accessibility == null)
+        if (Preferences == null || Accessibility == null)
             return;
 
         _isApplying = true;
+        _applyingPresetId = preset.Id;
         _applySuccess = false;
         StateHasChanged();
 
         try
         {
             // Apply preset to preferences
-            _selectedPreset.ApplyToPreferences(Preferences);
+            preset.ApplyToPreferences(Preferences);
 
             // Apply preset to accessibility
-            _selectedPreset.ApplyToAccessibility(Accessibility);
+            preset.ApplyToAccessibility(Accessibility);
 
             // Notify parent components
             await PreferencesChanged.InvokeAsync(Preferences);
@@ -575,11 +679,36 @@
             await OnPresetApplied.InvokeAsync();
 
             _applySuccess = true;
-            ClearSelection();
+            _expandedPresetId = null;
         }
         finally
         {
             _isApplying = false;
+            _applyingPresetId = null;
         }
     }
+
+    private string GetCategoryClass(string category) => category.ToLower() switch
+    {
+        "adhd" => "category-adhd",
+        "anxiety" => "category-anxiety",
+        "depression" => "category-depression",
+        "autism" => "category-autism",
+        "dyslexia" => "category-dyslexia",
+        "vision" => "category-vision",
+        "motor" => "category-motor",
+        _ => "category-general"
+    };
+
+    private string GetCategoryIcon(string category) => category.ToLower() switch
+    {
+        "adhd" => "target",
+        "anxiety" => "cloud",
+        "depression" => "heart",
+        "autism" => "puzzle-piece",
+        "dyslexia" => "book",
+        "vision" => "eye",
+        "motor" => "move",
+        _ => "dial"
+    };
 }

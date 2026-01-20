@@ -1,0 +1,325 @@
+@namespace SelfOrganizer.App.Components.Shared
+
+<div class="info-tooltip-wrapper" @onmouseenter="ShowTooltip" @onmouseleave="HideTooltip">
+    <button type="button"
+            class="info-tooltip-trigger @(IsVisible ? "active" : "")"
+            @onclick="ToggleTooltip"
+            @onclick:stopPropagation="true"
+            aria-label="More information">
+        <span class="oi oi-info"></span>
+    </button>
+
+    @if (IsVisible)
+    {
+        <div class="info-tooltip-content @PositionClass" @onclick:stopPropagation="true">
+            <div class="tooltip-arrow"></div>
+
+            @if (!string.IsNullOrEmpty(Title))
+            {
+                <div class="tooltip-header">
+                    <span class="tooltip-title">@Title</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Description))
+            {
+                <div class="tooltip-body">
+                    <p class="tooltip-description">@Description</p>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(WhyItHelps))
+            {
+                <div class="tooltip-why">
+                    <span class="why-label">Why it helps:</span>
+                    <p class="why-text">@WhyItHelps</p>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(LearnMoreUrl))
+            {
+                <div class="tooltip-footer">
+                    <a href="@LearnMoreUrl" class="learn-more-link">
+                        Learn more <span class="oi oi-arrow-right"></span>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .info-tooltip-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .info-tooltip-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .info-tooltip-trigger:hover,
+    .info-tooltip-trigger.active {
+        color: var(--color-primary);
+        background: var(--color-primary-subtle, rgba(124, 58, 237, 0.1));
+    }
+
+    .info-tooltip-trigger .oi {
+        font-size: 0.75rem;
+    }
+
+    .info-tooltip-content {
+        position: absolute;
+        z-index: 1000;
+        width: 280px;
+        padding: 0;
+        background: var(--bg-elevated, #fff);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg, 14px);
+        box-shadow: var(--shadow-lg), 0 0 20px rgba(124, 58, 237, 0.1);
+        animation: tooltip-fade-in 0.2s ease-out;
+        overflow: hidden;
+    }
+
+    .info-tooltip-content.position-top {
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .info-tooltip-content.position-bottom {
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .info-tooltip-content.position-left {
+        right: calc(100% + 8px);
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .info-tooltip-content.position-right {
+        left: calc(100% + 8px);
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .tooltip-arrow {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: var(--bg-elevated, #fff);
+        border: 1px solid var(--border-default);
+        transform: rotate(45deg);
+    }
+
+    .position-top .tooltip-arrow {
+        bottom: -7px;
+        left: 50%;
+        margin-left: -6px;
+        border-top: none;
+        border-left: none;
+    }
+
+    .position-bottom .tooltip-arrow {
+        top: -7px;
+        left: 50%;
+        margin-left: -6px;
+        border-bottom: none;
+        border-right: none;
+    }
+
+    .tooltip-header {
+        padding: 12px 14px 8px;
+        border-bottom: 1px solid var(--border-muted);
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+    }
+
+    .tooltip-title {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+    }
+
+    .tooltip-body {
+        padding: 10px 14px;
+    }
+
+    .tooltip-description {
+        margin: 0;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--text-secondary);
+    }
+
+    .tooltip-why {
+        padding: 10px 14px;
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border-muted);
+    }
+
+    .why-label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-primary);
+        margin-bottom: 4px;
+    }
+
+    .why-text {
+        margin: 0;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        font-style: italic;
+    }
+
+    .tooltip-footer {
+        padding: 8px 14px;
+        border-top: 1px solid var(--border-muted);
+        background: var(--bg-secondary);
+    }
+
+    .learn-more-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--color-primary);
+        text-decoration: none;
+        transition: gap var(--transition-fast);
+    }
+
+    .learn-more-link:hover {
+        gap: 8px;
+    }
+
+    .learn-more-link .oi {
+        font-size: 0.65rem;
+    }
+
+    @@keyframes tooltip-fade-in {
+        from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    }
+
+    .position-left @@keyframes tooltip-fade-in {
+        from {
+            opacity: 0;
+            transform: translateY(-50%) translateX(4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+    }
+
+    /* Dark mode adjustments */
+    :root[data-theme="dark"] .info-tooltip-content {
+        box-shadow: var(--shadow-lg), 0 0 30px rgba(124, 58, 237, 0.15);
+    }
+
+    /* Mobile: click to toggle instead of hover */
+    @@media (max-width: 768px) {
+        .info-tooltip-content {
+            position: fixed;
+            left: 16px !important;
+            right: 16px !important;
+            bottom: 16px !important;
+            top: auto !important;
+            width: auto;
+            transform: none !important;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .tooltip-arrow {
+            display: none;
+        }
+
+        @@keyframes tooltip-fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public string? WhyItHelps { get; set; }
+
+    [Parameter]
+    public string? LearnMoreUrl { get; set; }
+
+    [Parameter]
+    public string Position { get; set; } = "bottom";
+
+    private bool IsVisible { get; set; }
+    private bool IsPinned { get; set; }
+
+    private string PositionClass => $"position-{Position}";
+
+    private void ShowTooltip()
+    {
+        if (!IsPinned)
+        {
+            IsVisible = true;
+        }
+    }
+
+    private void HideTooltip()
+    {
+        if (!IsPinned)
+        {
+            IsVisible = false;
+        }
+    }
+
+    private void ToggleTooltip()
+    {
+        if (IsVisible && IsPinned)
+        {
+            IsVisible = false;
+            IsPinned = false;
+        }
+        else
+        {
+            IsVisible = true;
+            IsPinned = true;
+        }
+    }
+}
