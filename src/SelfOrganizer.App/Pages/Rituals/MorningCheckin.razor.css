@@ -113,10 +113,40 @@
 .step-content h2 {
     font-family: var(--font-display);
     margin-bottom: var(--space-xs);
+    color: var(--text-primary);
+}
+
+.step-content h5 {
+    color: var(--text-primary);
 }
 
 .step-content .lead {
     font-size: 1.1rem;
+    color: var(--text-secondary);
+}
+
+.step-content .form-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.step-content .form-text {
+    color: var(--text-muted);
+}
+
+.step-content .form-control {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.step-content .form-control::placeholder {
+    color: var(--text-muted);
+}
+
+.step-content .form-control:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
 
 /* Rating Scale */
@@ -132,17 +162,19 @@
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-md);
-    background-color: var(--bg-secondary);
+    background-color: var(--card-bg);
     border: 2px solid var(--border-default);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
     min-width: 80px;
+    color: var(--text-primary);
 }
 
 .rating-btn:hover {
     border-color: var(--color-primary);
     background-color: var(--color-primary-subtle);
+    color: var(--text-primary);
 }
 
 .rating-btn.selected {
@@ -153,11 +185,13 @@
 
 .rating-icon {
     font-size: 1.5rem;
+    color: inherit;
 }
 
 .rating-label {
-    font-size: 0.75rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: inherit;
 }
 
 /* Priority Picker */
@@ -172,11 +206,14 @@
     display: flex;
     align-items: center;
     padding: var(--space-sm) var(--space-md);
+    background-color: var(--card-bg);
+    border-color: var(--border-default);
+    color: var(--text-primary);
 }
 
 .priority-number {
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--color-primary-text);
     font-size: 1.1rem;
 }
 
@@ -196,6 +233,8 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-xs);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
 }
 
 .task-item:hover:not(.disabled) {
@@ -213,9 +252,15 @@
     min-width: 0;
 }
 
+/* Badge overrides for contrast */
+.task-item .badge {
+    font-weight: 500;
+}
+
 /* Review Card */
 .review-card {
-    background-color: var(--bg-tertiary);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
 }
@@ -231,11 +276,15 @@
 }
 
 .review-section h6 {
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: var(--space-sm);
+}
+
+.review-section p {
+    color: var(--text-primary);
 }
 
 /* Navigation */
@@ -244,7 +293,18 @@
     justify-content: space-between;
     padding: var(--space-lg) var(--space-xl);
     border-top: 1px solid var(--border-muted);
-    background-color: var(--bg-tertiary);
+    background-color: var(--card-bg);
+}
+
+/* Alert styling */
+.step-content .alert-info {
+    background-color: var(--color-info-subtle, rgba(59, 130, 246, 0.1));
+    border-color: var(--color-info, #3b82f6);
+    color: var(--text-primary);
+}
+
+.step-content .alert-info .oi {
+    color: var(--color-info, #3b82f6);
 }
 
 /* Responsive */

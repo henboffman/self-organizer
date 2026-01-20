@@ -161,59 +161,63 @@ else
                            @onclick:stopPropagation="true" />
                 </div>
 
-                <a href="/tasks/@task.Id" class="flex-grow-1 text-decoration-none text-reset">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="d-flex align-items-start gap-2">
-                            <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-secondary")"
-                                    @onclick="() => ToggleComplete(task)"
-                                    @onclick:stopPropagation="true"
-                                    @onclick:preventDefault="true">
-                                <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
-                            </button>
-                            <div>
-                                <div class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
-                                    @task.Title
-                                </div>
-                                @if (!string.IsNullOrEmpty(task.Description))
-                                {
-                                    <div class="small text-muted text-truncate" style="max-width: 400px;">
-                                        <TagDisplay Text="@task.Description" />
-                                    </div>
-                                }
-                                @if (task.Tags.Any())
-                                {
-                                    <div class="mt-1">
-                                        @foreach (var tag in task.Tags.Take(3))
-                                        {
-                                            <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1" @onclick:stopPropagation="true">#@tag</a>
-                                        }
-                                        @if (task.Tags.Count > 3)
-                                        {
-                                            <span class="badge bg-secondary">+@(task.Tags.Count - 3)</span>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                        <div class="text-end">
+                <div class="d-flex align-items-start gap-3 flex-grow-1">
+                    <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-success")"
+                            @onclick="() => ToggleComplete(task)"
+                            @onclick:stopPropagation="true"
+                            title="@(task.Status == TodoTaskStatus.Completed ? "Mark incomplete" : "Mark complete")">
+                        <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
+                    </button>
+                    <a href="/tasks/@task.Id" class="flex-grow-1 text-decoration-none text-reset min-width-0">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                @task.Title
+                            </span>
                             @if (task.Priority == 1)
                             {
                                 <span class="badge bg-danger">High</span>
                             }
+                        </div>
+                        @if (!string.IsNullOrEmpty(task.Description))
+                        {
+                            <div class="small text-muted mb-1">
+                                @(task.Description.Length > 120 ? task.Description.Substring(0, 120) + "..." : task.Description)
+                            </div>
+                        }
+                        <div class="d-flex align-items-center gap-2 flex-wrap small">
+                            @if (task.EstimatedMinutes > 0)
+                            {
+                                <span class="text-muted">
+                                    <span class="oi oi-timer me-1"></span><SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                </span>
+                            }
                             @if (task.DueDate.HasValue)
                             {
                                 var isOverdue = task.DueDate.Value.Date < DateTime.Today;
-                                <div class="small @(isOverdue ? "text-danger" : "text-muted")">
+                                <span class="@(isOverdue ? "text-danger" : "text-muted")">
                                     <span class="oi oi-calendar me-1"></span>@task.DueDate.Value.ToString("MMM d")
-                                </div>
+                                </span>
                             }
                             @if (!string.IsNullOrEmpty(task.Category))
                             {
-                                <div class="small text-muted">@@@task.Category</div>
+                                <span class="text-muted">
+                                    <span class="oi oi-location me-1"></span>@@@task.Category
+                                </span>
+                            }
+                            @if (task.Tags.Any())
+                            {
+                                @foreach (var tag in task.Tags.Take(3))
+                                {
+                                    <a href="/tags/@tag" class="badge bg-primary text-decoration-none" @onclick:stopPropagation="true">#@tag</a>
+                                }
+                                @if (task.Tags.Count > 3)
+                                {
+                                    <span class="text-muted">+@(task.Tags.Count - 3)</span>
+                                }
                             }
                         </div>
-                    </div>
-                </a>
+                    </a>
+                </div>
             </div>
         }
     </div>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using SelfOrganizer.App.Services;
 using SelfOrganizer.App.Services.Data;
@@ -22,6 +23,7 @@ public partial class MainLayout : IDisposable
     private KeyboardNavigationService KeyboardNavigation { get; set; } = default!;
 
     private DotNetObjectReference<MainLayout>? _dotNetRef;
+    private ErrorBoundary? _errorBoundary;
     private bool _showOnboarding = false;
     private bool _checkedOnboarding = false;
     private bool _showGlobalSearch = false;
@@ -183,6 +185,12 @@ public partial class MainLayout : IDisposable
     private void OnQuickAddClosed()
     {
         _showQuickAdd = false;
+    }
+
+    private void RecoverFromError()
+    {
+        // Reset the error boundary to allow re-rendering
+        _errorBoundary?.Recover();
     }
 
     public void Dispose()

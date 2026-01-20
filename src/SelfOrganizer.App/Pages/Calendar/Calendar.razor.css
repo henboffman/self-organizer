@@ -174,7 +174,7 @@
 .event-time {
     font-weight: 600;
     opacity: 0.8;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
 }
 
 .event-title {
@@ -213,7 +213,7 @@
 }
 
 .event-location {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     opacity: 0.7;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -334,7 +334,7 @@
 
 .smart-block-action {
     margin-left: auto;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #ec4899;
     white-space: nowrap;
@@ -363,7 +363,7 @@
 .smart-block-time {
     margin-left: auto;
     opacity: 0.7;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     white-space: nowrap;
 }
 
@@ -806,11 +806,11 @@
     }
 
     .hour-label {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
     }
 
     .timeline-event {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         padding: 2px 4px;
     }
 }

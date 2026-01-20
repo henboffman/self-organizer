@@ -233,6 +233,22 @@ public class UserPreferences : BaseEntity
     public Dictionary<string, int>? LifeAreaRatings { get; set; }
     public DateTime? LifeAreaAssessmentDate { get; set; }
 
+    // Balance AI Recommendations
+    /// <summary>Whether to generate task suggestions in balance recommendations</summary>
+    public bool BalanceAiSuggestTasks { get; set; } = true;
+
+    /// <summary>Whether to generate goal suggestions in balance recommendations</summary>
+    public bool BalanceAiSuggestGoals { get; set; } = true;
+
+    /// <summary>Whether to show insights in balance recommendations</summary>
+    public bool BalanceAiShowInsights { get; set; } = true;
+
+    /// <summary>Rating threshold (dimensions at or below this are prioritized)</summary>
+    public int BalanceAiThreshold { get; set; } = 5;
+
+    /// <summary>Context-to-dimension mappings for cross-app balance awareness</summary>
+    public Dictionary<string, List<string>>? ContextDimensionMappings { get; set; }
+
     // App Mode
     /// <summary>Current app mode (Work/Life/Balanced) affecting contexts and dimensions</summary>
     public AppMode AppMode { get; set; } = AppMode.Balanced;

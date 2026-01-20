@@ -76,11 +76,11 @@
 }
 
 .nav-section-label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.05em;
     color: var(--sidebar-text);
-    opacity: 0.6;
+    /* Removed opacity: 0.6 for better accessibility contrast */
 }
 
 .badge {

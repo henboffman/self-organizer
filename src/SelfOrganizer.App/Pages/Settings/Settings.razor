@@ -16,160 +16,233 @@
 @inject ISettingsExportService SettingsExportService
 @inject IJSRuntime JSRuntime
 
-<h3 class="mb-4">
-    <span class="oi oi-cog me-2"></span>Settings
-</h3>
+<div class="settings-page">
+    <div class="settings-header">
+        <h2>Settings</h2>
+        <p class="text-muted">Customize your experience</p>
+    </div>
 
-@* Quick Start Presets *@
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><span class="oi oi-bolt me-2"></span>Quick Start Presets</span>
-        <button class="btn btn-sm btn-link p-0" @onclick="() => _presetsExpanded = !_presetsExpanded">
-            <span class="oi @(_presetsExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+    @* Tab Navigation *@
+    <div class="settings-tabs">
+        <button class="tab-btn @(_activeTab == "general" ? "active" : "")" @onclick="@(() => SetTab("general"))">
+            <span class="oi oi-home"></span>
+            <span>General</span>
+        </button>
+        <button class="tab-btn @(_activeTab == "schedule" ? "active" : "")" @onclick="@(() => SetTab("schedule"))">
+            <span class="oi oi-clock"></span>
+            <span>Schedule</span>
+        </button>
+        <button class="tab-btn @(_activeTab == "focus" ? "active" : "")" @onclick="@(() => SetTab("focus"))">
+            <span class="oi oi-target"></span>
+            <span>Focus & Accessibility</span>
+        </button>
+        <button class="tab-btn @(_activeTab == "ai" ? "active" : "")" @onclick="@(() => SetTab("ai"))">
+            <span class="oi oi-lightbulb"></span>
+            <span>AI</span>
+        </button>
+        <button class="tab-btn @(_activeTab == "data" ? "active" : "")" @onclick="@(() => SetTab("data"))">
+            <span class="oi oi-hard-drive"></span>
+            <span>Data</span>
         </button>
     </div>
-    @if (_presetsExpanded)
-    {
-        <div class="card-body">
-            @if (_preferences != null)
-            {
-                <QuickStartPresetsPanel
-                    Preferences="@_preferences"
-                    Accessibility="@_accessibilitySettings"
-                    PreferencesChanged="@OnPreferencesChanged"
-                    AccessibilityChanged="@OnAccessibilitySettingsChanged"
-                    OnPresetApplied="@OnPresetApplied" />
-            }
-        </div>
-    }
-</div>
 
-<div class="row">
-    <div class="col-lg-8">
-        @* App Mode *@
-        <div class="card mb-4">
-            <div class="card-header">
-                <span class="oi oi-dial me-2"></span>App Mode
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Choose your focus mode. This affects which contexts and balance dimensions are available.
-                </p>
+    <div class="settings-content">
+        @* ==================== GENERAL TAB ==================== *@
+        @if (_activeTab == "general")
+        {
+            <div class="settings-section animate-fade-in">
+                <h3>App Mode</h3>
+                <p class="section-description">Choose your focus. This affects which contexts and dimensions are available.</p>
 
-                <div class="mode-selection mb-3">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="appMode" id="modeWork"
-                               checked="@(_appMode == AppMode.Work)"
-                               @onchange="() => SelectMode(AppMode.Work)" />
-                        <label class="form-check-label" for="modeWork">
-                            <strong><span class="oi oi-briefcase me-1"></span>Work Mode</strong>
-                            <br /><small class="text-muted">Professional focus - career-oriented contexts and dimensions</small>
-                        </label>
+                <div class="mode-cards">
+                    <div class="mode-card @(_appMode == AppMode.Work ? "selected" : "")" @onclick="() => SelectMode(AppMode.Work)">
+                        <span class="mode-icon oi oi-briefcase"></span>
+                        <div class="mode-info">
+                            <strong>Work</strong>
+                            <span>Career-focused contexts</span>
+                        </div>
+                        @if (_appMode == AppMode.Work)
+                        {
+                            <span class="oi oi-check mode-check"></span>
+                        }
                     </div>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="appMode" id="modeLife"
-                               checked="@(_appMode == AppMode.Life)"
-                               @onchange="() => SelectMode(AppMode.Life)" />
-                        <label class="form-check-label" for="modeLife">
-                            <strong><span class="oi oi-heart me-1"></span>Life Mode</strong>
-                            <br /><small class="text-muted">Personal focus - home and life contexts and dimensions</small>
-                        </label>
+                    <div class="mode-card @(_appMode == AppMode.Life ? "selected" : "")" @onclick="() => SelectMode(AppMode.Life)">
+                        <span class="mode-icon oi oi-heart"></span>
+                        <div class="mode-info">
+                            <strong>Life</strong>
+                            <span>Personal & home focus</span>
+                        </div>
+                        @if (_appMode == AppMode.Life)
+                        {
+                            <span class="oi oi-check mode-check"></span>
+                        }
                     </div>
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="radio" name="appMode" id="modeBalanced"
-                               checked="@(_appMode == AppMode.Balanced)"
-                               @onchange="() => SelectMode(AppMode.Balanced)" />
-                        <label class="form-check-label" for="modeBalanced">
-                            <strong><span class="oi oi-dial me-1"></span>Balanced Mode</strong>
-                            <br /><small class="text-muted">Hybrid approach - curated mix of work and life dimensions</small>
-                        </label>
+                    <div class="mode-card @(_appMode == AppMode.Balanced ? "selected" : "")" @onclick="() => SelectMode(AppMode.Balanced)">
+                        <span class="mode-icon oi oi-dial"></span>
+                        <div class="mode-info">
+                            <strong>Balanced</strong>
+                            <span>Work & life combined</span>
+                        </div>
+                        @if (_appMode == AppMode.Balanced)
+                        {
+                            <span class="oi oi-check mode-check"></span>
+                        }
                     </div>
                 </div>
 
                 @if (_pendingModeChange.HasValue && _pendingModeChange != _appMode)
                 {
-                    <div class="alert alert-warning py-2 mb-0">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <span>
-                                <span class="oi oi-warning me-1"></span>
-                                Switching modes will update your available contexts.
-                            </span>
-                            <div>
-                                <button class="btn btn-sm btn-outline-secondary me-2" @onclick="CancelModeChange">Cancel</button>
-                                <button class="btn btn-sm btn-warning" @onclick="ConfirmModeChange" disabled="@_isSwitchingMode">
-                                    @if (_isSwitchingMode)
-                                    {
-                                        <span class="spinner-border spinner-border-sm me-1"></span>
-                                    }
-                                    Confirm
-                                </button>
-                            </div>
+                    <div class="mode-confirm">
+                        <span>Switching modes will update your available contexts.</span>
+                        <div class="mode-confirm-actions">
+                            <button class="btn btn-ghost" @onclick="CancelModeChange">Cancel</button>
+                            <button class="btn btn-primary" @onclick="ConfirmModeChange" disabled="@_isSwitchingMode">
+                                @if (_isSwitchingMode)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Confirm
+                            </button>
                         </div>
                     </div>
                 }
             </div>
-        </div>
 
-        @* Work Schedule *@
-        <div class="card mb-4">
-            <div class="card-header">Work Schedule</div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Work Day Start</label>
-                        <input type="time" class="form-control" @bind="_workDayStart" />
+            <div class="settings-section">
+                <h3>Contexts</h3>
+                <p class="section-description">Where or how you can do tasks (e.g., @@home, @@computer)</p>
+
+                @if (_contexts != null)
+                {
+                    <div class="context-chips">
+                        @foreach (var context in _contexts)
+                        {
+                            <div class="context-chip">
+                                <span class="context-dot" style="background-color: @context.Color;"></span>
+                                <span>@context.Name</span>
+                                @if (!context.IsBuiltIn)
+                                {
+                                    <button class="chip-remove" @onclick="() => DeleteContext(context.Id)">
+                                        <span class="oi oi-x"></span>
+                                    </button>
+                                }
+                            </div>
+                        }
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Work Day End</label>
-                        <input type="time" class="form-control" @bind="_workDayEnd" />
+
+                    <div class="add-context">
+                        <input type="text" placeholder="Add new context..."
+                               @bind="_newContextName" @bind:event="oninput"
+                               @onkeydown="HandleNewContextKeyDown" />
+                        <button class="btn btn-primary btn-sm" @onclick="AddNewContext"
+                                disabled="@string.IsNullOrWhiteSpace(_newContextName)">
+                            Add
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <div class="settings-section">
+                <h3>Quick Start</h3>
+                <p class="section-description">Apply preset configurations optimized for different needs</p>
+
+                @if (_preferences != null)
+                {
+                    <QuickStartPresetsPanel
+                        Preferences="@_preferences"
+                        Accessibility="@_accessibilitySettings"
+                        PreferencesChanged="@OnPreferencesChanged"
+                        AccessibilityChanged="@OnAccessibilitySettingsChanged"
+                        OnPresetApplied="@OnPresetApplied" />
+                }
+            </div>
+        }
+
+        @* ==================== SCHEDULE TAB ==================== *@
+        @if (_activeTab == "schedule")
+        {
+            <div class="settings-section animate-fade-in">
+                <h3>Work Hours</h3>
+                <p class="section-description">When your work day typically starts and ends</p>
+
+                <div class="settings-row">
+                    <div class="setting-field">
+                        <label>Start</label>
+                        <input type="time" @bind="_workDayStart" />
+                    </div>
+                    <div class="setting-field">
+                        <label>End</label>
+                        <input type="time" @bind="_workDayEnd" />
                     </div>
                 </div>
             </div>
-        </div>
 
-        @* Scheduling Preferences *@
-        <div class="card mb-4">
-            <div class="card-header">Scheduling Preferences</div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Default Task Duration (min)</label>
-                        <input type="number" class="form-control" @bind="_defaultTaskDuration" min="5" />
+            <div class="settings-section">
+                <h3>Task Defaults</h3>
+                <p class="section-description">Default durations for new tasks and breaks</p>
+
+                <div class="settings-grid">
+                    <div class="setting-field">
+                        <label>Default task duration</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_defaultTaskDuration" min="5" />
+                            <span>min</span>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Minimum Block Size (min)</label>
-                        <input type="number" class="form-control" @bind="_minimumBlockSize" min="5" />
+                    <div class="setting-field">
+                        <label>Minimum block size</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_minimumBlockSize" min="5" />
+                            <span>min</span>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Deep Work Minimum (min)</label>
-                        <input type="number" class="form-control" @bind="_deepWorkMinimum" min="30" />
+                    <div class="setting-field">
+                        <label>Deep work minimum</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_deepWorkMinimum" min="30" />
+                            <span>min</span>
+                        </div>
                     </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Default Break (min)</label>
-                        <input type="number" class="form-control" @bind="_defaultBreak" min="5" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Buffer Between Meetings (min)</label>
-                        <input type="number" class="form-control" @bind="_bufferBetweenMeetings" min="0" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Max Consecutive Meetings (min)</label>
-                        <input type="number" class="form-control" @bind="_maxConsecutiveMeetings" min="30" />
+                    <div class="setting-field">
+                        <label>Default break</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_defaultBreak" min="5" />
+                            <span>min</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        @* Review Settings *@
-        <div class="card mb-4">
-            <div class="card-header">Review Settings</div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Daily Review Reminder Hour</label>
-                        <select class="form-select" @bind="_dailyReviewHour">
+            <div class="settings-section">
+                <h3>Meetings</h3>
+                <p class="section-description">Buffer time and meeting limits</p>
+
+                <div class="settings-row">
+                    <div class="setting-field">
+                        <label>Buffer between meetings</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_bufferBetweenMeetings" min="0" />
+                            <span>min</span>
+                        </div>
+                    </div>
+                    <div class="setting-field">
+                        <label>Max consecutive meetings</label>
+                        <div class="input-with-unit">
+                            <input type="number" @bind="_maxConsecutiveMeetings" min="30" />
+                            <span>min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h3>Reviews</h3>
+                <p class="section-description">When to be reminded about daily and weekly reviews</p>
+
+                <div class="settings-row">
+                    <div class="setting-field">
+                        <label>Daily review time</label>
+                        <select @bind="_dailyReviewHour">
                             @for (int i = 0; i < 24; i++)
                             {
                                 var hour = i == 0 ? 12 : (i > 12 ? i - 12 : i);
@@ -178,546 +251,231 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Weekly Review Day</label>
-                        <select class="form-select" @bind="_weeklyReviewDay">
+                    <div class="setting-field">
+                        <label>Weekly review day</label>
+                        <select @bind="_weeklyReviewDay">
                             <option value="0">Sunday</option>
                             <option value="1">Monday</option>
-                            <option value="2">Tuesday</option>
-                            <option value="3">Wednesday</option>
-                            <option value="4">Thursday</option>
                             <option value="5">Friday</option>
                             <option value="6">Saturday</option>
                         </select>
                     </div>
                 </div>
             </div>
-        </div>
+        }
 
-        @* Accessibility Settings *@
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><span class="oi oi-contrast me-2"></span>Accessibility</span>
-                <button class="btn btn-sm btn-link p-0" @onclick="() => _accessibilityExpanded = !_accessibilityExpanded">
-                    <span class="oi @(_accessibilityExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
-                </button>
+        @* ==================== FOCUS & ACCESSIBILITY TAB ==================== *@
+        @if (_activeTab == "focus")
+        {
+            <div class="settings-section animate-fade-in">
+                <h3>Accessibility</h3>
+                <p class="section-description">Vision, reading, motion, and interaction settings</p>
+
+                <AccessibilitySettingsPanel
+                    Settings="@_accessibilitySettings"
+                    SettingsChanged="@OnAccessibilitySettingsChanged"
+                    OnChanged="@MarkDirty" />
             </div>
-            @if (_accessibilityExpanded)
-            {
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        Vision, reading, motion, and interaction settings for improved accessibility.
-                    </p>
-                    <AccessibilitySettingsPanel
-                        Settings="@_accessibilitySettings"
-                        SettingsChanged="@OnAccessibilitySettingsChanged"
-                        OnChanged="@MarkDirty" />
-                </div>
-            }
-        </div>
 
-        @* ADHD & Neurodivergent Accommodations *@
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><span class="oi oi-target me-2"></span>ADHD & Neurodivergent Accommodations</span>
-                <button class="btn btn-sm btn-link p-0" @onclick="() => _adhdExpanded = !_adhdExpanded">
-                    <span class="oi @(_adhdExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
-                </button>
-            </div>
-            @if (_adhdExpanded)
-            {
-                <div class="card-body">
-                    <p class="text-muted small mb-3">
-                        Comprehensive settings for focus, time perception, motivation, and executive function support.
-                    </p>
-                    @if (_preferences != null)
-                    {
-                        <NeurodivergentSettingsPanel
-                            Preferences="@_preferences"
-                            PreferencesChanged="@OnPreferencesChanged"
-                            OnSettingsChanged="@MarkDirty" />
-                    }
-                </div>
-            }
-        </div>
+            <div class="settings-section">
+                <h3>ADHD & Neurodivergent Support</h3>
+                <p class="section-description">Focus, time perception, and executive function accommodations</p>
 
-        @* Context Management *@
-        <div class="card mb-4">
-            <div class="card-header">
-                <span class="oi oi-tag me-2"></span>Context Management
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Contexts define where or how you can do tasks (e.g., home, computer, errands). Built-in contexts cannot be deleted.
-                </p>
-
-                @if (_contexts == null)
+                @if (_preferences != null)
                 {
-                    <div class="text-center py-2">
-                        <div class="spinner-border spinner-border-sm text-primary"></div>
-                    </div>
-                }
-                else
-                {
-                    <div class="context-list mb-3">
-                        @foreach (var context in _contexts)
-                        {
-                            <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">
-                                <div class="d-flex align-items-center">
-                                    <span class="context-color-dot me-2" style="background-color: @context.Color; width: 12px; height: 12px; border-radius: 50%; display: inline-block;"></span>
-                                    <span>@context.Name</span>
-                                    @if (context.IsBuiltIn)
-                                    {
-                                        <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Built-in</span>
-                                    }
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <small class="text-muted me-2">Used @context.UsageCount times</small>
-                                    @if (!context.IsBuiltIn)
-                                    {
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteContext(context.Id)"
-                                                title="Delete context">
-                                            <span class="oi oi-trash"></span>
-                                        </button>
-                                    }
-                                </div>
-                            </div>
-                        }
-                    </div>
-
-                    @* Add new context *@
-                    <div class="input-group">
-                        <input type="text" class="form-control" placeholder="New context name..."
-                               @bind="_newContextName" @bind:event="oninput"
-                               @onkeydown="HandleNewContextKeyDown" />
-                        <button class="btn btn-outline-success" @onclick="AddNewContext"
-                                disabled="@string.IsNullOrWhiteSpace(_newContextName)">
-                            <span class="oi oi-plus me-1"></span> Add
-                        </button>
-                    </div>
+                    <NeurodivergentSettingsPanel
+                        Preferences="@_preferences"
+                        PreferencesChanged="@OnPreferencesChanged"
+                        OnSettingsChanged="@MarkDirty" />
                 }
             </div>
-        </div>
+        }
 
-        @* AI / LLM Configuration *@
-        <div class="card mb-4">
-            <div class="card-header">
-                <span class="oi oi-lightbulb me-2"></span>AI / LLM Configuration
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-3">
-                    Configure your AI provider for goal improvement, task generation, and other AI-powered features.
-                    <strong>API keys are configured in <code>appsettings.Local.json</code></strong> for security.
-                </p>
+        @* ==================== AI TAB ==================== *@
+        @if (_activeTab == "ai")
+        {
+            <div class="settings-section animate-fade-in">
+                <h3>AI Features</h3>
+                <p class="section-description">Configure AI-powered suggestions and improvements</p>
 
-                <div class="mb-3">
-                    <div class="form-check form-switch mb-3">
-                        <input class="form-check-input" type="checkbox" id="llmEnabled" @bind="_llmEnabled" />
-                        <label class="form-check-label" for="llmEnabled">
-                            <strong>Enable AI Features</strong>
-                        </label>
+                <div class="setting-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" @bind="_llmEnabled" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <div class="toggle-label">
+                        <strong>Enable AI Features</strong>
+                        <span>Goal suggestions, task generation, and smart recommendations</span>
                     </div>
                 </div>
 
                 @if (_llmEnabled)
                 {
-                    <div class="mb-3">
-                        <label class="form-label">AI Provider</label>
-                        <select class="form-select" @bind="_llmProvider">
-                            <option value="@LlmProvider.Ollama">Ollama (Local)</option>
-                            <option value="@LlmProvider.OpenAI">OpenAI</option>
-                            <option value="@LlmProvider.AzureOpenAI">Azure OpenAI</option>
-                            <option value="@LlmProvider.Anthropic">Anthropic Claude</option>
-                        </select>
-                    </div>
-
-                    @* Ollama Settings *@
-                    @if (_llmProvider == LlmProvider.Ollama)
-                    {
-                        <div class="provider-settings border rounded p-3 bg-light">
-                            <h6 class="mb-3">Ollama Settings</h6>
-                            <div class="row mb-3">
-                                <div class="col-md-8">
-                                    <label class="form-label">Endpoint URL</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                        @(_configSettings?.OllamaEndpoint ?? "http://localhost:11434")
-                                    </div>
+                    <div class="ai-provider-section">
+                        <label>AI Provider</label>
+                        <div class="provider-options">
+                            <label class="provider-option @(_llmProvider == LlmProvider.Ollama ? "selected" : "")">
+                                <input type="radio" name="provider" checked="@(_llmProvider == LlmProvider.Ollama)"
+                                       @onchange="() => _llmProvider = LlmProvider.Ollama" />
+                                <div class="provider-info">
+                                    <strong>Ollama</strong>
+                                    <span>Local, free, private</span>
                                 </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Model</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                        @(_configSettings?.OllamaModel ?? "llama3.2")
-                                    </div>
+                            </label>
+                            <label class="provider-option @(_llmProvider == LlmProvider.OpenAI ? "selected" : "")">
+                                <input type="radio" name="provider" checked="@(_llmProvider == LlmProvider.OpenAI)"
+                                       @onchange="() => _llmProvider = LlmProvider.OpenAI" />
+                                <div class="provider-info">
+                                    <strong>OpenAI</strong>
+                                    <span>GPT-4, cloud-based</span>
                                 </div>
-                            </div>
-                            <small class="text-muted">
-                                <a href="https://ollama.ai" target="_blank">Ollama</a> runs locally and doesn't require an API key.
-                                Configure in <code>appsettings.Local.json</code>.
-                            </small>
+                            </label>
+                            <label class="provider-option @(_llmProvider == LlmProvider.Anthropic ? "selected" : "")">
+                                <input type="radio" name="provider" checked="@(_llmProvider == LlmProvider.Anthropic)"
+                                       @onchange="() => _llmProvider = LlmProvider.Anthropic" />
+                                <div class="provider-info">
+                                    <strong>Claude</strong>
+                                    <span>Anthropic, cloud-based</span>
+                                </div>
+                            </label>
                         </div>
-                    }
 
-                    @* OpenAI Settings *@
-                    @if (_llmProvider == LlmProvider.OpenAI)
-                    {
-                        <div class="provider-settings border rounded p-3 bg-light">
-                            <h6 class="mb-3">OpenAI Settings</h6>
-                            <div class="mb-3">
-                                <label class="form-label">API Key Status</label>
-                                <div class="d-flex align-items-center">
-                                    @if (_configSettings?.HasOpenAIApiKey == true)
-                                    {
-                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
-                                        <span class="text-muted small">API key loaded from appsettings</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
-                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
-                                    }
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Model</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                        @(_configSettings?.OpenAIModel ?? "gpt-4o")
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Endpoint</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.OpenAIEndpoint)">
-                                        @(_configSettings?.OpenAIEndpoint ?? "https://api.openai.com/v1")
-                                    </div>
-                                </div>
-                            </div>
-                            <small class="text-muted">
-                                Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
-                                and add it to <code>appsettings.Local.json</code>.
-                            </small>
-                        </div>
-                    }
-
-                    @* Azure OpenAI Settings *@
-                    @if (_llmProvider == LlmProvider.AzureOpenAI)
-                    {
-                        <div class="provider-settings border rounded p-3 bg-light">
-                            <h6 class="mb-3">Azure OpenAI Settings</h6>
-                            <div class="mb-3">
-                                <label class="form-label">Authentication Status</label>
-                                <div class="d-flex align-items-center">
-                                    @if (_configSettings?.UseAzureAD == true)
-                                    {
-                                        @if (_configSettings?.HasAzureADConfig == true)
-                                        {
-                                            <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Azure AD Configured</span>
-                                            <span class="text-muted small">Using service principal authentication</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Azure AD Not Configured</span>
-                                            <span class="text-muted small">Add TenantId, ClientId, ClientSecret to appsettings</span>
-                                        }
-                                    }
-                                    else if (_configSettings?.HasAzureApiKey == true)
-                                    {
-                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>API Key Configured</span>
-                                        <span class="text-muted small">Using API key authentication</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
-                                        <span class="text-muted small">Add API key or Azure AD credentials to appsettings</span>
-                                    }
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-8">
-                                    <label class="form-label">Endpoint</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.AzureEndpoint)">
-                                        @(string.IsNullOrEmpty(_configSettings?.AzureEndpoint) ? "(not configured)" : _configSettings.AzureEndpoint)
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">API Version</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                        @(_configSettings?.AzureApiVersion ?? "2024-02-01")
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Deployment Name</label>
-                                <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                    @(string.IsNullOrEmpty(_configSettings?.AzureDeploymentName) ? "(not configured)" : _configSettings.AzureDeploymentName)
-                                </div>
-                            </div>
-                            <small class="text-muted">
-                                Configure your Azure OpenAI settings in <code>appsettings.Local.json</code>.
-                                You can use either an API key or Azure AD service principal (TenantId, ClientId, ClientSecret).
-                            </small>
-                        </div>
-                    }
-
-                    @* Anthropic Claude Settings *@
-                    @if (_llmProvider == LlmProvider.Anthropic)
-                    {
-                        <div class="provider-settings border rounded p-3 bg-light">
-                            <h6 class="mb-3">Anthropic Claude Settings</h6>
-                            <div class="mb-3">
-                                <label class="form-label">API Key Status</label>
-                                <div class="d-flex align-items-center">
-                                    @if (_configSettings?.HasAnthropicApiKey == true)
-                                    {
-                                        <span class="badge bg-success me-2"><span class="oi oi-check me-1"></span>Configured</span>
-                                        <span class="text-muted small">API key loaded from appsettings</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-warning text-dark me-2"><span class="oi oi-warning me-1"></span>Not Configured</span>
-                                        <span class="text-muted small">Add API key to appsettings.Local.json</span>
-                                    }
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Model</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2">
-                                        @(_configSettings?.AnthropicModel ?? "claude-3-5-sonnet-20241022")
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Endpoint</label>
-                                    <div class="form-control-plaintext bg-white border rounded px-3 py-2 text-truncate" title="@(_configSettings?.AnthropicEndpoint)">
-                                        @(_configSettings?.AnthropicEndpoint ?? "https://api.anthropic.com")
-                                    </div>
-                                </div>
-                            </div>
-                            <small class="text-muted">
-                                Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic Console</a>
-                                and add it to <code>appsettings.Local.json</code>.
-                            </small>
-                        </div>
-                    }
-
-                    <div class="mt-3">
-                        <label class="form-label">Request Timeout</label>
-                        <div class="form-control-plaintext bg-white border rounded px-3 py-2" style="max-width: 150px;">
-                            @(_configSettings?.TimeoutSeconds ?? 60) seconds
-                        </div>
-                    </div>
-
-                    @* Configuration Help *@
-                    <div class="alert alert-info mt-3 py-2">
-                        <small>
-                            <strong>To configure API keys:</strong> Copy <code>src/SelfOrganizer.Server/appsettings.Development.json.template</code>
-                            to <code>src/SelfOrganizer.Server/appsettings.Development.json</code> and fill in your credentials.
-                            This file is git-ignored and won't be committed.
-                        </small>
-                    </div>
-
-                    @* Connection Status *@
-                    <div class="mt-3 pt-3 border-top">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <strong>Connection Status:</strong>
+                        <div class="connection-status">
+                            <div class="status-info">
                                 @if (_llmConnectionStatus == null)
                                 {
-                                    <span class="text-muted ms-2">Not tested</span>
+                                    <span class="status-dot neutral"></span>
+                                    <span>Not tested</span>
                                 }
                                 else if (_llmConnectionStatus.IsConnected)
                                 {
-                                    <span class="text-success ms-2">
-                                        <span class="oi oi-check me-1"></span>Connected
-                                        @if (!string.IsNullOrEmpty(_llmConnectionStatus.Model))
-                                        {
-                                            <span class="text-muted">(@_llmConnectionStatus.Model)</span>
-                                        }
-                                    </span>
+                                    <span class="status-dot connected"></span>
+                                    <span>Connected @(!string.IsNullOrEmpty(_llmConnectionStatus.Model) ? $"({_llmConnectionStatus.Model})" : "")</span>
                                 }
                                 else
                                 {
-                                    <span class="text-danger ms-2">
-                                        <span class="oi oi-x me-1"></span>@(_llmConnectionStatus.ErrorMessage ?? "Not connected")
-                                    </span>
+                                    <span class="status-dot error"></span>
+                                    <span>@(_llmConnectionStatus.ErrorMessage ?? "Not connected")</span>
                                 }
                             </div>
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="TestLlmConnection" disabled="@_isTestingLlm">
+                            <button class="btn btn-ghost btn-sm" @onclick="TestLlmConnection" disabled="@_isTestingLlm">
                                 @if (_isTestingLlm)
                                 {
-                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    <span class="spinner-border spinner-border-sm"></span>
                                 }
                                 else
                                 {
-                                    <span class="oi oi-pulse me-1"></span>
+                                    <span>Test</span>
                                 }
-                                Test Connection
                             </button>
+                        </div>
+
+                        <div class="config-note">
+                            <span class="oi oi-info"></span>
+                            <span>API keys are configured in <code>appsettings.Local.json</code> for security.</span>
                         </div>
                     </div>
                 }
             </div>
-        </div>
-
-        <button class="btn btn-primary btn-lg" @onclick="SaveSettings">
-            <span class="oi oi-check me-1"></span> Save Settings
-        </button>
-        @if (_saveSuccess)
-        {
-            <span class="text-success ms-3">
-                <span class="oi oi-check"></span> Saved!
-            </span>
         }
-    </div>
 
-    <div class="col-lg-4">
-        @* Data Management *@
-        <div class="card mb-4">
-            <div class="card-header">Data Management</div>
-            <div class="card-body">
-                <h6 class="mb-2">Export Settings</h6>
-                <p class="text-muted small mb-2">
-                    Export your settings to restore on another device or as a backup.
-                </p>
-                <div class="d-grid gap-2 mb-3">
-                    <button class="btn btn-outline-success" @onclick="ExportSettingsJson" disabled="@_isExportingSettings">
-                        @if (_isExportingSettings)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-cog me-1"></span>
-                        }
-                        Export Settings (JSON)
+        @* ==================== DATA TAB ==================== *@
+        @if (_activeTab == "data")
+        {
+            <div class="settings-section animate-fade-in">
+                <h3>Export</h3>
+                <p class="section-description">Backup your data or transfer to another device</p>
+
+                <div class="data-actions">
+                    <button class="data-action-btn" @onclick="ExportSettingsJson" disabled="@_isExportingSettings">
+                        <span class="oi oi-cog"></span>
+                        <div>
+                            <strong>Export Settings</strong>
+                            <span>Preferences and configuration</span>
+                        </div>
+                    </button>
+                    <button class="data-action-btn" @onclick="ExportAllJson" disabled="@_isExporting">
+                        <span class="oi oi-data-transfer-download"></span>
+                        <div>
+                            <strong>Export All Data</strong>
+                            <span>Complete backup (JSON)</span>
+                        </div>
                     </button>
                 </div>
 
-                @if (_settingsExportResult != null)
+                @if (_exportResult != null || _settingsExportResult != null)
                 {
-                    <div class="alert @(_settingsExportResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
-                        @if (_settingsExportResult.Success)
-                        {
-                            <span class="oi oi-check me-1"></span>
-                            <span>Exported to @_settingsExportResult.Filename</span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-warning me-1"></span>
-                            <span>@_settingsExportResult.ErrorMessage</span>
-                        }
+                    var result = _exportResult ?? _settingsExportResult;
+                    <div class="export-result @(result!.Success ? "success" : "error")">
+                        <span class="oi @(result.Success ? "oi-check" : "oi-warning")"></span>
+                        <span>@(result.Success ? $"Exported to {result.Filename}" : result.ErrorMessage)</span>
                     </div>
                 }
+            </div>
 
-                <hr />
+            <div class="settings-section">
+                <h3>Import</h3>
+                <p class="section-description">Restore from a backup file</p>
 
-                <h6 class="mb-2">Export All Data</h6>
-                <p class="text-muted small mb-2">
-                    Export your entire database including tasks, projects, and settings.
-                </p>
-                <div class="d-grid gap-2 mb-3">
-                    <button class="btn btn-outline-primary" @onclick="ExportAllJson" disabled="@_isExporting">
-                        @if (_isExporting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-data-transfer-download me-1"></span>
-                        }
-                        Export All Data (JSON)
-                    </button>
-                </div>
-
-                @if (_exportResult != null)
-                {
-                    <div class="alert @(_exportResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
-                        @if (_exportResult.Success)
-                        {
-                            <span class="oi oi-check me-1"></span>
-                            <span>Exported to @_exportResult.Filename</span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-warning me-1"></span>
-                            <span>@_exportResult.ErrorMessage</span>
-                        }
+                <button class="data-action-btn" @onclick="() => _showImportModal = true">
+                    <span class="oi oi-data-transfer-upload"></span>
+                    <div>
+                        <strong>Import Data</strong>
+                        <span>Restore from JSON backup</span>
                     </div>
-                }
-
-                <h6 class="mb-2">Import Data</h6>
-                <div class="d-grid gap-2 mb-3">
-                    <button class="btn btn-outline-secondary" @onclick="() => _showImportModal = true">
-                        <span class="oi oi-data-transfer-upload me-1"></span> Import Data (JSON)
-                    </button>
-                </div>
+                </button>
 
                 @if (_importResult != null)
                 {
-                    <div class="alert @(_importResult.Success ? "alert-success" : "alert-danger") py-2 small mb-3">
-                        @if (_importResult.Success)
-                        {
-                            <span class="oi oi-check me-1"></span>
-                            <span>@_importResult.Message</span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-warning me-1"></span>
-                            <span>@_importResult.Message</span>
-                        }
+                    <div class="export-result @(_importResult.Success ? "success" : "error")">
+                        <span class="oi @(_importResult.Success ? "oi-check" : "oi-warning")"></span>
+                        <span>@_importResult.Message</span>
                     </div>
                 }
-
-                <hr />
-                <h6 class="mb-2 text-danger">Danger Zone</h6>
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-danger" @onclick="() => _showClearConfirm = true">
-                        <span class="oi oi-trash me-1"></span> Clear All Data
-                    </button>
-                </div>
             </div>
-        </div>
 
-        @* Advanced Settings Links *@
-        <div class="card mb-4">
-            <div class="card-header">Advanced Settings</div>
-            <div class="card-body">
-                <a href="/settings/linking-rules" class="d-flex align-items-center text-decoration-none text-reset p-2 rounded hover-bg-light">
-                    <span class="oi oi-link-intact me-3 text-primary" style="font-size: 1.2rem;"></span>
+            <div class="settings-section danger-zone">
+                <h3>Danger Zone</h3>
+                <p class="section-description">Irreversible actions</p>
+
+                <button class="btn btn-danger-outline" @onclick="() => _showClearConfirm = true">
+                    <span class="oi oi-trash"></span>
+                    Clear All Data
+                </button>
+            </div>
+
+            <div class="settings-section">
+                <h3>Advanced</h3>
+
+                <a href="/settings/linking-rules" class="advanced-link">
+                    <span class="oi oi-link-intact"></span>
                     <div>
-                        <div class="fw-bold">Entity Linking Rules</div>
-                        <small class="text-muted">Auto-link calendar events to projects & goals</small>
+                        <strong>Entity Linking Rules</strong>
+                        <span>Auto-link calendar events to projects</span>
                     </div>
-                    <span class="oi oi-chevron-right ms-auto text-muted"></span>
+                    <span class="oi oi-chevron-right"></span>
                 </a>
-                <hr class="my-2" />
-                <a href="/settings/calendar-providers" class="d-flex align-items-center text-decoration-none text-reset p-2 rounded hover-bg-light">
-                    <span class="oi oi-calendar me-3 text-primary" style="font-size: 1.2rem;"></span>
+                <a href="/settings/calendar-providers" class="advanced-link">
+                    <span class="oi oi-calendar"></span>
                     <div>
-                        <div class="fw-bold">Calendar Providers</div>
-                        <small class="text-muted">Connect Google Calendar & other sources</small>
+                        <strong>Calendar Providers</strong>
+                        <span>Connect Google Calendar & others</span>
                     </div>
-                    <span class="oi oi-chevron-right ms-auto text-muted"></span>
+                    <span class="oi oi-chevron-right"></span>
                 </a>
             </div>
-        </div>
+        }
 
-        <div class="card">
-            <div class="card-header">About</div>
-            <div class="card-body">
-                <p class="mb-1"><strong>Self Organizer</strong> <span class="badge bg-primary">v2.0</span></p>
-                <p class="text-muted small mb-2">GTD-inspired task management with smart scheduling, designed with comprehensive accessibility and neurodivergent accommodations.</p>
-                <p class="text-muted small mb-0">
-                    <span class="oi oi-contrast me-1"></span>Accessibility settings for vision, reading, and motor accommodations
-                </p>
-                <p class="text-muted small mb-0">
-                    <span class="oi oi-target me-1"></span>ADHD, anxiety, autism, and depression-friendly presets
-                </p>
-                <hr />
-                <p class="small text-muted mb-2">Built with Blazor WebAssembly and .NET 9</p>
-                <a href="/release-notes" class="small">
-                    <span class="oi oi-document me-1"></span>View Release Notes
-                </a>
-            </div>
+        @* Save Button - Fixed at bottom *@
+        <div class="settings-footer">
+            <button class="btn btn-primary btn-lg" @onclick="SaveSettings">
+                <span class="oi oi-check"></span>
+                Save Changes
+            </button>
+            @if (_saveSuccess)
+            {
+                <span class="save-success">Saved!</span>
+            }
         </div>
     </div>
 </div>
@@ -737,6 +495,10 @@
     OnImportRequested="HandleImportRequested" />
 
 @code {
+    private string _activeTab = "general";
+
+    private void SetTab(string tab) => _activeTab = tab;
+
     private TimeOnly _workDayStart = new TimeOnly(9, 0);
     private TimeOnly _workDayEnd = new TimeOnly(17, 0);
     private int _defaultTaskDuration = 30;
@@ -771,11 +533,6 @@
     private AppMode? _pendingModeChange;
     private bool _isSwitchingMode;
 
-    // Section expansion state
-    private bool _presetsExpanded = true;
-    private bool _accessibilityExpanded = false;
-    private bool _adhdExpanded = false;
-
     // Accessibility settings
     private AccessibilitySettings _accessibilitySettings = new();
 
@@ -792,7 +549,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Load App Mode
         _appMode = await BalanceDimensionService.GetCurrentModeAsync();
 
         var prefs = await PreferencesRepository.GetAllAsync();
@@ -800,7 +556,6 @@
 
         if (_preferences != null)
         {
-            // Work schedule
             _workDayStart = TimeOnly.FromTimeSpan(_preferences.WorkDayStart);
             _workDayEnd = TimeOnly.FromTimeSpan(_preferences.WorkDayEnd);
             _defaultTaskDuration = _preferences.DefaultTaskDurationMinutes;
@@ -811,18 +566,11 @@
             _maxConsecutiveMeetings = _preferences.MaxConsecutiveMeetingMinutes;
             _dailyReviewHour = _preferences.DailyReviewReminderHour;
             _weeklyReviewDay = _preferences.WeeklyReviewDay;
-
-            // Load accessibility settings
             _accessibilitySettings = _preferences.Accessibility ?? new AccessibilitySettings();
         }
 
-        // Apply accessibility settings on load
         await ApplyAccessibilitySettings();
-
-        // Load contexts
         await LoadContexts();
-
-        // Load LLM settings
         await LoadLlmSettings();
     }
 
@@ -832,10 +580,7 @@
         {
             await JSRuntime.InvokeVoidAsync("accessibilityInterop.applyAccessibilitySettings", _accessibilitySettings);
         }
-        catch
-        {
-            // Silently fail if JS interop not available yet
-        }
+        catch { }
     }
 
     private void OnAccessibilitySettingsChanged(AccessibilitySettings settings)
@@ -859,10 +604,7 @@
 
     private async Task OnPresetApplied()
     {
-        // Apply accessibility settings immediately
         await ApplyAccessibilitySettings();
-
-        // Auto-save after preset is applied
         await SaveSettings();
     }
 
@@ -891,8 +633,6 @@
             await BalanceDimensionService.SetModeAsync(_pendingModeChange.Value, seedContexts: true);
             _appMode = _pendingModeChange.Value;
             _pendingModeChange = null;
-
-            // Reload contexts to show updated list
             await LoadContexts();
         }
         finally
@@ -903,12 +643,9 @@
 
     private async Task LoadLlmSettings()
     {
-        // Load user preferences (provider selection, enabled state)
         var llmSettings = await LlmService.GetSettingsAsync();
         _llmEnabled = llmSettings.IsEnabled;
         _llmProvider = llmSettings.Provider;
-
-        // Load config settings from server (API keys, endpoints from appsettings.json)
         _configSettings = await LlmService.GetConfigSettingsAsync();
     }
 
@@ -919,8 +656,7 @@
 
     private async Task AddNewContext()
     {
-        if (string.IsNullOrWhiteSpace(_newContextName))
-            return;
+        if (string.IsNullOrWhiteSpace(_newContextName)) return;
 
         try
         {
@@ -930,7 +666,6 @@
         }
         catch (InvalidOperationException)
         {
-            // Context already exists - just clear the input
             _newContextName = string.Empty;
         }
     }
@@ -958,7 +693,6 @@
             _preferences = new UserPreferences();
         }
 
-        // Work schedule
         _preferences.WorkDayStart = _workDayStart.ToTimeSpan();
         _preferences.WorkDayEnd = _workDayEnd.ToTimeSpan();
         _preferences.DefaultTaskDurationMinutes = _defaultTaskDuration;
@@ -969,11 +703,8 @@
         _preferences.MaxConsecutiveMeetingMinutes = _maxConsecutiveMeetings;
         _preferences.DailyReviewReminderHour = _dailyReviewHour;
         _preferences.WeeklyReviewDay = _weeklyReviewDay;
-
-        // Accessibility settings
         _preferences.Accessibility = _accessibilitySettings;
 
-        // Save LLM settings
         await SaveLlmSettings();
 
         if (_preferences.CreatedAt == default)
@@ -987,12 +718,20 @@
 
         _saveSuccess = true;
         _isDirty = false;
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            _saveSuccess = false;
+            await InvokeAsync(StateHasChanged);
+        });
     }
 
     private async Task ExportSettingsJson()
     {
         _isExportingSettings = true;
         _settingsExportResult = null;
+        _exportResult = null;
         StateHasChanged();
 
         try
@@ -1013,6 +752,7 @@
     {
         _isExporting = true;
         _exportResult = null;
+        _settingsExportResult = null;
         StateHasChanged();
 
         try
@@ -1040,20 +780,17 @@
     {
         if (args.IsValidationOnly)
         {
-            // For JSON full database import, just mark as valid
             args.ValidationResult = new ImportValidationResult { IsValid = true };
             return;
         }
 
         try
         {
-            // Import the full database
             await DbService.ImportAllAsync(args.Content);
-
             args.Success = true;
             args.ImportedCount = 1;
             args.TotalCount = 1;
-            args.ResultMessage = "Database imported successfully. Please refresh the page to see updated data.";
+            args.ResultMessage = "Database imported successfully. Refresh to see changes.";
 
             _importResult = new ImportResultInfo
             {
@@ -1074,7 +811,6 @@
 
     private async Task ClearAllData()
     {
-        // Clear all stores
         await DbService.ClearAsync("captures");
         await DbService.ClearAsync("tasks");
         await DbService.ClearAsync("projects");
@@ -1095,14 +831,11 @@
 
     private async Task SaveLlmSettings()
     {
-        // Only save user preferences (provider selection, enabled state)
-        // API keys and other settings come from appsettings.json
         var llmSettings = new LlmSettings
         {
             IsEnabled = _llmEnabled,
             Provider = _llmProvider
         };
-
         await LlmService.SaveSettingsAsync(llmSettings);
     }
 
@@ -1114,10 +847,7 @@
 
         try
         {
-            // Save current settings first so the test uses them
             await SaveLlmSettings();
-
-            // Test the connection
             _llmConnectionStatus = await LlmService.GetConnectionStatusAsync();
         }
         catch (Exception ex)

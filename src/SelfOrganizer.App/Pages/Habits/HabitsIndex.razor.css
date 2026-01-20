@@ -111,6 +111,50 @@
     flex-wrap: wrap;
 }
 
+/* AI Badge - high contrast */
+.bg-purple-subtle {
+    background-color: #8b5cf6;
+}
+
+.text-purple {
+    color: #ffffff;
+}
+
+/* Habit Rationale */
+.habit-rationale {
+    max-width: 400px;
+    line-height: 1.4;
+}
+
+/* Goal Links */
+.habit-goals {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.habit-goals .goal-link {
+    text-decoration: none;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    background-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.habit-goals .goal-link:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    color: #ffffff;
+}
+
+.bg-primary-subtle {
+    background-color: var(--color-primary);
+    color: #ffffff;
+}
+
 .habit-actions {
     display: flex;
     gap: var(--space-xs);

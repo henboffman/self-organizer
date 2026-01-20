@@ -25,7 +25,16 @@
         </div>
 
         <article class="content px-4">
-            @Body
+            <ErrorBoundary @ref="_errorBoundary">
+                <ChildContent>
+                    @Body
+                </ChildContent>
+                <ErrorContent Context="exception">
+                    <SelfOrganizer.App.Components.Shared.ErrorContent
+                        Exception="@exception"
+                        OnRecover="RecoverFromError" />
+                </ErrorContent>
+            </ErrorBoundary>
         </article>
     </main>
 </div>
@@ -47,3 +56,5 @@
     OnClose="OnQuickAddClosed" />
 
 <SelfOrganizer.App.Components.Shared.QuickActionsButton />
+
+<SelfOrganizer.App.Components.Shared.ToastContainer />

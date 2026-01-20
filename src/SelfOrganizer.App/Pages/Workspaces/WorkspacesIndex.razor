@@ -109,7 +109,7 @@ else if (string.IsNullOrEmpty(Context))
             <div class="card mt-4 border-secondary">
                 <div class="card-header bg-secondary text-white">
                     <span class="oi oi-question-mark me-2"></span>Tasks Without Context
-                    <span class="badge bg-light text-dark ms-2">@_tasksWithoutContext.Count</span>
+                    <span class="badge status-badge ms-2">@_tasksWithoutContext.Count</span>
                 </div>
                 <div class="card-body">
                     <p class="small text-muted mb-3">These tasks don't have a context assigned. Consider adding a context like @@computer, @@phone, or @@errands.</p>
@@ -119,7 +119,7 @@ else if (string.IsNullOrEmpty(Context))
                             <a href="/tasks/@task.Id" class="list-group-item list-group-item-action py-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span>@task.Title</span>
-                                    <span class="badge bg-light text-dark">@task.Status</span>
+                                    <span class="badge status-badge">@task.Status</span>
                                 </div>
                             </a>
                         }
@@ -157,7 +157,7 @@ else
                                         <div class="fw-bold">@task.Title</div>
                                         @if (!string.IsNullOrEmpty(task.Description))
                                         {
-                                            <div class="small text-muted text-truncate" style="max-width: 400px;">@task.Description</div>
+                                            <div class="small text-muted">@task.Description</div>
                                         }
                                     </div>
                                     <div class="text-end">
@@ -201,7 +201,7 @@ else
                                         <span>@task.Title</span>
                                         @if (!string.IsNullOrEmpty(task.WaitingForNote))
                                         {
-                                            <span class="badge bg-light text-dark">@task.WaitingForNote</span>
+                                            <span class="badge status-badge">@task.WaitingForNote</span>
                                         }
                                     </div>
                                 </a>

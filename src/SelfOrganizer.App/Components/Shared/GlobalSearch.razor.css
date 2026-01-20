@@ -57,7 +57,7 @@
 }
 
 .search-icon {
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     font-size: 1.1rem;
     flex-shrink: 0;
 }
@@ -73,13 +73,13 @@
 }
 
 .search-input::placeholder {
-    color: var(--text-tertiary);
+    color: var(--input-placeholder);
 }
 
 .clear-button {
     background: none;
     border: none;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     cursor: pointer;
     padding: var(--space-xs);
     border-radius: var(--radius-sm);
@@ -133,11 +133,11 @@
 }
 
 .result-group-title {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
 }
 
 .result-group-count {
@@ -191,19 +191,19 @@
 }
 
 .result-subtitle {
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .result-type-badge {
-    font-size: 0.65rem;
-    font-weight: 500;
+    font-size: 0.7rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     background-color: var(--bg-tertiary);
     padding: 2px 6px;
     border-radius: var(--radius-sm);
@@ -240,11 +240,11 @@
 }
 
 .quick-actions-header {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-tertiary);
+    color: var(--text-muted);
     padding: var(--space-xs) var(--space-lg) var(--space-sm);
     border-top: 1px solid var(--border-muted, rgba(0,0,0,0.05));
     margin-top: var(--space-xs);
@@ -310,8 +310,8 @@
 }
 
 .hint {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
+    font-size: 0.8rem;
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: var(--space-xs);

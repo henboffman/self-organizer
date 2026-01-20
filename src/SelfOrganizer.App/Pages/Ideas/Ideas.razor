@@ -131,11 +131,11 @@ else
                             }
                             @foreach (var tag in idea.Tags.Take(3))
                             {
-                                <span class="badge bg-light text-dark">#@tag</span>
+                                <span class="badge status-badge">#@tag</span>
                             }
                             @if (idea.Tags.Count > 3)
                             {
-                                <span class="badge bg-light text-dark">+@(idea.Tags.Count - 3)</span>
+                                <span class="badge status-badge">+@(idea.Tags.Count - 3)</span>
                             }
                         </div>
                         @if (idea.LinkedGoalId.HasValue || idea.LinkedProjectId.HasValue)

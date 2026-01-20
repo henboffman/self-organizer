@@ -1,8 +1,11 @@
 @page "/balance"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Balance
 @inject SelfOrganizer.Core.Interfaces.IBalanceDimensionService BalanceDimensionService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject SelfOrganizer.Core.Interfaces.IGoalService GoalService
 @inject SelfOrganizer.Core.Interfaces.IRepository<Goal> GoalRepository
 @inject IDataChangeNotificationService DataChangeNotification
 @inject NavigationManager Navigation
@@ -125,18 +128,124 @@
     else
     {
         <div class="balance-dashboard">
+            @* Collapsible Insights Panel at Top *@
+            @{
+                var lowestDimension = _dimensions.OrderBy(d => GetEffectiveRating(d.Id)).FirstOrDefault();
+                var highestDimension = _dimensions.OrderByDescending(d => GetEffectiveRating(d.Id)).FirstOrDefault();
+                var avgRating = GetOverallScore();
+                var variance = CalculateVariance();
+                var dimensionsWithoutGoals = _dimensions.Where(d =>
+                    !_goalsByDimension.GetValueOrDefault(d.Id, new List<Goal>()).Any() &&
+                    GetEffectiveRating(d.Id) < 6).ToList();
+                var hasInsights = (lowestDimension != null && GetEffectiveRating(lowestDimension.Id) < 5) ||
+                                  (highestDimension != null && GetEffectiveRating(highestDimension.Id) >= 8) ||
+                                  variance > 4 || (variance < 2 && avgRating >= 6) ||
+                                  dimensionsWithoutGoals.Any();
+            }
+            @if (hasInsights)
+            {
+                <div class="insights-panel mb-4">
+                    <div class="insights-header" @onclick="ToggleInsights">
+                        <div class="d-flex align-items-center">
+                            <span class="oi oi-lightbulb me-2"></span>
+                            <span class="fw-medium">Insights & Recommendations</span>
+                            <span class="insight-count ms-2">@GetInsightCount()</span>
+                        </div>
+                        <span class="oi @(_showInsights ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                    </div>
+                    @if (_showInsights)
+                    {
+                        <div class="insights-content">
+                            @if (lowestDimension != null && GetEffectiveRating(lowestDimension.Id) < 5)
+                            {
+                                <div class="insight-item needs-attention">
+                                    <div class="insight-icon">
+                                        <span class="oi oi-target"></span>
+                                    </div>
+                                    <div class="insight-body">
+                                        <div class="insight-title">@lowestDimension.Name needs attention</div>
+                                        <div class="insight-text">Rated @GetEffectiveRating(lowestDimension.Id)/10. Consider setting goals in this area.</div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (highestDimension != null && GetEffectiveRating(highestDimension.Id) >= 8)
+                            {
+                                <div class="insight-item strength">
+                                    <div class="insight-icon">
+                                        <span class="oi oi-star"></span>
+                                    </div>
+                                    <div class="insight-body">
+                                        <div class="insight-title">@highestDimension.Name is a strength</div>
+                                        <div class="insight-text">Rated @GetEffectiveRating(highestDimension.Id)/10. Great job maintaining this area!</div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (variance > 4)
+                            {
+                                <div class="insight-item imbalance">
+                                    <div class="insight-icon">
+                                        <span class="oi oi-warning"></span>
+                                    </div>
+                                    <div class="insight-body">
+                                        <div class="insight-title">High imbalance detected</div>
+                                        <div class="insight-text">Consider focusing on neglected areas for better overall wellbeing.</div>
+                                    </div>
+                                </div>
+                            }
+                            else if (variance < 2 && avgRating >= 6)
+                            {
+                                <div class="insight-item balanced">
+                                    <div class="insight-icon">
+                                        <span class="oi oi-check"></span>
+                                    </div>
+                                    <div class="insight-body">
+                                        <div class="insight-title">Good balance!</div>
+                                        <div class="insight-text">Your @GetModeLabel().ToLower() areas are fairly well-distributed.</div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (dimensionsWithoutGoals.Any())
+                            {
+                                <div class="insight-item suggestion">
+                                    <div class="insight-icon">
+                                        <span class="oi oi-plus"></span>
+                                    </div>
+                                    <div class="insight-body">
+                                        <div class="insight-title">Set goals for improvement</div>
+                                        <div class="insight-text">Consider creating goals for: @string.Join(", ", dimensionsWithoutGoals.Take(3).Select(d => d.Name))</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @* AI Recommendations Panel *@
+            <BalanceAiPanel
+                Ratings="_ratings"
+                Dimensions="_dimensions"
+                ActiveGoals="_activeGoals"
+                ActiveTasks="_activeTasks"
+                CurrentMode="_currentMode"
+                OnTasksCreated="HandleTasksCreated"
+                OnGoalCreated="HandleGoalCreated" />
+
             <div class="row">
                 <div class="col-lg-6 mb-4">
                     @* Balance Wheel *@
                     <div class="balance-wheel-card">
                         <h5 class="mb-3">Balance Wheel</h5>
                         <div class="wheel-container">
-                            <svg class="balance-wheel" viewBox="0 0 300 300">
-                                @* Background circles *@
+                            <svg class="balance-wheel" viewBox="-100 -100 400 400">
+                                @* Background circles - centered at 100,100 *@
                                 @for (int i = 1; i <= 10; i++)
                                 {
-                                    var radius = i * 12;
-                                    <circle cx="150" cy="150" r="@radius"
+                                    var radius = i * 10;
+                                    <circle cx="100" cy="100" r="@radius"
                                             class="wheel-ring @(i == 5 || i == 10 ? "major" : "")" />
                                 }
 
@@ -145,9 +254,9 @@
                                 {
                                     var angle = (i * 360.0 / _dimensions.Count) - 90;
                                     var rad = angle * Math.PI / 180;
-                                    var x2 = 150 + 120 * Math.Cos(rad);
-                                    var y2 = 150 + 120 * Math.Sin(rad);
-                                    <line x1="150" y1="150" x2="@x2" y2="@y2" class="wheel-axis" />
+                                    var x2 = 100 + 100 * Math.Cos(rad);
+                                    var y2 = 100 + 100 * Math.Sin(rad);
+                                    <line x1="100" y1="100" x2="@x2" y2="@y2" class="wheel-axis" />
                                 }
 
                                 @* Filled area polygon *@
@@ -156,12 +265,12 @@
                                     for (int i = 0; i < _dimensions.Count; i++)
                                     {
                                         var dimension = _dimensions[i];
-                                        var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                        var rating = GetEffectiveRating(dimension.Id);
                                         var angle = (i * 360.0 / _dimensions.Count) - 90;
                                         var rad = angle * Math.PI / 180;
-                                        var r = rating * 12;
-                                        var x = 150 + r * Math.Cos(rad);
-                                        var y = 150 + r * Math.Sin(rad);
+                                        var r = rating * 10;
+                                        var x = 100 + r * Math.Cos(rad);
+                                        var y = 100 + r * Math.Sin(rad);
                                         points.Add($"{x:F1},{y:F1}");
                                     }
                                 }
@@ -171,13 +280,13 @@
                                 @for (int i = 0; i < _dimensions.Count; i++)
                                 {
                                     var dimension = _dimensions[i];
-                                    var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                    var pointRating = GetEffectiveRating(dimension.Id);
                                     var angle = (i * 360.0 / _dimensions.Count) - 90;
                                     var rad = angle * Math.PI / 180;
-                                    var r = rating * 12;
-                                    var x = 150 + r * Math.Cos(rad);
-                                    var y = 150 + r * Math.Sin(rad);
-                                    <circle cx="@x" cy="@y" r="6"
+                                    var r = pointRating * 10;
+                                    var x = 100 + r * Math.Cos(rad);
+                                    var y = 100 + r * Math.Sin(rad);
+                                    <circle cx="@x" cy="@y" r="5"
                                             fill="@dimension.Color" class="wheel-point" />
                                 }
 
@@ -187,14 +296,14 @@
                                     var dimension = _dimensions[i];
                                     var angle = (i * 360.0 / _dimensions.Count) - 90;
                                     var rad = angle * Math.PI / 180;
-                                    var x = 150 + 138 * Math.Cos(rad);
-                                    var y = 150 + 138 * Math.Sin(rad);
+                                    var x = 100 + 115 * Math.Cos(rad);
+                                    var y = 100 + 115 * Math.Sin(rad);
                                     var textAnchor = angle > -90 && angle < 90 ? "start" : "end";
                                     if (Math.Abs(angle + 90) < 5 || Math.Abs(angle - 90) < 5)
                                     {
                                         textAnchor = "middle";
                                     }
-                                    @((MarkupString)$"<text x=\"{x:F1}\" y=\"{y:F1}\" class=\"wheel-label\" style=\"text-anchor: {textAnchor};\">{dimension.Name}</text>")
+                                    @((MarkupString)$"<text x=\"{x:F1}\" y=\"{y:F1}\" class=\"wheel-label\" style=\"text-anchor: {textAnchor}; fill: var(--text-primary, #e5e7eb);\">{dimension.Name}</text>")
                                 }
                             </svg>
                         </div>
@@ -211,9 +320,9 @@
                     <div class="areas-detail">
                         <h5 class="mb-3">Dimension Breakdown</h5>
                         <div class="area-list">
-                            @foreach (var dimension in _dimensions.OrderByDescending(d => _ratings.GetValueOrDefault(d.Id, 0)))
+                            @foreach (var dimension in _dimensions.OrderByDescending(d => GetEffectiveRating(d.Id)))
                             {
-                                var rating = _ratings.GetValueOrDefault(dimension.Id, 0);
+                                var rating = GetEffectiveRating(dimension.Id);
                                 var goals = _goalsByDimension.GetValueOrDefault(dimension.Id, new List<Goal>());
                                 var tasksCount = _tasksByDimension.GetValueOrDefault(dimension.Id, 0);
                                 var isExpanded = _expandedDimension == dimension.Id;
@@ -225,7 +334,12 @@
                                         </span>
                                         <span class="area-name">@dimension.Name</span>
                                         <span class="area-rating" style="color: @GetRatingColor(rating);">@rating/10</span>
-                                        @if (goals.Any())
+                                        @{
+                                            var dimTasks = _taskListByDimension.GetValueOrDefault(dimension.Id, new List<TodoTask>());
+                                            var dimProjects = _projectsByDimension.GetValueOrDefault(dimension.Id, new List<Project>());
+                                            var hasAnyItems = goals.Any() || dimTasks.Any() || dimProjects.Any();
+                                        }
+                                        @if (hasAnyItems)
                                         {
                                             <span class="oi @(isExpanded ? "oi-chevron-top" : "oi-chevron-bottom") ms-2 text-muted small"></span>
                                         }
@@ -233,17 +347,26 @@
                                     <div class="rating-bar">
                                         <div class="rating-fill" style="width: @(rating * 10)%; background-color: @dimension.Color;"></div>
                                     </div>
+                                    @{
+                                        var tasks = _taskListByDimension.GetValueOrDefault(dimension.Id, new List<TodoTask>());
+                                        var projects = _projectsByDimension.GetValueOrDefault(dimension.Id, new List<Project>());
+                                        var hasItems = tasksCount > 0 || goals.Any() || projects.Any();
+                                    }
                                     <div class="area-stats">
-                                        @if (tasksCount > 0 || goals.Any())
+                                        @if (hasItems)
                                         {
                                             <span class="text-muted small">
-                                                @if (tasksCount > 0)
-                                                {
-                                                    <span><span class="oi oi-task me-1"></span>@tasksCount tasks</span>
-                                                }
                                                 @if (goals.Any())
                                                 {
-                                                    <span class="ms-2"><span class="oi oi-target me-1"></span>@goals.Count goals</span>
+                                                    <span><span class="oi oi-target me-1"></span>@goals.Count goal@(goals.Count != 1 ? "s" : "")</span>
+                                                }
+                                                @if (projects.Any())
+                                                {
+                                                    <span class="@(goals.Any() ? "ms-2" : "")"><span class="oi oi-folder me-1"></span>@projects.Count project@(projects.Count != 1 ? "s" : "")</span>
+                                                }
+                                                @if (tasksCount > 0)
+                                                {
+                                                    <span class="@(goals.Any() || projects.Any() ? "ms-2" : "")"><span class="oi oi-task me-1"></span>@tasksCount task@(tasksCount != 1 ? "s" : "")</span>
                                                 }
                                             </span>
                                         }
@@ -253,102 +376,73 @@
                                         }
                                     </div>
 
-                                    @* Expanded goal list *@
-                                    @if (isExpanded && goals.Any())
+                                    @* Expanded items list *@
+                                    @if (isExpanded && hasItems)
                                     {
-                                        <div class="dimension-goals">
-                                            @foreach (var goal in goals.Take(5))
+                                        <div class="dimension-items">
+                                            @if (goals.Any())
                                             {
-                                                <div class="linked-goal" @onclick="() => NavigateToGoal(goal.Id)" @onclick:stopPropagation="true">
-                                                    <span class="oi oi-target me-2" style="color: @dimension.Color;"></span>
-                                                    <span class="goal-title">@goal.Title</span>
-                                                    <span class="goal-progress">@goal.ProgressPercent%</span>
+                                                <div class="item-section">
+                                                    <div class="item-section-header">
+                                                        <span class="oi oi-target me-1"></span>Goals
+                                                    </div>
+                                                    @foreach (var goal in goals.Take(3))
+                                                    {
+                                                        <div class="linked-item goal" @onclick="() => NavigateToGoal(goal.Id)" @onclick:stopPropagation="true">
+                                                            <span class="item-indicator" style="background-color: @dimension.Color;"></span>
+                                                            <span class="item-title">@goal.Title</span>
+                                                            <span class="item-meta">@goal.ProgressPercent%</span>
+                                                        </div>
+                                                    }
+                                                    @if (goals.Count > 3)
+                                                    {
+                                                        <div class="more-items text-muted small">+@(goals.Count - 3) more</div>
+                                                    }
                                                 </div>
                                             }
-                                            @if (goals.Count > 5)
+                                            @if (projects.Any())
                                             {
-                                                <div class="more-goals text-muted small">
-                                                    +@(goals.Count - 5) more goals
+                                                <div class="item-section">
+                                                    <div class="item-section-header">
+                                                        <span class="oi oi-folder me-1"></span>Projects
+                                                    </div>
+                                                    @foreach (var project in projects.Take(3))
+                                                    {
+                                                        <div class="linked-item project" @onclick="() => NavigateToProject(project.Id)" @onclick:stopPropagation="true">
+                                                            <span class="item-indicator" style="background-color: var(--color-primary);"></span>
+                                                            <span class="item-title">@project.Name</span>
+                                                            <span class="item-meta badge @GetProjectStatusBadge(project.Status)">@project.Status</span>
+                                                        </div>
+                                                    }
+                                                    @if (projects.Count > 3)
+                                                    {
+                                                        <div class="more-items text-muted small">+@(projects.Count - 3) more</div>
+                                                    }
+                                                </div>
+                                            }
+                                            @if (tasks.Any())
+                                            {
+                                                <div class="item-section">
+                                                    <div class="item-section-header">
+                                                        <span class="oi oi-task me-1"></span>Tasks
+                                                    </div>
+                                                    @foreach (var task in tasks.Take(3))
+                                                    {
+                                                        <div class="linked-item task" @onclick="() => NavigateToTask(task.Id)" @onclick:stopPropagation="true">
+                                                            <span class="item-indicator" style="background-color: var(--color-warning);"></span>
+                                                            <span class="item-title">@task.Title</span>
+                                                            <span class="item-meta badge @GetTaskPriorityBadge(task.Priority)">P@(task.Priority)</span>
+                                                        </div>
+                                                    }
+                                                    @if (tasks.Count > 3)
+                                                    {
+                                                        <div class="more-items text-muted small">+@(tasks.Count - 3) more</div>
+                                                    }
                                                 </div>
                                             }
                                         </div>
                                     }
                                 </div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            @* Insights *@
-            <div class="row">
-                <div class="col-12">
-                    <div class="balance-insights">
-                        <h5 class="mb-3"><span class="oi oi-lightbulb me-2"></span>Insights</h5>
-                        <div class="insights-grid">
-                            @{
-                                var lowestDimension = _dimensions.OrderBy(d => _ratings.GetValueOrDefault(d.Id, 0)).FirstOrDefault();
-                                var highestDimension = _dimensions.OrderByDescending(d => _ratings.GetValueOrDefault(d.Id, 0)).FirstOrDefault();
-                                var avgRating = GetOverallScore();
-                                var variance = CalculateVariance();
-                            }
-
-                            @if (lowestDimension != null && _ratings.GetValueOrDefault(lowestDimension.Id, 0) < 5)
-                            {
-                                <div class="insight-card needs-attention">
-                                    <span class="oi oi-target me-2"></span>
-                                    <strong>@lowestDimension.Name</strong> needs attention (rated @_ratings.GetValueOrDefault(lowestDimension.Id, 0)/10).
-                                    Consider setting goals in this area.
-                                </div>
-                            }
-
-                            @if (highestDimension != null && _ratings.GetValueOrDefault(highestDimension.Id, 0) >= 8)
-                            {
-                                <div class="insight-card strength">
-                                    <span class="oi oi-star me-2"></span>
-                                    <strong>@highestDimension.Name</strong> is a strength (rated @_ratings.GetValueOrDefault(highestDimension.Id, 0)/10).
-                                    Great job maintaining this area!
-                                </div>
-                            }
-
-                            @if (variance > 4)
-                            {
-                                <div class="insight-card imbalance">
-                                    <span class="oi oi-warning me-2"></span>
-                                    High imbalance detected. Consider focusing on neglected areas for better overall wellbeing.
-                                </div>
-                            }
-                            else if (variance < 2 && avgRating >= 6)
-                            {
-                                <div class="insight-card balanced">
-                                    <span class="oi oi-check me-2"></span>
-                                    Good balance! Your @GetModeLabel().ToLower() areas are fairly well-distributed.
-                                </div>
-                            }
-
-                            @{
-                                var dimensionsWithoutGoals = _dimensions.Where(d =>
-                                    !_goalsByDimension.GetValueOrDefault(d.Id, new List<Goal>()).Any() &&
-                                    _ratings.GetValueOrDefault(d.Id, 0) < 6).ToList();
-                            }
-                            @if (dimensionsWithoutGoals.Any())
-                            {
-                                <div class="insight-card suggestion">
-                                    <span class="oi oi-plus me-2"></span>
-                                    Consider creating goals for: @string.Join(", ", dimensionsWithoutGoals.Take(3).Select(d => d.Name))
-                                </div>
-                            }
-
-                            @if (_lastAssessmentDate.HasValue)
-                            {
-                                var daysSince = (DateTime.Today - _lastAssessmentDate.Value.Date).Days;
-                                @if (daysSince > 14)
-                                {
-                                    <div class="insight-card reminder">
-                                        <span class="oi oi-clock me-2"></span>
-                                        It's been @daysSince days since your last assessment. Consider updating your ratings.
-                                    </div>
-                                }
                             }
                         </div>
                     </div>
@@ -361,15 +455,22 @@
 @code {
     private bool _isLoading = true;
     private bool _showAssessment = false;
+    private bool _showInsights = true;
     private int _currentAreaIndex = 0;
     private Dictionary<string, int> _currentRatings = new();
     private Dictionary<string, int> _ratings = new();
     private Dictionary<string, int> _tasksByDimension = new();
+    private Dictionary<string, List<TodoTask>> _taskListByDimension = new();
     private Dictionary<string, List<Goal>> _goalsByDimension = new();
+    private Dictionary<string, List<Project>> _projectsByDimension = new();
     private DateTime? _lastAssessmentDate;
     private AppMode _currentMode = AppMode.Balanced;
     private List<BalanceDimension> _dimensions = new();
     private string? _expandedDimension;
+
+    // For AI panel
+    private IReadOnlyList<Goal> _activeGoals = Array.Empty<Goal>();
+    private IReadOnlyList<TodoTask> _activeTasks = Array.Empty<TodoTask>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -399,11 +500,13 @@
             // Load goals and tasks
             var allGoals = await GoalRepository.GetAllAsync();
             var activeGoals = allGoals.Where(g => g.Status != GoalStatus.Completed && g.Status != GoalStatus.Archived).ToList();
+            _activeGoals = activeGoals;
 
             var tasks = await TaskService.GetAllAsync();
             var activeTasks = tasks.Where(t =>
                 t.Status != TodoTaskStatus.Completed &&
                 t.Status != TodoTaskStatus.Deleted).ToList();
+            _activeTasks = activeTasks;
 
             // Group goals by dimension
             _goalsByDimension = new Dictionary<string, List<Goal>>();
@@ -422,13 +525,30 @@
                 _goalsByDimension[dimension.Id] = linkedGoals.Concat(categoryMappedGoals).ToList();
             }
 
-            // Count tasks by dimension (using category/keyword mapping)
+            // Load projects
+            var allProjects = await ProjectService.GetAllAsync();
+            var activeProjects = allProjects.Where(p =>
+                p.Status != ProjectStatus.Completed &&
+                p.Status != ProjectStatus.Deleted).ToList();
+
+            // Group tasks by dimension (using category/keyword mapping)
             _tasksByDimension = new Dictionary<string, int>();
+            _taskListByDimension = new Dictionary<string, List<TodoTask>>();
             foreach (var dimension in _dimensions)
             {
-                var count = activeTasks.Count(t =>
-                    MatchesDimension(t.Category, t.Title, dimension));
-                _tasksByDimension[dimension.Id] = count;
+                var matchingTasks = activeTasks.Where(t =>
+                    MatchesDimension(t.Category, t.Title, dimension)).ToList();
+                _tasksByDimension[dimension.Id] = matchingTasks.Count;
+                _taskListByDimension[dimension.Id] = matchingTasks;
+            }
+
+            // Group projects by dimension (using category/keyword mapping)
+            _projectsByDimension = new Dictionary<string, List<Project>>();
+            foreach (var dimension in _dimensions)
+            {
+                var matchingProjects = activeProjects.Where(p =>
+                    MatchesDimension(p.Category, p.Name, dimension)).ToList();
+                _projectsByDimension[dimension.Id] = matchingProjects;
             }
         }
         finally
@@ -557,21 +677,16 @@
 
     private double GetOverallScore()
     {
-        if (!_ratings.Any()) return 0;
-        var dimensionIds = _dimensions.Select(d => d.Id).ToHashSet();
-        var relevantRatings = _ratings.Where(r => dimensionIds.Contains(r.Key)).ToList();
-        if (!relevantRatings.Any()) return 0;
-        return relevantRatings.Average(r => r.Value);
+        if (!_dimensions.Any()) return 0;
+        return _dimensions.Average(d => GetEffectiveRating(d.Id));
     }
 
     private double CalculateVariance()
     {
-        if (!_ratings.Any()) return 0;
-        var dimensionIds = _dimensions.Select(d => d.Id).ToHashSet();
-        var relevantRatings = _ratings.Where(r => dimensionIds.Contains(r.Key)).Select(r => r.Value).ToList();
-        if (!relevantRatings.Any()) return 0;
-        var avg = relevantRatings.Average();
-        return relevantRatings.Select(r => Math.Pow(r - avg, 2)).Average();
+        if (!_dimensions.Any()) return 0;
+        var ratings = _dimensions.Select(d => (double)GetEffectiveRating(d.Id)).ToList();
+        var avg = ratings.Average();
+        return ratings.Select(r => Math.Pow(r - avg, 2)).Average();
     }
 
     private string GetRatingColor(int rating) => rating switch
@@ -581,4 +696,93 @@
         >= 4 => "#f97316",
         _ => "#ef4444"
     };
+
+    private int GetEffectiveRating(string dimensionId)
+    {
+        // If user has rated this dimension, use their rating
+        if (_ratings.TryGetValue(dimensionId, out var userRating))
+        {
+            return userRating;
+        }
+
+        // Otherwise, calculate based on linked goals and tasks
+        var goals = _goalsByDimension.GetValueOrDefault(dimensionId, new List<Goal>());
+        var tasksCount = _tasksByDimension.GetValueOrDefault(dimensionId, 0);
+
+        // Calculate a score based on activity in this dimension
+        // Each goal = 2 points, each task = 0.5 points, capped at 8
+        // Base score of 3 to not make empty areas look alarming
+        var activityScore = 3 + (goals.Count * 2) + (tasksCount * 0.5);
+
+        // Boost score if goals have good progress
+        var avgGoalProgress = goals.Any() ? goals.Average(g => g.ProgressPercent) : 0;
+        var progressBonus = avgGoalProgress / 25; // Up to 4 points for 100% progress
+
+        var calculatedRating = (int)Math.Min(10, Math.Max(1, activityScore + progressBonus));
+        return calculatedRating;
+    }
+
+    private void ToggleInsights()
+    {
+        _showInsights = !_showInsights;
+    }
+
+    private int GetInsightCount()
+    {
+        var count = 0;
+        var lowestDimension = _dimensions.OrderBy(d => GetEffectiveRating(d.Id)).FirstOrDefault();
+        var highestDimension = _dimensions.OrderByDescending(d => GetEffectiveRating(d.Id)).FirstOrDefault();
+        var variance = CalculateVariance();
+        var avgRating = GetOverallScore();
+
+        if (lowestDimension != null && GetEffectiveRating(lowestDimension.Id) < 5) count++;
+        if (highestDimension != null && GetEffectiveRating(highestDimension.Id) >= 8) count++;
+        if (variance > 4) count++;
+        else if (variance < 2 && avgRating >= 6) count++;
+
+        var dimensionsWithoutGoals = _dimensions.Where(d =>
+            !_goalsByDimension.GetValueOrDefault(d.Id, new List<Goal>()).Any() &&
+            GetEffectiveRating(d.Id) < 6).ToList();
+        if (dimensionsWithoutGoals.Any()) count++;
+
+        return count;
+    }
+
+    private void NavigateToProject(Guid projectId)
+    {
+        Navigation.NavigateTo($"/projects/{projectId}");
+    }
+
+    private void NavigateToTask(Guid taskId)
+    {
+        Navigation.NavigateTo($"/tasks/{taskId}");
+    }
+
+    private string GetProjectStatusBadge(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Active => "bg-primary",
+        ProjectStatus.OnHold => "bg-warning text-dark",
+        ProjectStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetTaskPriorityBadge(int priority) => priority switch
+    {
+        1 => "bg-danger",
+        2 => "bg-warning text-dark",
+        3 => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private async Task HandleTasksCreated()
+    {
+        await LoadData();
+        DataChangeNotification.NotifyDataChanged();
+    }
+
+    private async Task HandleGoalCreated()
+    {
+        await LoadData();
+        DataChangeNotification.NotifyDataChanged();
+    }
 }

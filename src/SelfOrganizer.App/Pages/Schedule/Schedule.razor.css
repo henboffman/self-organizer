@@ -123,7 +123,7 @@
 .event-time {
     font-weight: 600;
     opacity: 0.8;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
 }
 
 .event-title {
@@ -135,7 +135,7 @@
 }
 
 .event-location {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     opacity: 0.7;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -184,11 +184,11 @@
     }
 
     .hour-label {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
     }
 
     .timeline-event {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         padding: 2px 4px;
     }
 }

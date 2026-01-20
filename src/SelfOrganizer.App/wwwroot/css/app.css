@@ -59,9 +59,10 @@ p {
 
 /* ----------------------------------------
    Links
+   Using --color-primary-text for WCAG AA compliant contrast
    ---------------------------------------- */
 a {
-    color: var(--color-primary);
+    color: var(--color-primary-text);
     text-decoration: none;
     transition: color var(--transition-fast);
 }
@@ -73,7 +74,7 @@ a:focus {
 }
 
 .btn-link {
-    color: var(--color-primary);
+    color: var(--color-primary-text);
 }
 
 .btn-link:hover {
@@ -127,9 +128,16 @@ a:focus {
 }
 
 .btn-success {
-    background-color: var(--color-success);
-    border-color: var(--color-success);
-    color: var(--text-on-primary);
+    background-color: #047857;  /* Darker green for 4.5:1 contrast with white */
+    border-color: #047857;
+    color: white;
+}
+
+.btn-success:hover,
+.btn-success:focus {
+    background-color: #065f46;
+    border-color: #065f46;
+    color: white;
 }
 
 .btn-danger {
@@ -145,7 +153,7 @@ a:focus {
 }
 
 .btn-outline-primary {
-    color: var(--color-primary);
+    color: var(--text-primary);
     border-color: var(--color-primary);
     background-color: transparent;
 }
@@ -153,29 +161,38 @@ a:focus {
 .btn-outline-primary:hover {
     background-color: var(--color-primary);
     border-color: var(--color-primary);
-    color: var(--text-on-primary);
+    color: white;
 }
 
 .btn-outline-secondary {
-    color: var(--color-secondary);
-    border-color: var(--color-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-strong, var(--color-secondary));
     background-color: transparent;
 }
 
 .btn-outline-secondary:hover {
     background-color: var(--color-secondary);
-    color: var(--text-on-primary);
+    border-color: var(--color-secondary);
+    color: white;
+}
+
+.btn-outline-secondary.disabled,
+.btn-outline-secondary:disabled {
+    color: var(--text-secondary);
+    border-color: var(--border-default);
+    opacity: 1;
 }
 
 .btn-outline-danger {
-    color: var(--color-danger);
+    color: var(--color-danger-light, var(--color-danger));
     border-color: var(--color-danger);
     background-color: transparent;
 }
 
 .btn-outline-danger:hover {
     background-color: var(--color-danger);
-    color: var(--text-on-primary);
+    border-color: var(--color-danger);
+    color: white;
 }
 
 /* ----------------------------------------
@@ -226,6 +243,55 @@ a:focus {
 .form-floating > .form-control-plaintext::placeholder,
 .form-floating > .form-control::placeholder {
     color: var(--input-placeholder);
+}
+
+.input-group-text {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--input-border);
+    color: var(--text-secondary);
+}
+
+/* ----------------------------------------
+   Bootstrap Utility Overrides
+   ---------------------------------------- */
+.bg-body {
+    background-color: var(--bg-primary) !important;
+}
+
+.bg-body-secondary {
+    background-color: var(--bg-secondary) !important;
+}
+
+.bg-body-tertiary {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.text-body {
+    color: var(--text-primary) !important;
+}
+
+.text-body-secondary {
+    color: var(--text-secondary) !important;
+}
+
+.text-body-tertiary {
+    color: var(--text-muted) !important;
+}
+
+.border {
+    border-color: var(--border-default) !important;
+}
+
+.border-top,
+.border-bottom,
+.border-start,
+.border-end {
+    border-color: var(--border-default) !important;
+}
+
+/* Flex utilities */
+.min-width-0 {
+    min-width: 0;
 }
 
 /* ----------------------------------------
@@ -294,9 +360,9 @@ a:focus {
 }
 
 .alert-info {
-    background-color: var(--color-info-bg);
-    border-color: var(--color-info-border);
-    color: var(--color-info);
+    background-color: var(--color-info);
+    border-color: var(--color-info);
+    color: white;
 }
 
 /* ----------------------------------------
@@ -310,32 +376,58 @@ a:focus {
 .badge.bg-primary,
 .bg-primary {
     background-color: var(--color-primary) !important;
+    color: white !important;
 }
 
 .badge.bg-secondary,
 .bg-secondary {
-    background-color: var(--text-muted) !important;
+    background-color: var(--color-secondary, #6c757d) !important;
+    color: white !important;
 }
 
 .badge.bg-success,
 .bg-success {
     background-color: var(--color-success) !important;
+    color: white !important;
 }
 
 .badge.bg-danger,
 .bg-danger {
     background-color: var(--color-danger) !important;
+    color: white !important;
 }
 
 .badge.bg-warning,
 .bg-warning {
     background-color: var(--color-warning) !important;
-    color: var(--text-primary) !important;
+    color: #000 !important;
 }
 
 .badge.bg-info,
 .bg-info {
     background-color: var(--color-info) !important;
+    color: white !important;
+}
+
+/* Light badge that works in both light and dark modes */
+.badge.bg-light {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-default);
+}
+
+.badge.bg-light.text-dark {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-default);
+}
+
+/* Status badge - ensures proper contrast in all themes */
+.badge.status-badge {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-default);
+    font-weight: 500;
 }
 
 /* ----------------------------------------
@@ -355,6 +447,32 @@ a:focus {
 
 .table-hover > tbody > tr:hover {
     background-color: var(--bg-tertiary);
+}
+
+/* ----------------------------------------
+   Breadcrumbs
+   ---------------------------------------- */
+.breadcrumb {
+    background-color: transparent;
+    margin-bottom: 0;
+}
+
+.breadcrumb-item a {
+    color: var(--color-primary-text);
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+    color: var(--text-primary);
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    color: var(--text-muted);
 }
 
 /* ----------------------------------------
@@ -440,6 +558,48 @@ a:focus {
 }
 
 /* ----------------------------------------
+   Navigation Tabs
+   ---------------------------------------- */
+.nav-tabs {
+    border-bottom-color: var(--border-default);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--text-primary);
+    border-color: var(--border-muted) var(--border-muted) var(--border-default);
+    background-color: var(--bg-secondary);
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--bg-primary);
+    border-color: var(--border-default) var(--border-default) var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.nav-pills .nav-link {
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+}
+
+.nav-pills .nav-link:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+}
+
+.nav-pills .nav-link.active {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+/* ----------------------------------------
    List Groups
    ---------------------------------------- */
 .list-group-item {
@@ -450,6 +610,50 @@ a:focus {
 
 .list-group-item-action:hover {
     background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Selection highlighting - subtle, not jarring white */
+.list-group-item-info,
+.list-group-item.list-group-item-info {
+    background-color: var(--color-primary-subtle) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item-info:hover {
+    background-color: var(--color-primary-subtle) !important;
+}
+
+/* Contextual list group items - themed for dark mode */
+.list-group-item-success {
+    background-color: var(--color-success-bg) !important;
+    border-color: var(--color-success-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item-warning {
+    background-color: var(--color-warning-bg) !important;
+    border-color: var(--color-warning-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item-danger {
+    background-color: var(--color-danger-bg) !important;
+    border-color: var(--color-danger-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item-primary {
+    background-color: var(--color-primary-subtle) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item-secondary {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
 }
 
 /* Keyboard navigation focus state */
@@ -803,4 +1007,80 @@ pre {
 
 [data-bs-theme="dark"] .tag-styled {
     background-color: rgba(var(--bs-primary-rgb), 0.2);
+}
+
+/* ----------------------------------------
+   Skeleton Loading
+   ---------------------------------------- */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 0%,
+        var(--border-default) 50%,
+        var(--bg-tertiary) 100%
+    );
+    background-size: 200% 100%;
+    border-radius: var(--radius-sm);
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.skeleton-text {
+    height: 1em;
+    margin-bottom: 0.5em;
+}
+
+.skeleton-text-sm {
+    height: 0.75em;
+}
+
+.skeleton-text-lg {
+    height: 1.5em;
+}
+
+.skeleton-title {
+    height: 1.25em;
+    width: 70%;
+    margin-bottom: 0.75em;
+}
+
+.skeleton-badge {
+    height: 1.5em;
+    width: 3em;
+    border-radius: var(--radius-full);
+    display: inline-block;
+}
+
+.skeleton-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+}
+
+.skeleton-stat {
+    height: 2.5rem;
+    width: 3rem;
+    margin: 0 auto 0.5rem;
+}
+
+.skeleton-tag {
+    height: 1.75em;
+    width: 5em;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    margin: 0.25em;
+}
+
+.skeleton-search {
+    height: 2.5rem;
+    border-radius: var(--radius-md);
 }

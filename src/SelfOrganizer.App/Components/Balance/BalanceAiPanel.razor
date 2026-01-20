@@ -1,0 +1,572 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Services.Intelligence
+@inject IBalanceAiService BalanceAiService
+@inject ITaskService TaskService
+@inject IGoalService GoalService
+@inject IToastService ToastService
+@inject NavigationManager NavigationManager
+
+<div class="balance-ai-panel @(_isExpanded ? "expanded" : "collapsed")">
+    <div class="ai-panel-header" @onclick="ToggleExpanded">
+        <div class="header-left">
+            <span class="oi oi-lightbulb"></span>
+            <span class="header-title">AI Recommendations</span>
+            @if (_isAiAvailable.HasValue)
+            {
+                <span class="status-badge @(_isAiAvailable.Value ? "online" : "offline")">
+                    @(_isAiAvailable.Value ? "Ready" : "Offline")
+                </span>
+            }
+        </div>
+        <div class="header-right">
+            @if (_recommendations != null)
+            {
+                <span class="results-count">@GetTotalSuggestionsCount() suggestions</span>
+            }
+            <span class="oi @(_isExpanded ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+        </div>
+    </div>
+
+    @if (_isExpanded)
+    {
+        <div class="ai-panel-body">
+            @if (_isCheckingAi)
+            {
+                <div class="loading-state">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <span>Checking AI availability...</span>
+                </div>
+            }
+            else if (_isAiAvailable == false)
+            {
+                <div class="offline-state">
+                    <span class="oi oi-warning"></span>
+                    <p>AI features require Ollama to be running locally.</p>
+                    <a href="/settings" class="btn btn-sm btn-outline-primary">Configure in Settings</a>
+                </div>
+            }
+            else if (_isGenerating)
+            {
+                <div class="generating-state">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Analyzing your balance and generating recommendations...</p>
+                    <small class="text-muted">This may take a moment</small>
+                </div>
+            }
+            else if (_recommendations == null)
+            {
+                @* Pre-generation: Show options and generate button *@
+                <div class="pre-generate">
+                    <p class="description">Get AI-powered suggestions based on your current life balance ratings and existing goals/tasks.</p>
+
+                    <div class="preference-toggles">
+                        <label class="toggle-item">
+                            <input type="checkbox" @bind="SuggestTasks" />
+                            <span>Suggest Tasks</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" @bind="SuggestGoals" />
+                            <span>Suggest Goals</span>
+                        </label>
+                        <label class="toggle-item">
+                            <input type="checkbox" @bind="ShowInsights" />
+                            <span>Show Insights</span>
+                        </label>
+                    </div>
+
+                    <div class="threshold-setting">
+                        <label>Focus on dimensions rated</label>
+                        <select class="form-select form-select-sm" @bind="Threshold">
+                            <option value="3">3 or below (Critical)</option>
+                            <option value="5">5 or below (Needs attention)</option>
+                            <option value="7">7 or below (Room to grow)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary generate-btn" @onclick="GenerateRecommendations" disabled="@(!CanGenerate)">
+                        <span class="oi oi-bolt me-1"></span>
+                        Generate Recommendations
+                    </button>
+                </div>
+            }
+            else
+            {
+                @* Post-generation: Show results *@
+                <div class="recommendations-content">
+                    @* Overall Assessment *@
+                    @if (!string.IsNullOrEmpty(_recommendations.OverallAssessment))
+                    {
+                        <div class="overall-assessment">
+                            <p>@((MarkupString)ConvertMarkdownToHtml(_recommendations.OverallAssessment))</p>
+                        </div>
+                    }
+
+                    @* Error Message *@
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            <span class="oi oi-warning me-1"></span> @_errorMessage
+                        </div>
+                    }
+
+                    @* Suggested Tasks Section *@
+                    @if (_recommendations.SuggestedTasks.Any())
+                    {
+                        <div class="suggestion-section">
+                            <div class="section-header" @onclick="() => _showTasks = !_showTasks">
+                                <span class="oi oi-task me-1"></span>
+                                <span>Suggested Tasks</span>
+                                <span class="badge">@_recommendations.SuggestedTasks.Count</span>
+                                <span class="oi @(_showTasks ? "oi-chevron-top" : "oi-chevron-bottom") ms-auto"></span>
+                            </div>
+
+                            @if (_showTasks)
+                            {
+                                <div class="section-content">
+                                    @foreach (var task in _recommendations.SuggestedTasks)
+                                    {
+                                        var dimension = GetDimension(task.DimensionId);
+                                        <div class="suggestion-card task-card @(task.IsSelected ? "selected" : "")">
+                                            <div class="card-header">
+                                                <input type="checkbox" @bind="task.IsSelected" class="form-check-input" />
+                                                <span class="dimension-badge" style="background-color: @(dimension?.Color ?? "#6b7280")">
+                                                    @(dimension?.Name ?? task.DimensionId)
+                                                </span>
+                                            </div>
+                                            <div class="card-body">
+                                                <h6 class="card-title">@task.Title</h6>
+                                                @if (!string.IsNullOrEmpty(task.Description))
+                                                {
+                                                    <p class="card-description">@((MarkupString)ConvertMarkdownToHtml(task.Description))</p>
+                                                }
+                                                <div class="card-meta">
+                                                    <span class="meta-item">
+                                                        <span class="oi oi-clock"></span> @task.EstimatedMinutes min
+                                                    </span>
+                                                    @if (task.SuggestedContexts.Any())
+                                                    {
+                                                        @foreach (var ctx in task.SuggestedContexts.Take(2))
+                                                        {
+                                                            <span class="context-tag">@ctx</span>
+                                                        }
+                                                    }
+                                                </div>
+                                                <details class="rationale-details">
+                                                    <summary>Why this task?</summary>
+                                                    <p>@((MarkupString)ConvertMarkdownToHtml(task.Rationale))</p>
+                                                </details>
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <div class="bulk-actions">
+                                        <div class="selection-controls">
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="SelectAllTasks">Select All</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="DeselectAllTasks">Deselect All</button>
+                                        </div>
+                                        <button class="btn btn-success" @onclick="CreateSelectedTasks"
+                                                disabled="@(!_recommendations.SuggestedTasks.Any(t => t.IsSelected))">
+                                            <span class="oi oi-plus me-1"></span>
+                                            Create @_recommendations.SuggestedTasks.Count(t => t.IsSelected) Tasks
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Suggested Goals Section *@
+                    @if (_recommendations.SuggestedGoals.Any())
+                    {
+                        <div class="suggestion-section">
+                            <div class="section-header" @onclick="() => _showGoals = !_showGoals">
+                                <span class="oi oi-target me-1"></span>
+                                <span>Suggested Goals</span>
+                                <span class="badge">@_recommendations.SuggestedGoals.Count</span>
+                                <span class="oi @(_showGoals ? "oi-chevron-top" : "oi-chevron-bottom") ms-auto"></span>
+                            </div>
+
+                            @if (_showGoals)
+                            {
+                                <div class="section-content">
+                                    @foreach (var goal in _recommendations.SuggestedGoals)
+                                    {
+                                        var dimension = GetDimension(goal.DimensionId);
+                                        <div class="suggestion-card goal-card @(goal.IsSelected ? "selected" : "")">
+                                            <div class="card-header">
+                                                <input type="checkbox" @bind="goal.IsSelected" class="form-check-input" />
+                                                <span class="dimension-badge" style="background-color: @(dimension?.Color ?? "#6b7280")">
+                                                    @(dimension?.Name ?? goal.DimensionId)
+                                                </span>
+                                                <span class="timeframe-badge">@goal.SuggestedTimeframe</span>
+                                            </div>
+                                            <div class="card-body">
+                                                <h6 class="card-title">@goal.Title</h6>
+                                                @if (!string.IsNullOrEmpty(goal.Description))
+                                                {
+                                                    <p class="card-description">@((MarkupString)ConvertMarkdownToHtml(goal.Description))</p>
+                                                }
+                                                @if (!string.IsNullOrEmpty(goal.DesiredOutcome))
+                                                {
+                                                    <div class="desired-outcome">
+                                                        <strong>Desired Outcome:</strong> @goal.DesiredOutcome
+                                                    </div>
+                                                }
+                                                <details class="rationale-details">
+                                                    <summary>Why this goal?</summary>
+                                                    <p>@((MarkupString)ConvertMarkdownToHtml(goal.Rationale))</p>
+                                                </details>
+                                            </div>
+                                            <div class="card-actions">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditAndCreateGoal(goal)">
+                                                    <span class="oi oi-pencil me-1"></span> Edit & Create
+                                                </button>
+                                                <button class="btn btn-sm btn-success" @onclick="() => CreateGoalDirectly(goal)">
+                                                    <span class="oi oi-plus me-1"></span> Create
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Insights Section *@
+                    @if (_recommendations.Insights.Any())
+                    {
+                        <div class="suggestion-section">
+                            <div class="section-header" @onclick="() => _showInsights = !_showInsights">
+                                <span class="oi oi-info me-1"></span>
+                                <span>Insights</span>
+                                <span class="badge">@_recommendations.Insights.Count</span>
+                                <span class="oi @(_showInsights ? "oi-chevron-top" : "oi-chevron-bottom") ms-auto"></span>
+                            </div>
+
+                            @if (_showInsights)
+                            {
+                                <div class="section-content insights-list">
+                                    @foreach (var insight in _recommendations.Insights)
+                                    {
+                                        <div class="insight-card @GetInsightTypeClass(insight.Type)">
+                                            <div class="insight-icon">
+                                                <span class="oi @GetInsightIcon(insight.Type)"></span>
+                                            </div>
+                                            <div class="insight-content">
+                                                <div class="insight-type">@insight.Type</div>
+                                                <h6 class="insight-title">@insight.Title</h6>
+                                                <p class="insight-description">@((MarkupString)ConvertMarkdownToHtml(insight.Description))</p>
+                                                @if (insight.AffectedDimensions.Any())
+                                                {
+                                                    <div class="affected-dimensions">
+                                                        @foreach (var dimId in insight.AffectedDimensions)
+                                                        {
+                                                            var dim = GetDimension(dimId);
+                                                            <span class="dimension-tag" style="border-color: @(dim?.Color ?? "#6b7280")">
+                                                                @(dim?.Name ?? dimId)
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Panel Actions *@
+                    <div class="panel-actions">
+                        <button class="btn btn-outline-secondary" @onclick="RegenerateRecommendations">
+                            <span class="oi oi-reload me-1"></span> Regenerate
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="DismissAll">
+                            <span class="oi oi-x me-1"></span> Dismiss
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Dictionary<string, int> Ratings { get; set; } = new();
+
+    [Parameter]
+    public IReadOnlyList<BalanceDimension> Dimensions { get; set; } = Array.Empty<BalanceDimension>();
+
+    [Parameter]
+    public IReadOnlyList<Goal> ActiveGoals { get; set; } = Array.Empty<Goal>();
+
+    [Parameter]
+    public IReadOnlyList<TodoTask> ActiveTasks { get; set; } = Array.Empty<TodoTask>();
+
+    [Parameter]
+    public AppMode CurrentMode { get; set; } = AppMode.Balanced;
+
+    [Parameter]
+    public bool SuggestTasks { get; set; } = true;
+
+    [Parameter]
+    public bool SuggestGoals { get; set; } = true;
+
+    [Parameter]
+    public bool ShowInsights { get; set; } = true;
+
+    [Parameter]
+    public int Threshold { get; set; } = 5;
+
+    [Parameter]
+    public EventCallback OnTasksCreated { get; set; }
+
+    [Parameter]
+    public EventCallback OnGoalCreated { get; set; }
+
+    private bool _isExpanded = true;
+    private bool _isCheckingAi = true;
+    private bool? _isAiAvailable;
+    private bool _isGenerating;
+    private string? _errorMessage;
+
+    private BalanceRecommendationResult? _recommendations;
+    private bool _showTasks = true;
+    private bool _showGoals = true;
+    private bool _showInsights = true;
+
+    private bool CanGenerate => _isAiAvailable == true && (SuggestTasks || SuggestGoals || ShowInsights);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAiAvailability();
+    }
+
+    private async Task CheckAiAvailability()
+    {
+        _isCheckingAi = true;
+        try
+        {
+            _isAiAvailable = await BalanceAiService.IsAvailableAsync();
+        }
+        catch
+        {
+            _isAiAvailable = false;
+        }
+        finally
+        {
+            _isCheckingAi = false;
+        }
+    }
+
+    private void ToggleExpanded()
+    {
+        _isExpanded = !_isExpanded;
+    }
+
+    private async Task GenerateRecommendations()
+    {
+        _isGenerating = true;
+        _errorMessage = null;
+        _recommendations = null;
+        StateHasChanged();
+
+        try
+        {
+            var request = new BalanceRecommendationRequest
+            {
+                Ratings = Ratings,
+                Dimensions = Dimensions,
+                ActiveGoals = ActiveGoals,
+                ActiveTasks = ActiveTasks,
+                CurrentMode = CurrentMode,
+                SuggestTasks = SuggestTasks,
+                SuggestGoals = SuggestGoals,
+                ShowInsights = ShowInsights,
+                Threshold = Threshold
+            };
+
+            _recommendations = await BalanceAiService.GenerateRecommendationsAsync(request);
+
+            if (_recommendations == null)
+            {
+                _errorMessage = "AI could not generate recommendations. Please try again.";
+            }
+        }
+        catch (TimeoutException)
+        {
+            _errorMessage = "AI request timed out. The model may still be loading - please try again in a moment.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RegenerateRecommendations()
+    {
+        await GenerateRecommendations();
+    }
+
+    private void DismissAll()
+    {
+        _recommendations = null;
+        _errorMessage = null;
+    }
+
+    private void SelectAllTasks()
+    {
+        if (_recommendations?.SuggestedTasks != null)
+        {
+            foreach (var task in _recommendations.SuggestedTasks)
+                task.IsSelected = true;
+        }
+    }
+
+    private void DeselectAllTasks()
+    {
+        if (_recommendations?.SuggestedTasks != null)
+        {
+            foreach (var task in _recommendations.SuggestedTasks)
+                task.IsSelected = false;
+        }
+    }
+
+    private async Task CreateSelectedTasks()
+    {
+        if (_recommendations?.SuggestedTasks == null) return;
+
+        var selectedTasks = _recommendations.SuggestedTasks.Where(t => t.IsSelected).ToList();
+        var createdCount = 0;
+
+        foreach (var suggested in selectedTasks)
+        {
+            var task = new TodoTask
+            {
+                Title = suggested.Title,
+                Description = suggested.Description,
+                EstimatedMinutes = suggested.EstimatedMinutes,
+                Priority = suggested.Priority,
+                Contexts = suggested.SuggestedContexts,
+                Status = TodoTaskStatus.NextAction,
+                Tags = new List<string> { "ai-suggested", $"balance:{suggested.DimensionId}" },
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow
+            };
+
+            await TaskService.CreateAsync(task);
+            createdCount++;
+        }
+
+        // Remove created tasks from suggestions
+        foreach (var created in selectedTasks)
+        {
+            _recommendations.SuggestedTasks.Remove(created);
+        }
+
+        ToastService.ShowSuccess($"Created {createdCount} task{(createdCount != 1 ? "s" : "")}");
+        await OnTasksCreated.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private async Task CreateGoalDirectly(SuggestedGoal suggested)
+    {
+        var timeframe = suggested.SuggestedTimeframe switch
+        {
+            "Week" => GoalTimeframe.Week,
+            "Month" => GoalTimeframe.Month,
+            "Quarter" => GoalTimeframe.Quarter,
+            "Year" => GoalTimeframe.Year,
+            _ => GoalTimeframe.Quarter
+        };
+
+        var goal = new Goal
+        {
+            Title = suggested.Title,
+            Description = suggested.Description,
+            DesiredOutcome = suggested.DesiredOutcome,
+            Timeframe = timeframe,
+            Category = GoalCategory.Personal,
+            Status = GoalStatus.Active,
+            BalanceDimensionIds = new List<string> { suggested.DimensionId },
+            Tags = new List<string> { "ai-suggested" },
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        await GoalService.CreateAsync(goal);
+
+        // Remove from suggestions
+        _recommendations?.SuggestedGoals.Remove(suggested);
+
+        ToastService.ShowSuccess($"Goal '{goal.Title}' created");
+        await OnGoalCreated.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private void EditAndCreateGoal(SuggestedGoal suggested)
+    {
+        // Navigate to goals page with pre-filled data
+        var queryParams = new Dictionary<string, string>
+        {
+            ["title"] = suggested.Title,
+            ["description"] = suggested.Description ?? "",
+            ["desiredOutcome"] = suggested.DesiredOutcome ?? "",
+            ["dimensionId"] = suggested.DimensionId,
+            ["timeframe"] = suggested.SuggestedTimeframe
+        };
+
+        var queryString = string.Join("&", queryParams.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"));
+        NavigationManager.NavigateTo($"/goals/new?{queryString}");
+    }
+
+    private int GetTotalSuggestionsCount()
+    {
+        if (_recommendations == null) return 0;
+        return _recommendations.SuggestedTasks.Count +
+               _recommendations.SuggestedGoals.Count +
+               _recommendations.Insights.Count;
+    }
+
+    private BalanceDimension? GetDimension(string dimensionId)
+    {
+        return Dimensions.FirstOrDefault(d => d.Id == dimensionId);
+    }
+
+    private static string GetInsightTypeClass(string type) => type.ToLowerInvariant() switch
+    {
+        "pattern" => "insight-pattern",
+        "strength" => "insight-strength",
+        "concern" => "insight-concern",
+        "opportunity" => "insight-opportunity",
+        _ => ""
+    };
+
+    private static string GetInsightIcon(string type) => type.ToLowerInvariant() switch
+    {
+        "pattern" => "oi-loop-circular",
+        "strength" => "oi-star",
+        "concern" => "oi-warning",
+        "opportunity" => "oi-sun",
+        _ => "oi-info"
+    };
+
+    private static string ConvertMarkdownToHtml(string markdown)
+    {
+        if (string.IsNullOrEmpty(markdown)) return "";
+
+        // Simple markdown to HTML conversion
+        return markdown
+            .Replace("**", "<strong>").Replace("**", "</strong>")
+            .Replace("*", "<em>").Replace("*", "</em>")
+            .Replace("\n\n", "</p><p>")
+            .Replace("\n", "<br>");
+    }
+}

@@ -17,6 +17,7 @@ public class Goal : BaseEntity
     public int ProgressPercent { get; set; } = 0;
     public List<Guid> LinkedProjectIds { get; set; } = new();
     public List<Guid> LinkedTaskIds { get; set; } = new();
+    public List<Guid> LinkedHabitIds { get; set; } = new();
     public List<string> Tags { get; set; } = new();
     public string? AiGeneratedPlan { get; set; }
     public DateTime? CompletedAt { get; set; }

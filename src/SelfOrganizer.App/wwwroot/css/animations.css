@@ -175,38 +175,83 @@
 
 /* ========================================
    SKELETON LOADING
+   Purple-tinted to match the app's color scheme
    ======================================== */
 
-@keyframes skeleton-shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
-}
-
-.skeleton {
-    background: linear-gradient(
+.skeleton,
+.skeleton-text,
+.skeleton-text-sm,
+.skeleton-avatar,
+.skeleton-button,
+.skeleton-card,
+.skeleton-title,
+.skeleton-badge,
+.skeleton-stat,
+.skeleton-tag {
+    background: var(--skeleton-base);
+    background-image: linear-gradient(
         90deg,
-        var(--bg-tertiary) 25%,
-        var(--bg-secondary) 50%,
-        var(--bg-tertiary) 75%
+        var(--skeleton-base) 0%,
+        var(--skeleton-highlight) 50%,
+        var(--skeleton-base) 100%
     );
     background-size: 200% 100%;
-    animation: skeleton-shimmer 1.5s infinite;
-    border-radius: var(--radius-sm);
+    background-position: 100% 0;
+    border-radius: var(--radius-md);
+    animation: skeleton-wave 2.5s ease-in-out infinite;
+}
+
+/* Light mode - subtle purple tint */
+:root {
+    --skeleton-base: rgba(167, 139, 250, 0.08);
+    --skeleton-highlight: rgba(167, 139, 250, 0.15);
+}
+
+/* Dark mode - deeper purple tint */
+[data-theme="dark"] {
+    --skeleton-base: rgba(139, 92, 246, 0.12);
+    --skeleton-highlight: rgba(167, 139, 250, 0.22);
+}
+
+@keyframes skeleton-wave {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
 }
 
 .skeleton-text {
     height: 1em;
     margin-bottom: 0.5em;
-    border-radius: var(--radius-sm);
 }
 
 .skeleton-text-sm {
     height: 0.75em;
     width: 60%;
+}
+
+.skeleton-title {
+    height: 1.25em;
+    margin-bottom: 0.5em;
+}
+
+.skeleton-badge {
+    height: 1.5em;
+    width: 2.5rem;
+    border-radius: var(--radius-full);
+}
+
+.skeleton-stat {
+    height: 2rem;
+    width: 3rem;
+    margin-bottom: 0.25em;
+}
+
+.skeleton-tag {
+    height: 1.5em;
+    border-radius: var(--radius-full);
 }
 
 .skeleton-avatar {
@@ -224,7 +269,9 @@
 .skeleton-card {
     height: 150px;
     border-radius: var(--radius-lg);
+    padding: var(--space-md);
 }
+
 
 /* ========================================
    STAGGERED LIST ANIMATIONS
@@ -424,6 +471,7 @@
    REDUCED MOTION
    ======================================== */
 
+/* Reduced motion - commented out for debugging
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -434,8 +482,18 @@
         scroll-behavior: auto !important;
     }
 
-    .skeleton {
+    .skeleton,
+    .skeleton-text,
+    .skeleton-text-sm,
+    .skeleton-avatar,
+    .skeleton-button,
+    .skeleton-card,
+    .skeleton-title,
+    .skeleton-badge,
+    .skeleton-stat,
+    .skeleton-tag {
         animation: none;
         background: var(--bg-tertiary);
     }
 }
+*/

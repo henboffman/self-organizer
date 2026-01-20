@@ -55,6 +55,21 @@ public class Habit : BaseEntity
     /// Optional: When the habit should end
     /// </summary>
     public DateTime? EndDate { get; set; }
+
+    /// <summary>
+    /// Goals this habit supports
+    /// </summary>
+    public List<Guid> LinkedGoalIds { get; set; } = new();
+
+    /// <summary>
+    /// If AI-generated, the rationale for why this habit helps
+    /// </summary>
+    public string? AiRationale { get; set; }
+
+    /// <summary>
+    /// Whether this habit was AI-suggested (vs manually created)
+    /// </summary>
+    public bool IsAiSuggested { get; set; } = false;
 }
 
 /// <summary>

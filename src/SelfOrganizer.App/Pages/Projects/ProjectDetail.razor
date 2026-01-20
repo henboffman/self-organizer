@@ -98,53 +98,79 @@ else
                     {
                         @foreach (var task in _tasks.OrderBy(t => t.Status == TodoTaskStatus.Completed).ThenBy(t => t.Priority))
                         {
-                            <div class="d-flex align-items-center py-2 border-bottom task-row">
-                                <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-secondary" : "btn-outline-success") me-2"
-                                        @onclick="() => ToggleComplete(task)" disabled="@(task.Status == TodoTaskStatus.Completed)"
-                                        title="@(task.Status == TodoTaskStatus.Completed ? "Already completed" : "Mark complete")">
-                                    <span class="oi oi-check"></span>
+                            <div class="d-flex align-items-start py-3 border-bottom task-row">
+                                <button class="btn btn-sm @(task.Status == TodoTaskStatus.Completed ? "btn-success" : "btn-outline-success") me-3"
+                                        @onclick="() => ToggleComplete(task)"
+                                        title="@(task.Status == TodoTaskStatus.Completed ? "Mark incomplete" : "Mark complete")">
+                                    <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
                                 </button>
-                                <div class="flex-grow-1">
-                                    <a href="/tasks/@task.Id" class="@(task.Status == TodoTaskStatus.Completed ? "text-decoration-line-through text-muted" : "")">
-                                        @task.Title
-                                    </a>
-                                    <div class="small text-muted">
-                                        <span class="badge bg-light text-dark">@task.Status</span>
+                                <div class="flex-grow-1 min-width-0">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <a href="/tasks/@task.Id" class="fw-medium @(task.Status == TodoTaskStatus.Completed ? "text-decoration-line-through text-muted" : "")">
+                                            @task.Title
+                                        </a>
+                                        @if (task.Priority == 1)
+                                        {
+                                            <span class="badge bg-danger">High</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(task.Description))
+                                    {
+                                        <div class="small text-muted mb-1">@(task.Description.Length > 100 ? task.Description.Substring(0, 100) + "..." : task.Description)</div>
+                                    }
+                                    <div class="d-flex align-items-center gap-2 flex-wrap small">
+                                        <span class="badge status-badge">@task.Status</span>
                                         @if (task.EstimatedMinutes > 0)
                                         {
-                                            <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                            <span class="text-muted">
+                                                <span class="oi oi-timer me-1"></span><SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
+                                            </span>
                                         }
                                         @if (task.DueDate.HasValue)
                                         {
                                             <span class="@(task.DueDate.Value < DateTime.Today ? "text-danger" : "text-muted")">
-                                                Due @task.DueDate.Value.ToString("MMM d")
+                                                <span class="oi oi-calendar me-1"></span>@task.DueDate.Value.ToString("MMM d")
                                             </span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(task.Category))
+                                        {
+                                            <span class="text-muted">
+                                                <span class="oi oi-location me-1"></span>@@@task.Category
+                                            </span>
+                                        }
+                                        @if (task.Tags.Any())
+                                        {
+                                            @foreach (var tag in task.Tags.Take(2))
+                                            {
+                                                <a href="/tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
+                                            }
+                                            @if (task.Tags.Count > 2)
+                                            {
+                                                <span class="text-muted">+@(task.Tags.Count - 2)</span>
+                                            }
                                         }
                                     </div>
                                 </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-link text-muted p-1" data-bs-toggle="dropdown" title="Task actions">
-                                            <span class="oi oi-ellipses"></span>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><a class="dropdown-item" href="/tasks/@task.Id"><span class="oi oi-eye me-2"></span>View Details</a></li>
-                                            <li><button class="dropdown-item" @onclick="() => ShowEditTaskModal(task)"><span class="oi oi-pencil me-2"></span>Quick Edit</button></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            @if (task.Status != TodoTaskStatus.NextAction)
-                                            {
-                                                <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.NextAction)"><span class="oi oi-media-play me-2"></span>Set as Next Action</button></li>
-                                            }
-                                            @if (task.Status != TodoTaskStatus.WaitingFor)
-                                            {
-                                                <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.WaitingFor)"><span class="oi oi-clock me-2"></span>Mark Waiting For</button></li>
-                                            }
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><button class="dropdown-item" @onclick="() => UnlinkTaskFromProject(task)"><span class="oi oi-link-broken me-2"></span>Remove from Project</button></li>
-                                            <li><button class="dropdown-item text-danger" @onclick="() => ShowDeleteTaskConfirm(task)"><span class="oi oi-trash me-2"></span>Delete Task</button></li>
-                                        </ul>
-                                    </div>
+                                <div class="dropdown ms-2">
+                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" title="Task actions">
+                                        <span class="oi oi-cog"></span>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="/tasks/@task.Id"><span class="oi oi-eye me-2"></span>View Details</a></li>
+                                        <li><button class="dropdown-item" @onclick="() => ShowEditTaskModal(task)"><span class="oi oi-pencil me-2"></span>Quick Edit</button></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        @if (task.Status != TodoTaskStatus.NextAction)
+                                        {
+                                            <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.NextAction)"><span class="oi oi-media-play me-2"></span>Set as Next Action</button></li>
+                                        }
+                                        @if (task.Status != TodoTaskStatus.WaitingFor)
+                                        {
+                                            <li><button class="dropdown-item" @onclick="() => SetTaskStatus(task, TodoTaskStatus.WaitingFor)"><span class="oi oi-clock me-2"></span>Mark Waiting For</button></li>
+                                        }
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><button class="dropdown-item" @onclick="() => UnlinkTaskFromProject(task)"><span class="oi oi-link-broken me-2"></span>Remove from Project</button></li>
+                                        <li><button class="dropdown-item text-danger" @onclick="() => ShowDeleteTaskConfirm(task)"><span class="oi oi-trash me-2"></span>Delete Task</button></li>
+                                    </ul>
                                 </div>
                             </div>
                         }
@@ -767,11 +793,11 @@ else
 
     private string GetGoalStatusClass(GoalStatus status) => status switch
     {
-        GoalStatus.Active => "bg-success",
+        GoalStatus.Active => "bg-success text-white",
         GoalStatus.OnHold => "bg-warning text-dark",
-        GoalStatus.Completed => "bg-info",
-        GoalStatus.Archived => "bg-secondary",
-        _ => "bg-secondary"
+        GoalStatus.Completed => "bg-info text-white",
+        GoalStatus.Archived => "bg-secondary text-white",
+        _ => "bg-secondary text-white"
     };
 
     // Task linking methods

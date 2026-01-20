@@ -1,0 +1,52 @@
+@* Error display component for ErrorBoundary *@
+
+<div class="error-container">
+    <div class="error-card">
+        <div class="error-icon">
+            <span class="oi oi-warning"></span>
+        </div>
+        <h4>Something went wrong</h4>
+        <p class="error-message">
+            We encountered an unexpected error while loading this content.
+            This has been logged and we'll look into it.
+        </p>
+
+        @if (ShowDetails && Exception != null)
+        {
+            <details class="error-details">
+                <summary>Technical details</summary>
+                <div class="error-technical">
+                    <strong>@Exception.GetType().Name:</strong> @Exception.Message
+                </div>
+            </details>
+        }
+
+        <div class="error-actions">
+            <button class="btn btn-primary" @onclick="TryAgain">
+                <span class="oi oi-reload me-1"></span>Try Again
+            </button>
+            <a href="/" class="btn btn-outline-secondary">
+                <span class="oi oi-home me-1"></span>Go Home
+            </a>
+        </div>
+
+        <p class="error-help">
+            If this keeps happening, try refreshing the page or
+            <a href="/settings">check your settings</a>.
+        </p>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Exception? Exception { get; set; }
+    [Parameter] public EventCallback OnRecover { get; set; }
+    [Parameter] public bool ShowDetails { get; set; } = true;
+
+    private async Task TryAgain()
+    {
+        if (OnRecover.HasDelegate)
+        {
+            await OnRecover.InvokeAsync();
+        }
+    }
+}

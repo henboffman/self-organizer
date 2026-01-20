@@ -60,6 +60,24 @@ public class SummaryReport
     public double AverageTaskCompletionRate { get; set; }
     public List<string> TopTags { get; set; } = new();
     public Dictionary<DayOfWeek, int> TasksCompletedByDayOfWeek { get; set; } = new();
+
+    // Focus Sessions
+    public int TotalFocusSessions { get; set; }
+    public int TotalFocusMinutes { get; set; }
+    public double AverageFocusRating { get; set; }
+    public int FocusSessionsDistracted { get; set; }
+    public List<FocusSessionSummary> FocusSessions { get; set; } = new();
+
+    // Habits
+    public int TotalHabitsTracked { get; set; }
+    public int TotalHabitCompletions { get; set; }
+    public double HabitCompletionRate { get; set; }
+    public List<HabitSummary> HabitProgress { get; set; } = new();
+
+    // Calendar Events
+    public int TotalMeetings { get; set; }
+    public int TotalMeetingMinutes { get; set; }
+    public Dictionary<string, int> MeetingsByCategory { get; set; } = new();
 }
 
 public class CompletedTaskSummary
@@ -111,4 +129,60 @@ public class GoalProgressSummary
     public bool WasCompletedInPeriod { get; set; }
     public int LinkedTasksCompleted { get; set; }
     public int LinkedProjectsWorkedOn { get; set; }
+
+    /// <summary>
+    /// Habits linked to this goal with their completion info
+    /// </summary>
+    public List<LinkedHabitInfo> LinkedHabits { get; set; } = new();
+}
+
+/// <summary>
+/// Summary info for a habit linked to a goal
+/// </summary>
+public class LinkedHabitInfo
+{
+    public Guid HabitId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int CompletionsInPeriod { get; set; }
+    public double CompletionRate { get; set; }
+    public int CurrentStreak { get; set; }
+    public bool IsAiSuggested { get; set; }
+}
+
+public class FocusSessionSummary
+{
+    public Guid Id { get; set; }
+    public string? TaskTitle { get; set; }
+    public int DurationMinutes { get; set; }
+    public DateTime StartedAt { get; set; }
+    public int FocusRating { get; set; }
+    public bool WasDistracted { get; set; }
+    public bool TaskCompleted { get; set; }
+    public string? Context { get; set; }
+}
+
+public class HabitSummary
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Icon { get; set; }
+    public string? Color { get; set; }
+    public HabitFrequency Frequency { get; set; }
+    public int TargetCount { get; set; }
+    public int CompletionsInPeriod { get; set; }
+    public int DaysTracked { get; set; }
+    public double CompletionRate { get; set; }
+    public int CurrentStreak { get; set; }
+    public int ActiveDaysInPeriod { get; set; }
+    public DateTime HabitStartDate { get; set; }
+
+    /// <summary>
+    /// Whether this habit was AI-suggested
+    /// </summary>
+    public bool IsAiSuggested { get; set; }
+
+    /// <summary>
+    /// Titles of goals this habit is linked to
+    /// </summary>
+    public List<string> LinkedGoalTitles { get; set; } = new();
 }

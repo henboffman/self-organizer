@@ -1,0 +1,112 @@
+@using SelfOrganizer.App.Services
+@inject IToastService ToastService
+@implements IDisposable
+
+<div class="toast-container">
+    @foreach (var toast in _toasts)
+    {
+        <div class="toast-item toast-@toast.Type.ToString().ToLower() @(toast.IsExiting ? "exiting" : "")">
+            <div class="toast-icon">
+                @switch (toast.Type)
+                {
+                    case ToastType.Success:
+                        <span class="oi oi-check"></span>
+                        break;
+                    case ToastType.Error:
+                        <span class="oi oi-warning"></span>
+                        break;
+                    case ToastType.Warning:
+                        <span class="oi oi-bell"></span>
+                        break;
+                    case ToastType.Info:
+                        <span class="oi oi-info"></span>
+                        break;
+                }
+            </div>
+            <div class="toast-content">
+                <div class="toast-title">@toast.Title</div>
+                <div class="toast-message">@toast.Message</div>
+            </div>
+            <button class="toast-close" @onclick="() => DismissToast(toast.Id)">
+                <span class="oi oi-x"></span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastItem> _toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastRequested += HandleToastRequested;
+        ToastService.OnToastDismissed += HandleToastDismissed;
+    }
+
+    private async void HandleToastRequested(ToastMessage toast)
+    {
+        var item = new ToastItem
+        {
+            Id = toast.Id,
+            Type = toast.Type,
+            Title = toast.Title,
+            Message = toast.Message,
+            DurationMs = toast.DurationMs
+        };
+
+        await InvokeAsync(() =>
+        {
+            _toasts.Add(item);
+            StateHasChanged();
+        });
+
+        // Auto-dismiss after duration
+        if (toast.DurationMs > 0)
+        {
+            _ = AutoDismiss(toast.Id, toast.DurationMs);
+        }
+    }
+
+    private async Task AutoDismiss(Guid id, int delayMs)
+    {
+        await Task.Delay(delayMs);
+        await DismissToast(id);
+    }
+
+    private async Task DismissToast(Guid id)
+    {
+        var toast = _toasts.FirstOrDefault(t => t.Id == id);
+        if (toast != null && !toast.IsExiting)
+        {
+            toast.IsExiting = true;
+            await InvokeAsync(StateHasChanged);
+
+            // Wait for exit animation
+            await Task.Delay(300);
+
+            _toasts.Remove(toast);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleToastDismissed(Guid id)
+    {
+        _ = DismissToast(id);
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnToastRequested -= HandleToastRequested;
+        ToastService.OnToastDismissed -= HandleToastDismissed;
+    }
+
+    private class ToastItem
+    {
+        public Guid Id { get; set; }
+        public ToastType Type { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public int DurationMs { get; set; }
+        public bool IsExiting { get; set; }
+    }
+}

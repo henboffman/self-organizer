@@ -80,6 +80,8 @@ builder.Services.AddScoped<IEntityExtractionService, EntityExtractionService>();
 builder.Services.AddScoped<ITaskOptimizerService, TaskOptimizerService>();
 builder.Services.AddScoped<ILlmService, LlmService>();
 builder.Services.AddScoped<IGoalAiService, GoalAiService>();
+builder.Services.AddScoped<IHabitAiService, HabitAiService>();
+builder.Services.AddScoped<IBalanceAiService, BalanceAiService>();
 builder.Services.AddScoped<IProactiveSuggestionsService, ProactiveSuggestionsService>();
 builder.Services.AddScoped<IEntityLinkingService, EntityLinkingService>();
 builder.Services.AddScoped<ICalendarIntelligenceService, CalendarIntelligenceService>();
@@ -98,6 +100,9 @@ builder.Services.AddScoped<IGoogleCalendarSyncService, GoogleCalendarSyncService
 
 // Notification Service (Singleton so all components share the same instance)
 builder.Services.AddSingleton<IDataChangeNotificationService, DataChangeNotificationService>();
+
+// Toast Notification Service (Singleton so toasts can be shown from anywhere)
+builder.Services.AddSingleton<IToastService, ToastService>();
 
 // Command History (Singleton so undo/redo state persists across page navigations)
 builder.Services.AddSingleton<ICommandHistory, CommandHistory>();

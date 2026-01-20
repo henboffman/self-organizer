@@ -1,30 +1,76 @@
+/* Summary Page Styles */
+
+/* Time Period Selector */
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--border-default);
+}
+
+.card-header {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-muted);
+    color: var(--text-primary);
+}
+
+.card-body {
+    color: var(--text-primary);
+}
+
+.form-label {
+    color: var(--text-primary);
+}
+
+.form-select,
+.form-control {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+}
+
+.form-select:focus,
+.form-control:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+/* Report Period Banner */
 .report-period-banner {
-    background: linear-gradient(135deg, var(--bs-primary) 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
     color: white;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
 }
 
 .report-period-banner h4 {
     color: white;
+    font-family: var(--font-display);
 }
 
+.report-period-banner small {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Summary Cards - Statistics Grid */
 .summary-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
     color: white;
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: var(--radius-md);
 }
 
 .summary-card:hover {
     transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
 .summary-card.highlight {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
 }
 
 .summary-value {
-    font-size: 1.75rem;
+    font-size: 2rem;
     font-weight: 700;
+    font-family: var(--font-display);
     line-height: 1.2;
 }
 
@@ -32,78 +78,170 @@
     font-size: 0.8rem;
     opacity: 0.9;
     margin-top: 4px;
+    font-weight: 500;
 }
 
+/* Goal Progress Cards */
 .goal-progress-card {
-    background-color: var(--bs-light);
-    border-left: 4px solid var(--bs-primary);
-    transition: background-color 0.2s ease;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+    border-left: 4px solid var(--color-primary);
+    transition: all 0.2s ease;
 }
 
 .goal-progress-card:hover {
-    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    background-color: var(--color-primary-subtle);
+    border-color: var(--color-primary);
 }
 
 .goal-progress-card.completed {
-    border-left-color: var(--bs-success);
-    background-color: rgba(var(--bs-success-rgb), 0.1);
+    border-left-color: var(--color-success);
+    background-color: var(--color-success-subtle, rgba(16, 185, 129, 0.1));
 }
 
+.goal-progress-card h6 {
+    color: var(--text-primary);
+}
+
+.goal-progress-card .progress {
+    background-color: var(--bg-tertiary);
+}
+
+.goal-progress-card .progress-bar {
+    background-color: var(--color-primary);
+}
+
+/* Project Summary Cards */
 .project-summary-card {
-    background-color: var(--bs-light);
-    border: 1px solid var(--bs-border-color);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
     transition: all 0.2s ease;
 }
 
 .project-summary-card:hover {
-    border-color: var(--bs-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
 }
 
 .project-summary-card.completed {
-    background-color: rgba(var(--bs-success-rgb), 0.1);
-    border-color: var(--bs-success);
+    background-color: var(--color-success-subtle, rgba(16, 185, 129, 0.1));
+    border-color: var(--color-success);
+}
+
+.project-summary-card h6 {
+    color: var(--text-primary);
 }
 
 .project-stat-value {
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--bs-dark);
+    color: var(--text-primary);
+    font-family: var(--font-display);
 }
 
 .project-stat-label {
     font-size: 0.75rem;
-    color: var(--bs-secondary);
+    color: var(--text-muted);
 }
 
+/* Time Allocation Bars */
+.progress {
+    background-color: var(--bg-tertiary);
+}
+
+/* Table Styling */
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-primary);
+    color: var(--text-primary);
+}
+
+.table thead th {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-default);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.table tbody td {
+    border-color: var(--border-muted);
+    color: var(--text-primary);
+}
+
+.table-hover tbody tr:hover {
+    --bs-table-hover-bg: var(--color-primary-subtle);
+    background-color: var(--color-primary-subtle);
+}
+
+.table-warning {
+    --bs-table-bg: rgba(245, 158, 11, 0.1);
+    --bs-table-color: var(--text-primary);
+}
+
+/* Capture Items */
 .capture-item {
-    background-color: var(--bs-light);
-    transition: background-color 0.2s ease;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+    transition: all 0.2s ease;
+    color: var(--text-primary);
 }
 
 .capture-item:hover {
-    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    background-color: var(--color-primary-subtle);
+    border-color: var(--color-primary);
 }
 
 .capture-item.processed {
     opacity: 0.7;
 }
 
+/* Tag Badges */
 .tag-badge {
     display: inline-block;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
     color: white;
-    border-radius: 20px;
+    border-radius: var(--radius-full);
     font-size: 0.9rem;
     font-weight: 500;
 }
 
-/* Dark mode adjustments */
-::deep .table {
-    --bs-table-bg: transparent;
+/* Empty State */
+.empty-report-state {
+    text-align: center;
+    padding: var(--space-2xl);
 }
 
+.empty-report-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--space-lg);
+}
+
+.empty-report-icon .oi {
+    font-size: 2.5rem;
+    color: var(--text-muted);
+}
+
+/* Alert styling */
+.alert-success {
+    background-color: var(--color-success-subtle, rgba(16, 185, 129, 0.1));
+    border-color: var(--color-success);
+    color: var(--text-primary);
+}
+
+.alert-danger {
+    background-color: var(--color-danger-subtle, rgba(239, 68, 68, 0.1));
+    border-color: var(--color-danger);
+    color: var(--text-primary);
+}
+
+/* Responsive */
 @media (max-width: 768px) {
     .summary-value {
         font-size: 1.5rem;
@@ -116,6 +254,102 @@
     .report-period-banner h4 {
         font-size: 1rem;
     }
+}
+
+/* Focus Stats */
+.focus-stat-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-muted);
+}
+
+.focus-stat-card .text-muted {
+    color: var(--text-muted);
+}
+
+.focus-stat-card .text-primary {
+    color: var(--color-primary);
+}
+
+.focus-stat-card .text-success {
+    color: var(--color-success);
+}
+
+.focus-stat-card .text-warning {
+    color: var(--color-warning);
+}
+
+/* Habit Cards */
+.habit-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+    transition: all 0.2s ease;
+}
+
+.habit-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.habit-card h6 {
+    color: var(--text-primary);
+}
+
+.habit-card .progress {
+    background-color: var(--bg-tertiary);
+}
+
+/* AI Badge - high contrast */
+.bg-purple-subtle {
+    background-color: #8b5cf6;
+}
+
+.text-purple {
+    color: #ffffff;
+}
+
+/* Linked Habits in Goals */
+.linked-habits {
+    padding-top: var(--space-sm);
+    border-top: 1px dashed var(--border-muted);
+}
+
+.linked-habit-item {
+    padding: 4px 0;
+}
+
+.linked-habit-item .habit-name {
+    max-width: 150px;
+    color: var(--text-secondary);
+}
+
+/* Goal badges in habits - high contrast */
+.bg-primary-subtle {
+    background-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.badge.bg-primary-subtle.text-primary {
+    color: #ffffff !important;
+}
+
+/* List group items */
+.list-group-item {
+    background-color: transparent;
+    border-color: var(--border-muted);
+    color: var(--text-primary);
+}
+
+.list-group-item .text-muted {
+    color: var(--text-muted) !important;
+}
+
+.list-group-item .fw-medium {
+    color: var(--text-primary);
+}
+
+/* Display numbers */
+.display-4 {
+    color: var(--color-primary);
 }
 
 /* Print styles */

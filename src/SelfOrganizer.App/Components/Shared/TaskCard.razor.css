@@ -21,10 +21,10 @@
 
 /* Detail link (external link icon) */
 .task-detail-link {
-    color: var(--text-tertiary, #999);
+    color: var(--text-muted);
     opacity: 0;
     transition: opacity 0.15s ease, color 0.15s ease;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     text-decoration: none;
 }
 

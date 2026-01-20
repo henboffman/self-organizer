@@ -164,11 +164,11 @@
                                             <span class="task-title">@task.Title</span>
                                             @if (task.DueDate.HasValue)
                                             {
-                                                <span class="badge bg-info ms-2">Due @task.DueDate.Value.ToString("MMM d")</span>
+                                                <span class="badge status-badge ms-2">Due @task.DueDate.Value.ToString("MMM d")</span>
                                             }
                                             @if (task.Priority == 1)
                                             {
-                                                <span class="badge bg-danger ms-2">High</span>
+                                                <span class="badge bg-danger text-white ms-2">High</span>
                                             }
                                         </div>
                                     }

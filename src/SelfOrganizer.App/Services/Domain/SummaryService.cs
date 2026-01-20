@@ -10,17 +10,29 @@ public class SummaryService : ISummaryService
     private readonly IProjectService _projectService;
     private readonly IGoalService _goalService;
     private readonly IRepository<CaptureItem> _captureRepository;
+    private readonly IRepository<FocusSessionLog> _focusSessionRepository;
+    private readonly IRepository<Habit> _habitRepository;
+    private readonly IRepository<HabitLog> _habitLogRepository;
+    private readonly IRepository<CalendarEvent> _calendarRepository;
 
     public SummaryService(
         ITaskService taskService,
         IProjectService projectService,
         IGoalService goalService,
-        IRepository<CaptureItem> captureRepository)
+        IRepository<CaptureItem> captureRepository,
+        IRepository<FocusSessionLog> focusSessionRepository,
+        IRepository<Habit> habitRepository,
+        IRepository<HabitLog> habitLogRepository,
+        IRepository<CalendarEvent> calendarRepository)
     {
         _taskService = taskService;
         _projectService = projectService;
         _goalService = goalService;
         _captureRepository = captureRepository;
+        _focusSessionRepository = focusSessionRepository;
+        _habitRepository = habitRepository;
+        _habitLogRepository = habitLogRepository;
+        _calendarRepository = calendarRepository;
     }
 
     public async Task<SummaryReport> GenerateSummaryAsync(DateTime startDate, DateTime endDate)
@@ -173,6 +185,11 @@ public class SummaryService : ISummaryService
         // Goal progress
         var allGoals = await _goalService.GetAllAsync();
         var goalSummaries = new List<GoalProgressSummary>();
+
+        // Pre-fetch habits for linking
+        var allHabitsForGoals = await _habitRepository.GetAllAsync();
+        var activeHabitsDict = allHabitsForGoals.Where(h => h.IsActive).ToDictionary(h => h.Id);
+
         foreach (var goal in allGoals.Where(g => g.Status != GoalStatus.Archived))
         {
             // Calculate linked tasks completed in period
@@ -188,6 +205,27 @@ public class SummaryService : ISummaryService
                                        goal.CompletedAt.Value >= startDate &&
                                        goal.CompletedAt.Value <= endDate;
 
+            // Get linked habits and their stats (bidirectional linking)
+            var linkedHabitIds = new HashSet<Guid>(goal.LinkedHabitIds);
+            foreach (var habit in activeHabitsDict.Values.Where(h => h.LinkedGoalIds.Contains(goal.Id)))
+            {
+                linkedHabitIds.Add(habit.Id);
+            }
+
+            var linkedHabitsInfo = new List<LinkedHabitInfo>();
+            foreach (var habitId in linkedHabitIds)
+            {
+                if (!activeHabitsDict.TryGetValue(habitId, out var habit)) continue;
+
+                // Will calculate stats after habitLogs are loaded
+                linkedHabitsInfo.Add(new LinkedHabitInfo
+                {
+                    HabitId = habit.Id,
+                    Name = habit.Name,
+                    IsAiSuggested = habit.IsAiSuggested
+                });
+            }
+
             goalSummaries.Add(new GoalProgressSummary
             {
                 Id = goal.Id,
@@ -200,7 +238,8 @@ public class SummaryService : ISummaryService
                 TargetDate = goal.TargetDate,
                 WasCompletedInPeriod = wasCompletedInPeriod,
                 LinkedTasksCompleted = linkedTasksCompleted,
-                LinkedProjectsWorkedOn = linkedProjectsWorkedOn
+                LinkedProjectsWorkedOn = linkedProjectsWorkedOn,
+                LinkedHabits = linkedHabitsInfo
             });
         }
         report.GoalProgress = goalSummaries
@@ -237,7 +276,187 @@ public class SummaryService : ISummaryService
             report.AverageTaskCompletionRate = report.TotalTasksCompleted / daysInPeriod;
         }
 
+        // Focus Sessions
+        var focusSessions = await _focusSessionRepository.QueryAsync(fs =>
+            fs.EndedAt >= startDate && fs.EndedAt <= endDate);
+        var focusSessionList = focusSessions.ToList();
+
+        report.TotalFocusSessions = focusSessionList.Count;
+        report.TotalFocusMinutes = focusSessionList.Sum(fs => fs.DurationMinutes);
+        report.AverageFocusRating = focusSessionList.Any()
+            ? focusSessionList.Average(fs => fs.FocusRating)
+            : 0;
+        report.FocusSessionsDistracted = focusSessionList.Count(fs => fs.WasDistracted);
+        report.FocusSessions = focusSessionList
+            .OrderByDescending(fs => fs.StartedAt)
+            .Take(20)
+            .Select(fs => new FocusSessionSummary
+            {
+                Id = fs.Id,
+                TaskTitle = fs.TaskTitle,
+                DurationMinutes = fs.DurationMinutes,
+                StartedAt = fs.StartedAt,
+                FocusRating = fs.FocusRating,
+                WasDistracted = fs.WasDistracted,
+                TaskCompleted = fs.TaskCompleted,
+                Context = fs.Context
+            })
+            .ToList();
+
+        // Habits
+        var allHabits = await _habitRepository.QueryAsync(h => h.IsActive);
+        var habitList = allHabits.ToList();
+        var habitLogs = await _habitLogRepository.QueryAsync(hl =>
+            hl.Date >= DateOnly.FromDateTime(startDate) && hl.Date <= DateOnly.FromDateTime(endDate));
+        var habitLogList = habitLogs.ToList();
+
+        report.TotalHabitsTracked = habitList.Count;
+        report.TotalHabitCompletions = habitLogList.Count(hl => hl.Completed);
+
+        // Build goal title lookup for habit linking
+        var goalTitles = allGoals.ToDictionary(g => g.Id, g => g.Title);
+
+        var habitSummaries = new List<HabitSummary>();
+        foreach (var habit in habitList)
+        {
+            var logsForHabit = habitLogList.Where(hl => hl.HabitId == habit.Id).ToList();
+            var completions = logsForHabit.Count(hl => hl.Completed);
+            var daysTracked = logsForHabit.Select(hl => hl.Date).Distinct().Count();
+
+            // Calculate expected completions based on frequency, but only for days since habit was created
+            var effectiveStartDate = habit.StartDate > startDate ? habit.StartDate : startDate;
+            var activeDaysInPeriod = Math.Max(1, (int)(endDate - effectiveStartDate).TotalDays + 1);
+            var expectedCompletions = CalculateExpectedCompletions(habit, effectiveStartDate, endDate);
+            var completionRate = expectedCompletions > 0
+                ? (double)completions / expectedCompletions * 100
+                : 0;
+            var currentStreak = CalculateCurrentStreak(habit.Id, habitLogList);
+
+            // Get linked goal titles (bidirectional)
+            var linkedGoalIds = new HashSet<Guid>(habit.LinkedGoalIds);
+            foreach (var goal in allGoals.Where(g => g.LinkedHabitIds.Contains(habit.Id)))
+            {
+                linkedGoalIds.Add(goal.Id);
+            }
+            var linkedGoalTitles = linkedGoalIds
+                .Where(id => goalTitles.ContainsKey(id))
+                .Select(id => goalTitles[id])
+                .ToList();
+
+            habitSummaries.Add(new HabitSummary
+            {
+                Id = habit.Id,
+                Name = habit.Name,
+                Icon = habit.Icon,
+                Color = habit.Color,
+                Frequency = habit.Frequency,
+                TargetCount = habit.TargetCount,
+                CompletionsInPeriod = completions,
+                DaysTracked = daysTracked,
+                CompletionRate = Math.Min(completionRate, 100),
+                CurrentStreak = currentStreak,
+                ActiveDaysInPeriod = activeDaysInPeriod,
+                HabitStartDate = habit.StartDate,
+                IsAiSuggested = habit.IsAiSuggested,
+                LinkedGoalTitles = linkedGoalTitles
+            });
+
+            // Update linked habit info in goal summaries with stats
+            foreach (var goalSummary in report.GoalProgress)
+            {
+                var linkedHabitInfo = goalSummary.LinkedHabits.FirstOrDefault(lh => lh.HabitId == habit.Id);
+                if (linkedHabitInfo != null)
+                {
+                    linkedHabitInfo.CompletionsInPeriod = completions;
+                    linkedHabitInfo.CompletionRate = Math.Min(completionRate, 100);
+                    linkedHabitInfo.CurrentStreak = currentStreak;
+                }
+            }
+        }
+        report.HabitProgress = habitSummaries.OrderByDescending(h => h.CompletionRate).ToList();
+        report.HabitCompletionRate = habitSummaries.Any()
+            ? habitSummaries.Average(h => h.CompletionRate)
+            : 0;
+
+        // Calendar Events / Meetings
+        var calendarEvents = await _calendarRepository.QueryAsync(ce =>
+            ce.StartTime >= startDate && ce.StartTime <= endDate);
+        var eventList = calendarEvents.ToList();
+
+        report.TotalMeetings = eventList.Count;
+        report.TotalMeetingMinutes = eventList.Sum(e => (int)(e.EndTime - e.StartTime).TotalMinutes);
+        report.MeetingsByCategory = eventList
+            .GroupBy(e => e.EffectiveCategory.ToString())
+            .ToDictionary(g => g.Key, g => g.Count());
+
         return report;
+    }
+
+    private static int CalculateExpectedCompletions(Habit habit, DateTime startDate, DateTime endDate)
+    {
+        var days = (int)(endDate - startDate).TotalDays + 1;
+
+        return habit.Frequency switch
+        {
+            HabitFrequency.Daily => days * habit.TargetCount,
+            HabitFrequency.Weekly => (days / 7 + 1) * habit.TargetCount,
+            HabitFrequency.Weekdays => CountWeekdays(startDate, endDate) * habit.TargetCount,
+            HabitFrequency.Weekends => CountWeekendDays(startDate, endDate) * habit.TargetCount,
+            HabitFrequency.Monthly => (days / 30 + 1) * habit.TargetCount,
+            _ => days * habit.TargetCount
+        };
+    }
+
+    private static int CountWeekdays(DateTime start, DateTime end)
+    {
+        var count = 0;
+        for (var date = start; date <= end; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday)
+                count++;
+        }
+        return count;
+    }
+
+    private static int CountWeekendDays(DateTime start, DateTime end)
+    {
+        var count = 0;
+        for (var date = start; date <= end; date = date.AddDays(1))
+        {
+            if (date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday)
+                count++;
+        }
+        return count;
+    }
+
+    private static int CalculateCurrentStreak(Guid habitId, List<HabitLog> logs)
+    {
+        var habitLogs = logs
+            .Where(l => l.HabitId == habitId && l.Completed)
+            .OrderByDescending(l => l.Date)
+            .ToList();
+
+        if (!habitLogs.Any()) return 0;
+
+        var streak = 0;
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var expectedDate = today;
+
+        foreach (var log in habitLogs)
+        {
+            // Allow for 1-day gap (yesterday or today)
+            if (log.Date == expectedDate || log.Date == expectedDate.AddDays(-1))
+            {
+                streak++;
+                expectedDate = log.Date.AddDays(-1);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return streak;
     }
 
     public string ExportToMarkdown(SummaryReport report)
@@ -256,9 +475,9 @@ public class SummaryService : ISummaryService
         sb.AppendLine($"- **Tasks Completed:** {report.TotalTasksCompleted}");
         sb.AppendLine($"- **Projects Worked On:** {report.ProjectsWorkedOn}");
         sb.AppendLine($"- **Total Time Tracked:** {FormatMinutes(report.TotalActualMinutes)}");
-        sb.AppendLine($"- **Ideas Captured:** {report.TotalCaptureItems}");
-        sb.AppendLine($"- **Deep Work Tasks:** {report.DeepWorkTasksCompleted}");
-        sb.AppendLine($"- **High Priority Tasks:** {report.HighPriorityTasksCompleted}");
+        sb.AppendLine($"- **Focus Sessions:** {report.TotalFocusSessions} ({FormatMinutes(report.TotalFocusMinutes)})");
+        sb.AppendLine($"- **Habits Completed:** {report.TotalHabitCompletions}");
+        sb.AppendLine($"- **Meetings:** {report.TotalMeetings} ({FormatMinutes(report.TotalMeetingMinutes)})");
         if (report.AverageTaskCompletionRate > 0)
         {
             sb.AppendLine($"- **Avg Tasks/Day:** {report.AverageTaskCompletionRate:F1}");
@@ -297,6 +516,52 @@ public class SummaryService : ISummaryService
                 }
                 sb.AppendLine();
             }
+        }
+
+        // Focus Sessions
+        if (report.FocusSessions.Any())
+        {
+            sb.AppendLine("## Focus Sessions");
+            sb.AppendLine();
+            sb.AppendLine($"- **Total Sessions:** {report.TotalFocusSessions}");
+            sb.AppendLine($"- **Total Time:** {FormatMinutes(report.TotalFocusMinutes)}");
+            sb.AppendLine($"- **Average Rating:** {report.AverageFocusRating:F1}/5");
+            sb.AppendLine($"- **Distracted Sessions:** {report.FocusSessionsDistracted}");
+            sb.AppendLine();
+        }
+
+        // Habits
+        if (report.HabitProgress.Any())
+        {
+            sb.AppendLine("## Habit Progress");
+            sb.AppendLine();
+            sb.AppendLine($"Overall completion rate: **{report.HabitCompletionRate:F0}%**");
+            sb.AppendLine();
+            foreach (var habit in report.HabitProgress)
+            {
+                var streakBadge = habit.CurrentStreak > 0 ? $" 🔥 {habit.CurrentStreak}" : "";
+                sb.AppendLine($"- **{habit.Name}:** {habit.CompletionsInPeriod} completions ({habit.CompletionRate:F0}%){streakBadge}");
+            }
+            sb.AppendLine();
+        }
+
+        // Meetings
+        if (report.TotalMeetings > 0)
+        {
+            sb.AppendLine("## Meetings");
+            sb.AppendLine();
+            sb.AppendLine($"- **Total Meetings:** {report.TotalMeetings}");
+            sb.AppendLine($"- **Total Meeting Time:** {FormatMinutes(report.TotalMeetingMinutes)}");
+            if (report.MeetingsByCategory.Any())
+            {
+                sb.AppendLine();
+                sb.AppendLine("### By Category");
+                foreach (var (category, count) in report.MeetingsByCategory.OrderByDescending(x => x.Value))
+                {
+                    sb.AppendLine($"- **{category}:** {count}");
+                }
+            }
+            sb.AppendLine();
         }
 
         // Projects
@@ -449,16 +714,16 @@ public class SummaryService : ISummaryService
         sb.AppendLine($"                    <div class=\"card-label\">Time Tracked</div>");
         sb.AppendLine($"                </div>");
         sb.AppendLine($"                <div class=\"summary-card\">");
-        sb.AppendLine($"                    <div class=\"card-value\">{report.TotalCaptureItems}</div>");
-        sb.AppendLine($"                    <div class=\"card-label\">Ideas Captured</div>");
+        sb.AppendLine($"                    <div class=\"card-value\">{report.TotalFocusSessions}</div>");
+        sb.AppendLine($"                    <div class=\"card-label\">Focus Sessions</div>");
         sb.AppendLine($"                </div>");
         sb.AppendLine($"                <div class=\"summary-card highlight\">");
-        sb.AppendLine($"                    <div class=\"card-value\">{report.DeepWorkTasksCompleted}</div>");
-        sb.AppendLine($"                    <div class=\"card-label\">Deep Work Tasks</div>");
+        sb.AppendLine($"                    <div class=\"card-value\">{report.TotalHabitCompletions}</div>");
+        sb.AppendLine($"                    <div class=\"card-label\">Habits Completed</div>");
         sb.AppendLine($"                </div>");
         sb.AppendLine($"                <div class=\"summary-card highlight\">");
-        sb.AppendLine($"                    <div class=\"card-value\">{report.HighPriorityTasksCompleted}</div>");
-        sb.AppendLine($"                    <div class=\"card-label\">High Priority</div>");
+        sb.AppendLine($"                    <div class=\"card-value\">{report.TotalMeetings}</div>");
+        sb.AppendLine($"                    <div class=\"card-label\">Meetings</div>");
         sb.AppendLine($"                </div>");
         sb.AppendLine("            </div>");
         sb.AppendLine("        </section>");

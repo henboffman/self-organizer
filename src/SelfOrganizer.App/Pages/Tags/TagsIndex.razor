@@ -74,80 +74,108 @@
     </div>
 }
 
-@if (_isLoading)
-{
-    <div class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
-}
-else
-{
-    <div class="row">
-        <div class="col-lg-8">
-            @* Search *@
-            <div class="mb-4">
-                <div class="input-group">
-                    <span class="input-group-text"><span class="oi oi-magnifying-glass"></span></span>
-                    <input type="text" class="form-control" placeholder="Search tags..." @bind="_searchTerm" @bind:event="oninput" />
-                </div>
+<div class="row">
+    <div class="col-lg-8">
+        @* Search - always visible *@
+        <div class="mb-4">
+            <div class="input-group">
+                <span class="input-group-text"><span class="oi oi-magnifying-glass"></span></span>
+                <input type="text" class="form-control" placeholder="Search tags..." @bind="_searchTerm" @bind:event="oninput" disabled="@_isLoading" />
             </div>
+        </div>
 
-            @if (!GetFilteredTags().Any())
-            {
-                <div class="text-center py-5">
-                    <h5 class="text-muted">No tags found</h5>
-                    <p class="text-muted">
-                        Use #hashtags in your tasks, events, and projects to create tags.
-                        <br/>Or click "Scan for Entities" to extract tags from existing content.
-                    </p>
-                </div>
-            }
-            else
-            {
-                @* Tags Grid *@
-                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-                    @foreach (var tagInfo in GetFilteredTags())
-                    {
-                        <div class="col">
-                            <div class="card h-100 tag-card" @onclick="() => NavigateToTag(tagInfo.Name)" style="cursor: pointer;">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <h5 class="card-title mb-1">
-                                            <span class="text-primary">#</span>@tagInfo.Name
-                                        </h5>
-                                        <span class="badge bg-primary">@tagInfo.TotalCount</span>
-                                    </div>
-                                    <div class="small text-muted mt-2">
-                                        @if (tagInfo.TaskCount > 0)
-                                        {
-                                            <span class="me-2"><span class="oi oi-task me-1"></span>@tagInfo.TaskCount tasks</span>
-                                        }
-                                        @if (tagInfo.EventCount > 0)
-                                        {
-                                            <span class="me-2"><span class="oi oi-calendar me-1"></span>@tagInfo.EventCount events</span>
-                                        }
-                                        @if (tagInfo.ProjectCount > 0)
-                                        {
-                                            <span><span class="oi oi-folder me-1"></span>@tagInfo.ProjectCount projects</span>
-                                        }
-                                    </div>
+        @if (_isLoading)
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                @for (int i = 0; i < 9; i++)
+                {
+                    <div class="col">
+                        <div class="skeleton-card">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="skeleton skeleton-title" style="width: @(50 + (i % 3) * 15)%;"></div>
+                                <div class="skeleton skeleton-badge"></div>
+                            </div>
+                            <div class="d-flex gap-3">
+                                <div class="skeleton skeleton-text-sm" style="width: 4rem;"></div>
+                                <div class="skeleton skeleton-text-sm" style="width: 5rem;"></div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (!GetFilteredTags().Any())
+        {
+            <div class="text-center py-5">
+                <h5 class="text-muted">No tags found</h5>
+                <p class="text-muted">
+                    Use #hashtags in your tasks, events, and projects to create tags.
+                    <br/>Or click "Scan for Entities" to extract tags from existing content.
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                @foreach (var tagInfo in GetFilteredTags())
+                {
+                    <div class="col">
+                        <div class="card h-100 tag-card" @onclick="() => NavigateToTag(tagInfo.Name)" style="cursor: pointer;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h5 class="card-title mb-1">
+                                        <span class="text-primary">#</span>@tagInfo.Name
+                                    </h5>
+                                    <span class="badge bg-primary">@tagInfo.TotalCount</span>
+                                </div>
+                                <div class="small text-muted mt-2">
+                                    @if (tagInfo.TaskCount > 0)
+                                    {
+                                        <span class="me-2"><span class="oi oi-task me-1"></span>@tagInfo.TaskCount tasks</span>
+                                    }
+                                    @if (tagInfo.EventCount > 0)
+                                    {
+                                        <span class="me-2"><span class="oi oi-calendar me-1"></span>@tagInfo.EventCount events</span>
+                                    }
+                                    @if (tagInfo.ProjectCount > 0)
+                                    {
+                                        <span><span class="oi oi-folder me-1"></span>@tagInfo.ProjectCount projects</span>
+                                    }
                                 </div>
                             </div>
                         </div>
-                    }
-                </div>
-            }
-        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
 
-        <div class="col-lg-4">
-            @* Stats Summary *@
-            <div class="card mb-4">
-                <div class="card-header">
-                    <span class="oi oi-bar-chart me-2"></span>Overview
-                </div>
-                <div class="card-body">
+    <div class="col-lg-4">
+        @* Stats Summary *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-bar-chart me-2"></span>Overview
+            </div>
+            <div class="card-body">
+                @if (_isLoading)
+                {
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="skeleton skeleton-stat mx-auto"></div>
+                            <div class="skeleton skeleton-text-sm mx-auto" style="width: 3rem;"></div>
+                        </div>
+                        <div class="col-4">
+                            <div class="skeleton skeleton-stat mx-auto"></div>
+                            <div class="skeleton skeleton-text-sm mx-auto" style="width: 5rem;"></div>
+                        </div>
+                        <div class="col-4">
+                            <div class="skeleton skeleton-stat mx-auto"></div>
+                            <div class="skeleton skeleton-text-sm mx-auto" style="width: 5rem;"></div>
+                        </div>
+                    </div>
+                }
+                else
+                {
                     <div class="row text-center">
                         <div class="col-4">
                             <div class="fs-3 fw-bold text-primary">@_allTags.Count</div>
@@ -162,58 +190,76 @@ else
                             <small class="text-muted">Tagged Events</small>
                         </div>
                     </div>
-                </div>
+                }
             </div>
+        </div>
 
-            @* Popular Tags *@
-            <div class="card mb-4">
-                <div class="card-header">
-                    <span class="oi oi-star me-2"></span>Most Used
-                </div>
-                <div class="card-body">
-                    @if (_allTags.Any())
-                    {
-                        <div class="d-flex flex-wrap gap-2">
-                            @foreach (var tag in _allTags.OrderByDescending(t => t.TotalCount).Take(10))
-                            {
-                                <a href="/tags/@tag.Name" class="badge bg-primary text-decoration-none tag-badge">
-                                    #@tag.Name
-                                    <span class="badge bg-light text-dark ms-1">@tag.TotalCount</span>
-                                </a>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-muted mb-0">No tags yet</p>
-                    }
-                </div>
+        @* Popular Tags *@
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-star me-2"></span>Most Used
             </div>
+            <div class="card-body">
+                @if (_isLoading)
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @for (int i = 0; i < 8; i++)
+                        {
+                            <div class="skeleton skeleton-tag" style="width: @(4 + (i % 4))rem;"></div>
+                        }
+                    </div>
+                }
+                else if (_allTags.Any())
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in _allTags.OrderByDescending(t => t.TotalCount).Take(10))
+                        {
+                            <a href="/tags/@tag.Name" class="badge bg-primary text-decoration-none tag-badge">
+                                #@tag.Name
+                                <span class="badge status-badge ms-1">@tag.TotalCount</span>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No tags yet</p>
+                }
+            </div>
+        </div>
 
-            @* Recent Tags *@
-            <div class="card">
-                <div class="card-header">
-                    <span class="oi oi-clock me-2"></span>Recently Used
-                </div>
-                <div class="card-body">
-                    @if (_recentTags.Any())
-                    {
-                        <div class="d-flex flex-wrap gap-2">
-                            @foreach (var tag in _recentTags)
-                            {
-                                <a href="/tags/@tag" class="badge bg-secondary text-decoration-none">#@tag</a>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <p class="text-muted mb-0">No recent tags</p>
-                    }
-                </div>
+        @* Recent Tags *@
+        <div class="card">
+            <div class="card-header">
+                <span class="oi oi-clock me-2"></span>Recently Used
+            </div>
+            <div class="card-body">
+                @if (_isLoading)
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @for (int i = 0; i < 6; i++)
+                        {
+                            <div class="skeleton skeleton-tag" style="width: @(3 + (i % 3))rem;"></div>
+                        }
+                    </div>
+                }
+                else if (_recentTags.Any())
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in _recentTags)
+                        {
+                            <a href="/tags/@tag" class="badge bg-secondary text-decoration-none">#@tag</a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No recent tags</p>
+                }
             </div>
         </div>
     </div>
-}
+</div>
 
 <style>
     .tag-card {
@@ -234,6 +280,7 @@ else
 @code {
     private bool _isLoading = true;
     private bool _isExtracting = false;
+    private bool _hasRenderedOnce = false;
     private string _searchTerm = "";
     private List<TagInfo> _allTags = new();
     private List<string> _recentTags = new();
@@ -246,10 +293,32 @@ else
     private static DateTime _cacheTimestamp = DateTime.MinValue;
     private static bool _cacheInvalidated = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         DataChangeNotification.OnDataChanged += HandleDataChanged;
-        await LoadTags();
+
+        // Use cached data immediately if available
+        if (!_cacheInvalidated && _cachedTags != null && _cachedRecentTags != null)
+        {
+            _allTags = _cachedTags;
+            _recentTags = _cachedRecentTags;
+            _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_hasRenderedOnce)
+        {
+            _hasRenderedOnce = true;
+
+            // Only load if we don't have cached data
+            if (_isLoading)
+            {
+                await LoadTags();
+                StateHasChanged();
+            }
+        }
     }
 
     private async void HandleDataChanged()
@@ -276,7 +345,7 @@ else
         }
 
         _isLoading = true;
-        StateHasChanged();
+        // Don't call StateHasChanged here - skeleton is already showing
 
         try
         {

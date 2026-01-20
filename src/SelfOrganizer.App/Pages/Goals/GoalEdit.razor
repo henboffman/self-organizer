@@ -2,6 +2,7 @@
 @page "/goals/{GoalId:guid}/edit"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Goals
 @inject IGoalService GoalService
 @inject SelfOrganizer.Core.Interfaces.IBalanceDimensionService BalanceDimensionService
 @inject IDataChangeNotificationService DataChangeNotification
@@ -225,6 +226,14 @@
                     </div>
                 }
 
+                @* Habits Panel - show prominently in edit mode *@
+                @if (IsEditMode && _goal.Id != Guid.Empty)
+                {
+                    <GoalHabitsPanel Goal="_goal"
+                                     GoalChanged="OnGoalChanged"
+                                     OnHabitCreated="OnHabitCreated" />
+                }
+
                 @* Balance Impact Section *@
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -364,6 +373,7 @@
                     ProgressPercent = existingGoal.ProgressPercent,
                     LinkedProjectIds = new List<Guid>(existingGoal.LinkedProjectIds),
                     LinkedTaskIds = new List<Guid>(existingGoal.LinkedTaskIds),
+                    LinkedHabitIds = new List<Guid>(existingGoal.LinkedHabitIds),
                     Tags = new List<string>(existingGoal.Tags),
                     AiGeneratedPlan = existingGoal.AiGeneratedPlan,
                     Notes = existingGoal.Notes,
@@ -499,4 +509,29 @@
         GoalTimeframe.MultiYear => "Multi-Year",
         _ => timeframe.ToString()
     };
+
+    private async Task OnHabitCreated(Habit habit)
+    {
+        // Link the habit to the goal
+        if (!_goal.LinkedHabitIds.Contains(habit.Id))
+        {
+            _goal.LinkedHabitIds.Add(habit.Id);
+        }
+
+        // Save the goal to persist the link
+        await GoalService.UpdateAsync(_goal);
+        DataChangeNotification.NotifyDataChanged();
+        StateHasChanged();
+    }
+
+    private async Task OnGoalChanged(Goal goal)
+    {
+        // Update the local goal reference
+        _goal = goal;
+
+        // Save the updated goal
+        await GoalService.UpdateAsync(_goal);
+        DataChangeNotification.NotifyDataChanged();
+        StateHasChanged();
+    }
 }

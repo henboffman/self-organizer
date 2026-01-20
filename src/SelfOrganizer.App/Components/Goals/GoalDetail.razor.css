@@ -160,7 +160,7 @@
 }
 
 .linked-item .badge {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     flex-shrink: 0;
 }
 
@@ -251,4 +251,17 @@
     .goal-title {
         font-size: 1.25rem;
     }
+}
+
+/* Generated task badges */
+.task-time-badge {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    font-weight: 500;
+}
+
+.context-tag {
+    background-color: var(--color-secondary) !important;
+    color: white !important;
+    font-weight: 500;
 }

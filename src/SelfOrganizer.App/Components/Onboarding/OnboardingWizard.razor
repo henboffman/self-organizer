@@ -1,8 +1,10 @@
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services
 @inject IRepository<UserPreferences> PreferencesRepository
 @inject IContextService ContextService
 @inject IBalanceDimensionService BalanceDimensionService
+@inject IThemeService ThemeService
 
 @if (IsVisible)
 {
@@ -35,10 +37,144 @@
                 @switch (_currentStep)
                 {
                     case 0:
+                        @* Theme Selection - First step for immediate visual comfort *@
+                        <div class="text-center animate-fade-in">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-sun" style="font-size: 3rem; color: #f59e0b;"></span>
+                            </div>
+                            <h2 class="mb-3">Choose Your Theme</h2>
+                            <p class="text-muted mb-4">
+                                Let's start by making you comfortable. Select your preferred appearance.
+                            </p>
+                            <div class="theme-selection">
+                                <button class="theme-option @(_selectedTheme == ThemeLight ? "selected" : "")"
+                                        @onclick="SelectLightTheme">
+                                    <div class="theme-preview light-preview">
+                                        <div class="preview-sidebar"></div>
+                                        <div class="preview-content">
+                                            <div class="preview-card"></div>
+                                            <div class="preview-card"></div>
+                                        </div>
+                                    </div>
+                                    <span class="theme-name">Light Mode</span>
+                                    @if (_selectedTheme == ThemeLight)
+                                    {
+                                        <span class="oi oi-check theme-check"></span>
+                                    }
+                                </button>
+                                <button class="theme-option @(_selectedTheme == ThemeDark ? "selected" : "")"
+                                        @onclick="SelectDarkTheme">
+                                    <div class="theme-preview dark-preview">
+                                        <div class="preview-sidebar"></div>
+                                        <div class="preview-content">
+                                            <div class="preview-card"></div>
+                                            <div class="preview-card"></div>
+                                        </div>
+                                    </div>
+                                    <span class="theme-name">Dark Mode</span>
+                                    @if (_selectedTheme == ThemeDark)
+                                    {
+                                        <span class="oi oi-check theme-check"></span>
+                                    }
+                                </button>
+                                <button class="theme-option system-option @(_selectedTheme == ThemeSystem ? "selected" : "")"
+                                        @onclick="SelectSystemTheme">
+                                    <div class="theme-preview system-preview">
+                                        <div class="preview-half light-half">
+                                            <div class="preview-sidebar"></div>
+                                        </div>
+                                        <div class="preview-half dark-half">
+                                            <div class="preview-sidebar"></div>
+                                        </div>
+                                    </div>
+                                    <span class="theme-name">Match System</span>
+                                    @if (_selectedTheme == ThemeSystem)
+                                    {
+                                        <span class="oi oi-check theme-check"></span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                        break;
+
+                    case 1:
+                        @* Accessibility Settings *@
+                        <div class="text-center animate-fade-in">
+                            <div class="step-icon mb-3">
+                                <span class="oi oi-text" style="font-size: 3rem; color: #8b5cf6;"></span>
+                            </div>
+                            <h2 class="mb-3">Reading Preferences</h2>
+                            <p class="text-muted mb-4">
+                                Adjust these settings for comfortable reading. Changes apply immediately.
+                            </p>
+
+                            <div class="accessibility-options">
+                                <div class="accessibility-option">
+                                    <label class="option-label">Text Size</label>
+                                    <div class="size-selector">
+                                        <button class="size-btn @(_textSize == 90 ? "selected" : "")"
+                                                @onclick="() => SelectTextSize(90)">
+                                            <span style="font-size: 0.85rem">A</span>
+                                        </button>
+                                        <button class="size-btn @(_textSize == 100 ? "selected" : "")"
+                                                @onclick="() => SelectTextSize(100)">
+                                            <span>A</span>
+                                        </button>
+                                        <button class="size-btn @(_textSize == 110 ? "selected" : "")"
+                                                @onclick="() => SelectTextSize(110)">
+                                            <span style="font-size: 1.1rem">A</span>
+                                        </button>
+                                        <button class="size-btn @(_textSize == 125 ? "selected" : "")"
+                                                @onclick="() => SelectTextSize(125)">
+                                            <span style="font-size: 1.25rem">A</span>
+                                        </button>
+                                    </div>
+                                    <span class="size-label">@_textSize%</span>
+                                </div>
+
+                                <div class="accessibility-option">
+                                    <label class="option-label">Reduce Motion</label>
+                                    <div class="toggle-group">
+                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.RespectSystem ? "selected" : "")"
+                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.RespectSystem)">
+                                            System
+                                        </button>
+                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.AlwaysReduce ? "selected" : "")"
+                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.AlwaysReduce)">
+                                            Reduce
+                                        </button>
+                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.NeverReduce ? "selected" : "")"
+                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.NeverReduce)">
+                                            Full
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="accessibility-option">
+                                    <label class="option-label">High Contrast</label>
+                                    <button class="contrast-toggle @(_highContrast ? "enabled" : "")"
+                                            @onclick="ToggleHighContrast">
+                                        <span class="toggle-track">
+                                            <span class="toggle-thumb"></span>
+                                        </span>
+                                        <span class="toggle-label">@(_highContrast ? "On" : "Off")</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="preview-text-box mt-4">
+                                <p class="preview-text" style="font-size: @(_textSize)%">
+                                    This is sample text to preview your settings. Adjust until it feels comfortable to read.
+                                </p>
+                            </div>
+                        </div>
+                        break;
+
+                    case 2:
                         @* Welcome *@
                         <div class="text-center animate-fade-in">
                             <div class="welcome-icon mb-3">
-                                <span class="oi oi-task" style="font-size: 4rem; color: var(--bs-primary);"></span>
+                                <span class="oi oi-task" style="font-size: 4rem; color: #0d6efd;"></span>
                             </div>
                             <h2 class="mb-3">Welcome to Self Organizer</h2>
                             <p class="lead text-muted mb-4">
@@ -65,11 +201,11 @@
                         </div>
                         break;
 
-                    case 1:
+                    case 3:
                         @* App Mode Selection *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-dial" style="font-size: 3rem; color: var(--bs-primary);"></span>
+                                <span class="oi oi-dial" style="font-size: 3rem; color: #0d6efd;"></span>
                             </div>
                             <h2 class="mb-3">How Will You Use Self Organizer?</h2>
                             <p class="text-muted mb-4">
@@ -122,11 +258,11 @@
                         </div>
                         break;
 
-                    case 2:
+                    case 4:
                         @* Mode Preview *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-eye" style="font-size: 3rem; color: var(--bs-info);"></span>
+                                <span class="oi oi-eye" style="font-size: 3rem; color: #06b6d4;"></span>
                             </div>
                             <h2 class="mb-3">Your @(_selectedMode) Setup</h2>
                             <p class="text-muted mb-4">
@@ -167,11 +303,11 @@
                         </div>
                         break;
 
-                    case 3:
+                    case 5:
                         @* Capture Flow *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-inbox" style="font-size: 3rem; color: var(--bs-success);"></span>
+                                <span class="oi oi-inbox" style="font-size: 3rem; color: #22c55e;"></span>
                             </div>
                             <h2 class="mb-3">Capture Everything</h2>
                             <p class="text-muted mb-4">
@@ -209,11 +345,11 @@
                         </div>
                         break;
 
-                    case 4:
+                    case 6:
                         @* Calendar Provider *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-calendar" style="font-size: 3rem; color: var(--bs-info);"></span>
+                                <span class="oi oi-calendar" style="font-size: 3rem; color: #06b6d4;"></span>
                             </div>
                             <h2 class="mb-3">Calendar Integration</h2>
                             <p class="text-muted mb-4">
@@ -256,11 +392,11 @@
                         </div>
                         break;
 
-                    case 5:
+                    case 7:
                         @* Balance Areas Selection *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-pie-chart" style="font-size: 3rem; color: var(--bs-warning);"></span>
+                                <span class="oi oi-pie-chart" style="font-size: 3rem; color: #eab308;"></span>
                             </div>
                             <h2 class="mb-3">Track Your Balance</h2>
                             <p class="text-muted mb-4">
@@ -289,11 +425,11 @@
                         </div>
                         break;
 
-                    case 6:
+                    case 8:
                         @* Get Started *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3 animate-bounce">
-                                <span class="oi oi-bolt" style="font-size: 3rem; color: var(--bs-success);"></span>
+                                <span class="oi oi-bolt" style="font-size: 3rem; color: #22c55e;"></span>
                             </div>
                             <h2 class="mb-3">You're All Set!</h2>
                             <p class="text-muted mb-4">
@@ -358,7 +494,12 @@
     [Parameter]
     public EventCallback OnCompleted { get; set; }
 
-    private const int TotalSteps = 7;
+    // Theme constants
+    private const string ThemeLight = "light";
+    private const string ThemeDark = "dark";
+    private const string ThemeSystem = "system";
+
+    private const int TotalSteps = 9;
     private int _currentStep = 0;
     private CalendarProvider _selectedProvider = CalendarProvider.None;
     private AppMode _selectedMode = AppMode.Balanced;
@@ -369,20 +510,48 @@
     private string _animationClass = "";
     private string _stepAnimationClass = "";
 
+    // Accessibility settings
+    private string _selectedTheme = "system";
+    private int _textSize = 100;
+    private ReducedMotionMode _reducedMotion = ReducedMotionMode.RespectSystem;
+    private bool _highContrast = false;
+    private UserPreferences? _preferences;
+
     protected override async Task OnInitializedAsync()
     {
+        // Load or create preferences
+        _preferences = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (_preferences == null)
+        {
+            _preferences = new UserPreferences();
+            await PreferencesRepository.AddAsync(_preferences);
+        }
+
+        // Initialize accessibility settings from preferences
+        if (_preferences.Accessibility != null)
+        {
+            _textSize = _preferences.Accessibility.TextScalingPercent;
+            _reducedMotion = _preferences.Accessibility.ReducedMotionMode;
+            _highContrast = _preferences.Accessibility.HighContrastMode;
+        }
+
+        // Get current theme
+        _selectedTheme = await ThemeService.GetThemeAsync();
+
         await UpdatePreviews();
     }
 
     private string GetStepLabel(int step) => step switch
     {
-        0 => "Welcome",
-        1 => "Mode",
-        2 => "Preview",
-        3 => "Capture",
-        4 => "Calendar",
-        5 => "Balance",
-        6 => "Start",
+        0 => "Theme",
+        1 => "Access",
+        2 => "Welcome",
+        3 => "Mode",
+        4 => "Preview",
+        5 => "Capture",
+        6 => "Calendar",
+        7 => "Balance",
+        8 => "Start",
         _ => ""
     };
 
@@ -420,6 +589,63 @@
             await Task.Delay(300);
             _stepAnimationClass = "";
         }
+    }
+
+    private async Task SelectLightTheme() => await SelectTheme(ThemeLight);
+    private async Task SelectDarkTheme() => await SelectTheme(ThemeDark);
+    private async Task SelectSystemTheme() => await SelectTheme(ThemeSystem);
+
+    private async Task SelectTheme(string theme)
+    {
+        _selectedTheme = theme;
+
+        // Apply theme immediately
+        if (theme == ThemeSystem)
+        {
+            await ThemeService.UseSystemThemeAsync();
+        }
+        else
+        {
+            await ThemeService.SetThemeAsync(theme);
+        }
+
+        await SavePreferences();
+    }
+
+    private async Task SelectTextSize(int size)
+    {
+        _textSize = size;
+        await SaveAccessibilitySettings();
+    }
+
+    private async Task SelectReducedMotion(ReducedMotionMode mode)
+    {
+        _reducedMotion = mode;
+        await SaveAccessibilitySettings();
+    }
+
+    private async Task ToggleHighContrast()
+    {
+        _highContrast = !_highContrast;
+        await SaveAccessibilitySettings();
+    }
+
+    private async Task SaveAccessibilitySettings()
+    {
+        if (_preferences == null) return;
+
+        _preferences.Accessibility ??= new AccessibilitySettings();
+        _preferences.Accessibility.TextScalingPercent = _textSize;
+        _preferences.Accessibility.ReducedMotionMode = _reducedMotion;
+        _preferences.Accessibility.HighContrastMode = _highContrast;
+
+        await PreferencesRepository.UpdateAsync(_preferences);
+    }
+
+    private async Task SavePreferences()
+    {
+        if (_preferences == null) return;
+        await PreferencesRepository.UpdateAsync(_preferences);
     }
 
     private void SelectProvider(CalendarProvider provider)
@@ -468,28 +694,25 @@
 
         try
         {
-            // Get or create preferences
-            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
-            if (prefs == null)
+            if (_preferences == null)
             {
-                prefs = new UserPreferences();
+                _preferences = new UserPreferences();
             }
 
             // Save all preferences
-            prefs.OnboardingCompleted = true;
-            prefs.PreferredCalendarProvider = _selectedProvider;
-            prefs.AppMode = _selectedMode;
-            prefs.AppModeSetAt = DateTime.UtcNow;
-            prefs.EnabledBalanceDimensions = _enabledDimensions.ToList();
+            _preferences.OnboardingCompleted = true;
+            _preferences.PreferredCalendarProvider = _selectedProvider;
+            _preferences.AppMode = _selectedMode;
+            _preferences.AppModeSetAt = DateTime.UtcNow;
+            _preferences.EnabledBalanceDimensions = _enabledDimensions.ToList();
 
-            if (prefs.CreatedAt == default)
-            {
-                await PreferencesRepository.AddAsync(prefs);
-            }
-            else
-            {
-                await PreferencesRepository.UpdateAsync(prefs);
-            }
+            // Ensure accessibility settings are saved
+            _preferences.Accessibility ??= new AccessibilitySettings();
+            _preferences.Accessibility.TextScalingPercent = _textSize;
+            _preferences.Accessibility.ReducedMotionMode = _reducedMotion;
+            _preferences.Accessibility.HighContrastMode = _highContrast;
+
+            await PreferencesRepository.UpdateAsync(_preferences);
 
             // Seed contexts for the selected mode
             await ContextService.SeedContextsForModeAsync(_selectedMode);

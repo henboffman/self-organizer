@@ -104,20 +104,20 @@
         </div>
         <div class="col-6 col-md-4 col-lg-2 mb-3">
             <div class="summary-card text-center p-3 rounded">
-                <div class="summary-value">@_report.TotalCaptureItems</div>
-                <div class="summary-label">Ideas Captured</div>
+                <div class="summary-value">@_report.TotalFocusSessions</div>
+                <div class="summary-label">Focus Sessions</div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-lg-2 mb-3">
             <div class="summary-card highlight text-center p-3 rounded">
-                <div class="summary-value">@_report.DeepWorkTasksCompleted</div>
-                <div class="summary-label">Deep Work Tasks</div>
+                <div class="summary-value">@_report.TotalHabitCompletions</div>
+                <div class="summary-label">Habits Completed</div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-lg-2 mb-3">
             <div class="summary-card highlight text-center p-3 rounded">
-                <div class="summary-value">@_report.HighPriorityTasksCompleted</div>
-                <div class="summary-label">High Priority</div>
+                <div class="summary-value">@_report.TotalMeetings</div>
+                <div class="summary-label">Meetings</div>
             </div>
         </div>
     </div>
@@ -146,7 +146,7 @@
                                     <span>@goal.EndProgressPercent% complete</span>
                                     <span>@goal.Category</span>
                                 </div>
-                                @if (goal.LinkedTasksCompleted > 0 || goal.LinkedProjectsWorkedOn > 0)
+                                @if (goal.LinkedTasksCompleted > 0 || goal.LinkedProjectsWorkedOn > 0 || goal.LinkedHabits.Any())
                                 {
                                     <div class="mt-2 small">
                                         @if (goal.LinkedTasksCompleted > 0)
@@ -155,13 +155,245 @@
                                         }
                                         @if (goal.LinkedProjectsWorkedOn > 0)
                                         {
-                                            <span><span class="oi oi-folder text-primary"></span> @goal.LinkedProjectsWorkedOn projects</span>
+                                            <span class="me-2"><span class="oi oi-folder text-primary"></span> @goal.LinkedProjectsWorkedOn projects</span>
                                         }
+                                        @if (goal.LinkedHabits.Any())
+                                        {
+                                            <span><span class="oi oi-pulse text-info"></span> @goal.LinkedHabits.Count habits</span>
+                                        }
+                                    </div>
+                                    @if (goal.LinkedHabits.Any())
+                                    {
+                                        <div class="mt-2 linked-habits">
+                                            @foreach (var habit in goal.LinkedHabits.Take(3))
+                                            {
+                                                <div class="linked-habit-item d-flex align-items-center gap-2 small">
+                                                    <span class="habit-name text-truncate">@habit.Name</span>
+                                                    @if (habit.IsAiSuggested)
+                                                    {
+                                                        <span class="badge bg-purple-subtle text-purple" title="AI Suggested">AI</span>
+                                                    }
+                                                    <span class="text-muted">@habit.CompletionRate.ToString("F0")%</span>
+                                                    @if (habit.CurrentStreak > 0)
+                                                    {
+                                                        <span class="text-warning" title="Current streak">@habit.CurrentStreak</span>
+                                                    }
+                                                </div>
+                                            }
+                                            @if (goal.LinkedHabits.Count > 3)
+                                            {
+                                                <div class="text-muted small">+@(goal.LinkedHabits.Count - 3) more habits</div>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Focus Sessions Section *@
+    @if (_report.FocusSessions.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-timer me-2"></span>Focus Sessions</span>
+                <div class="d-flex gap-3 small">
+                    <span class="text-muted">@FormatMinutes(_report.TotalFocusMinutes) total</span>
+                    @if (_report.AverageFocusRating > 0)
+                    {
+                        <span class="text-muted">@_report.AverageFocusRating.ToString("F1") avg rating</span>
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4 mb-2 mb-md-0">
+                        <div class="focus-stat-card p-3 rounded bg-light">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted">Sessions</span>
+                                <span class="h5 mb-0 text-primary">@_report.TotalFocusSessions</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-2 mb-md-0">
+                        <div class="focus-stat-card p-3 rounded bg-light">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted">Deep Focus Time</span>
+                                <span class="h5 mb-0 text-primary">@FormatMinutes(_report.TotalFocusMinutes)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="focus-stat-card p-3 rounded bg-light">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted">Distracted</span>
+                                <span class="h5 mb-0 @(_report.FocusSessionsDistracted > 0 ? "text-warning" : "text-success")">
+                                    @_report.FocusSessionsDistracted
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @if (_report.FocusSessions.Take(5).Any())
+                {
+                    <h6 class="text-muted mb-2">Recent Sessions</h6>
+                    <div class="list-group list-group-flush">
+                        @foreach (var session in _report.FocusSessions.Take(_showAllFocusSessions ? int.MaxValue : 5))
+                        {
+                            <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-medium">@(session.TaskTitle ?? "Untitled Session")</span>
+                                    <div class="small text-muted">
+                                        @session.StartedAt.ToString("MMM d, h:mm tt") &bull; @session.DurationMinutes min
+                                        @if (session.TaskCompleted)
+                                        {
+                                            <span class="badge bg-success ms-1">Completed</span>
+                                        }
+                                        @if (session.WasDistracted)
+                                        {
+                                            <span class="badge bg-warning text-dark ms-1">Distracted</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <span class="@(i <= session.FocusRating ? "text-warning" : "text-muted")">★</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    @if (_report.FocusSessions.Count > 5)
+                    {
+                        <div class="text-center pt-2">
+                            <button class="btn btn-link" @onclick="@(() => _showAllFocusSessions = !_showAllFocusSessions)">
+                                @if (_showAllFocusSessions)
+                                {
+                                    <span>Show Less</span>
+                                }
+                                else
+                                {
+                                    <span>Show All @_report.FocusSessions.Count Sessions</span>
+                                }
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    @* Habits Progress Section *@
+    @if (_report.HabitProgress.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-check me-2"></span>Habit Progress</span>
+                <span class="badge @(_report.HabitCompletionRate >= 80 ? "bg-success" : _report.HabitCompletionRate >= 50 ? "bg-warning text-dark" : "bg-secondary")">
+                    @_report.HabitCompletionRate.ToString("F0")% completion rate
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var habit in _report.HabitProgress)
+                    {
+                        var isNewHabit = habit.HabitStartDate > _report.StartDate;
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="habit-card p-3 rounded" style="border-left: 4px solid @(habit.Color ?? "var(--color-primary)");">
+                                <div class="d-flex align-items-center mb-2">
+                                    @if (!string.IsNullOrEmpty(habit.Icon))
+                                    {
+                                        <span class="me-2">@habit.Icon</span>
+                                    }
+                                    <h6 class="mb-0 flex-grow-1">@habit.Name</h6>
+                                    @if (habit.IsAiSuggested)
+                                    {
+                                        <span class="badge bg-purple-subtle text-purple me-1" title="AI Suggested">
+                                            <span class="oi oi-lightbulb"></span>
+                                        </span>
+                                    }
+                                    @if (habit.CurrentStreak > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark" title="Current Streak">
+                                            🔥 @habit.CurrentStreak
+                                        </span>
+                                    }
+                                </div>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar" role="progressbar"
+                                         style="width: @habit.CompletionRate%; background-color: @(habit.Color ?? "var(--color-primary)");">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>@habit.CompletionsInPeriod completions</span>
+                                    <span>@habit.CompletionRate.ToString("F0")%</span>
+                                </div>
+                                @if (habit.LinkedGoalTitles.Any())
+                                {
+                                    <div class="mt-2 small">
+                                        <span class="text-muted"><span class="oi oi-target me-1"></span>Goals:</span>
+                                        @foreach (var goalTitle in habit.LinkedGoalTitles.Take(2))
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary ms-1">@TruncateTitle(goalTitle, 20)</span>
+                                        }
+                                        @if (habit.LinkedGoalTitles.Count > 2)
+                                        {
+                                            <span class="text-muted ms-1">+@(habit.LinkedGoalTitles.Count - 2)</span>
+                                        }
+                                    </div>
+                                }
+                                @if (isNewHabit)
+                                {
+                                    <div class="small text-muted mt-1 fst-italic">
+                                        <span class="oi oi-info me-1"></span>Based on @habit.ActiveDaysInPeriod day@(habit.ActiveDaysInPeriod > 1 ? "s" : "") since started
                                     </div>
                                 }
                             </div>
                         </div>
                     }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Meetings Overview Section *@
+    @if (_report.TotalMeetings > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-calendar me-2"></span>Meetings</span>
+                <span class="badge bg-secondary">@FormatMinutes(_report.TotalMeetingMinutes) in meetings</span>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4 text-center mb-3 mb-md-0">
+                        <div class="display-4 text-primary">@_report.TotalMeetings</div>
+                        <div class="text-muted">Total Meetings</div>
+                    </div>
+                    <div class="col-md-8">
+                        @if (_report.MeetingsByCategory.Any())
+                        {
+                            <h6 class="text-muted mb-3">By Category</h6>
+                            @foreach (var (category, count) in _report.MeetingsByCategory.OrderByDescending(x => x.Value))
+                            {
+                                var percentage = _report.TotalMeetings > 0 ? (double)count / _report.TotalMeetings * 100 : 0;
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>@category</span>
+                                        <span class="text-muted">@count (@percentage.ToString("F0")%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-info" style="width: @percentage%"></div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -420,6 +652,7 @@ else if (!_isGenerating)
     private bool _isExporting = false;
     private bool _showAllTasks = false;
     private bool _showAllCaptures = false;
+    private bool _showAllFocusSessions = false;
     private string? _exportMessage;
     private bool _exportSuccess;
 
@@ -439,6 +672,7 @@ else if (!_isGenerating)
         _isGenerating = true;
         _showAllTasks = false;
         _showAllCaptures = false;
+        _showAllFocusSessions = false;
         _exportMessage = null;
 
         try
@@ -545,4 +779,10 @@ else if (!_isGenerating)
         GoalStatus.OnHold => "bg-warning text-dark",
         _ => "bg-secondary"
     };
+
+    private string TruncateTitle(string title, int maxLength)
+    {
+        if (string.IsNullOrEmpty(title)) return "";
+        return title.Length <= maxLength ? title : title.Substring(0, maxLength - 3) + "...";
+    }
 }

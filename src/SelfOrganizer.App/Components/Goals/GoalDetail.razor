@@ -1,8 +1,10 @@
 @using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
 @using SelfOrganizer.App.Services.Intelligence
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @inject IGoalService GoalService
+@inject IRepository<Habit> HabitRepository
 @inject IProjectService ProjectService
 @inject ITaskService TaskService
 @inject IGoalAiService GoalAiService
@@ -19,7 +21,7 @@
                 {
                     <span class="badge bg-danger">High Priority</span>
                 }
-                <span class="badge bg-light text-dark">@Goal.Timeframe</span>
+                <span class="badge status-badge">@Goal.Timeframe</span>
             </div>
             <h4 class="goal-title mb-0">@Goal.Title</h4>
         </div>
@@ -222,11 +224,11 @@
                                 {
                                     <div class="text-muted small">@task.Task.Description</div>
                                 }
-                                <div class="d-flex gap-2 mt-1">
-                                    <span class="badge bg-light text-dark">@task.Task.EstimatedMinutes min</span>
+                                <div class="d-flex gap-2 mt-1 flex-wrap">
+                                    <span class="badge task-time-badge">@task.Task.EstimatedMinutes min</span>
                                     @foreach (var context in task.Task.Contexts.Take(2))
                                     {
-                                        <span class="badge bg-secondary">@context</span>
+                                        <span class="badge context-tag">@context</span>
                                     }
                                 </div>
                             </div>
@@ -517,6 +519,11 @@
                     }
                 </div>
             </div>
+
+            @* Supporting Habits *@
+            <GoalHabitsPanel Goal="Goal"
+                             GoalChanged="OnGoalChangedFromHabits"
+                             OnHabitCreated="OnHabitCreatedFromPanel" />
 
             @* Tags *@
             @if (Goal.Tags.Any())
@@ -1320,6 +1327,26 @@
         // Close modal and refresh
         _showNewTaskModal = false;
         await LoadLinkedItems();
+        await OnGoalUpdated.InvokeAsync();
+        StateHasChanged();
+    }
+
+    // Habit panel callbacks
+    private async Task OnGoalChangedFromHabits(Goal updatedGoal)
+    {
+        // Goal was updated (e.g., linked habits changed)
+        await OnGoalUpdated.InvokeAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnHabitCreatedFromPanel(Habit habit)
+    {
+        // A new habit was created and linked to this goal
+        if (!Goal.LinkedHabitIds.Contains(habit.Id))
+        {
+            Goal.LinkedHabitIds.Add(habit.Id);
+            await GoalService.UpdateAsync(Goal);
+        }
         await OnGoalUpdated.InvokeAsync();
         StateHasChanged();
     }

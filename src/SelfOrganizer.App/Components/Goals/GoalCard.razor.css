@@ -73,7 +73,7 @@
 .category-badge {
     display: inline-block;
     padding: 0.2em 0.6em;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -141,7 +141,7 @@
 }
 
 .task-check {
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     flex-shrink: 0;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .tags .badge {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 500;
 }
 
@@ -226,6 +226,6 @@
     }
 
     .category-badge {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
     }
 }

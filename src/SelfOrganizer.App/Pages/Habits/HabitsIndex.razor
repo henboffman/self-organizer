@@ -1,9 +1,12 @@
 @page "/habits"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
-@inject SelfOrganizer.Core.Interfaces.IRepository<Habit> HabitRepository
-@inject SelfOrganizer.Core.Interfaces.IRepository<HabitLog> HabitLogRepository
+@using SelfOrganizer.Core.Interfaces
+@inject IRepository<Habit> HabitRepository
+@inject IRepository<HabitLog> HabitLogRepository
+@inject IRepository<Goal> GoalRepository
 @inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -96,6 +99,7 @@ else
             @foreach (var habit in _habits.Where(h => h.IsActive).OrderBy(h => h.SortOrder))
             {
                 var isCompleted = IsHabitCompletedForDate(habit.Id, _currentDate);
+                var linkedGoals = GetLinkedGoals(habit);
                 <div class="habit-item @(isCompleted ? "completed" : "")">
                     <button class="habit-check" @onclick="() => ToggleHabit(habit)">
                         @if (isCompleted)
@@ -104,10 +108,24 @@ else
                         }
                     </button>
                     <div class="habit-info">
-                        <div class="habit-name">@habit.Name</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="habit-name">@habit.Name</span>
+                            @if (habit.IsAiSuggested)
+                            {
+                                <span class="badge bg-purple-subtle text-purple small" title="AI Suggested">
+                                    <span class="oi oi-lightbulb me-1"></span>AI
+                                </span>
+                            }
+                        </div>
                         @if (!string.IsNullOrEmpty(habit.Description))
                         {
                             <div class="habit-description">@habit.Description</div>
+                        }
+                        @if (!string.IsNullOrEmpty(habit.AiRationale))
+                        {
+                            <div class="habit-rationale text-muted small fst-italic mt-1">
+                                <span class="oi oi-info me-1"></span>@habit.AiRationale
+                            </div>
                         }
                         <div class="habit-meta">
                             <span class="badge bg-secondary">@habit.Frequency</span>
@@ -117,6 +135,18 @@ else
                             }
                             <span class="text-muted small ms-2">@GetStreakForHabit(habit.Id) day streak</span>
                         </div>
+                        @if (linkedGoals.Any())
+                        {
+                            <div class="habit-goals mt-2">
+                                <span class="text-muted small me-1"><span class="oi oi-target"></span> Goals:</span>
+                                @foreach (var goal in linkedGoals)
+                                {
+                                    <a href="/goals/@goal.Id/edit" class="badge bg-primary-subtle text-primary goal-link" title="@goal.Title">
+                                        @TruncateTitle(goal.Title, 25)
+                                    </a>
+                                }
+                            </div>
+                        }
                     </div>
                     <div class="habit-actions">
                         <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditHabit(habit)">
@@ -217,6 +247,7 @@ else
     private bool _isLoading = true;
     private List<Habit> _habits = new();
     private List<HabitLog> _habitLogs = new();
+    private List<Goal> _goals = new();
     private DateOnly _currentDate = DateOnly.FromDateTime(DateTime.Today);
 
     private bool _showModal = false;
@@ -239,8 +270,15 @@ else
         _isLoading = true;
         try
         {
-            _habits = (await HabitRepository.GetAllAsync()).ToList();
-            _habitLogs = (await HabitLogRepository.GetAllAsync()).ToList();
+            var habitsTask = HabitRepository.GetAllAsync();
+            var logsTask = HabitLogRepository.GetAllAsync();
+            var goalsTask = GoalRepository.GetAllAsync();
+
+            await Task.WhenAll(habitsTask, logsTask, goalsTask);
+
+            _habits = (await habitsTask).ToList();
+            _habitLogs = (await logsTask).ToList();
+            _goals = (await goalsTask).Where(g => g.Status == GoalStatus.Active).ToList();
             CalculateStats();
         }
         finally
@@ -416,5 +454,27 @@ else
         await HabitRepository.UpdateAsync(habit);
         await LoadData();
         DataChangeNotification.NotifyDataChanged();
+    }
+
+    private List<Goal> GetLinkedGoals(Habit habit)
+    {
+        // Get goals linked from both directions
+        var linkedFromHabit = _goals.Where(g => habit.LinkedGoalIds.Contains(g.Id)).ToList();
+        var linkedFromGoals = _goals.Where(g => g.LinkedHabitIds.Contains(habit.Id)).ToList();
+
+        // Combine and deduplicate
+        return linkedFromHabit.Union(linkedFromGoals, new GoalComparer()).ToList();
+    }
+
+    private string TruncateTitle(string title, int maxLength)
+    {
+        if (string.IsNullOrEmpty(title)) return "";
+        return title.Length <= maxLength ? title : title.Substring(0, maxLength - 3) + "...";
+    }
+
+    private class GoalComparer : IEqualityComparer<Goal>
+    {
+        public bool Equals(Goal? x, Goal? y) => x?.Id == y?.Id;
+        public int GetHashCode(Goal obj) => obj.Id.GetHashCode();
     }
 }

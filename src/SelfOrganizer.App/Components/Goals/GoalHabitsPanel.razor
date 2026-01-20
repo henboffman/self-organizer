@@ -1,0 +1,635 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services.Intelligence
+@inject IRepository<Habit> HabitRepository
+@inject IHabitAiService HabitAiService
+
+<div class="goal-habits-panel">
+    <div class="panel-header">
+        <h6 class="mb-0">
+            <span class="oi oi-pulse me-2"></span>Supporting Habits
+        </h6>
+        <div class="d-flex gap-2">
+            @if (_aiAvailable)
+            {
+                <button class="btn btn-sm btn-outline-primary" @onclick="GenerateHabits"
+                        disabled="@(_isGenerating || string.IsNullOrWhiteSpace(Goal?.Title))"
+                        title="Generate habit suggestions with AI">
+                    @if (_isGenerating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Generating...</span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-lightbulb me-1"></span>
+                        <span>Suggest Habits</span>
+                    }
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ShowLinkModal" title="Link existing habit">
+                <span class="oi oi-link-intact"></span>
+            </button>
+        </div>
+    </div>
+
+    @if (_suggestedHabits.Any())
+    {
+        <div class="suggested-habits mt-3">
+            <div class="suggestion-header">
+                <span class="badge bg-primary-subtle text-primary">
+                    <span class="oi oi-lightbulb me-1"></span>AI Suggestions
+                </span>
+                @if (!string.IsNullOrEmpty(_overallStrategy))
+                {
+                    <p class="strategy-text mt-2 mb-0">@_overallStrategy</p>
+                }
+            </div>
+
+            <div class="habit-suggestions-list mt-3">
+                @foreach (var habit in _suggestedHabits)
+                {
+                    var isAccepted = _acceptedHabitNames.Contains(habit.Name);
+                    <div class="suggested-habit-card @(isAccepted ? "accepted" : "")">
+                        <div class="habit-main">
+                            <div class="habit-title">
+                                <strong>@habit.Name</strong>
+                                <span class="badge impact-@habit.ImpactLevel.ToLower()">@habit.ImpactLevel Impact</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(habit.Description))
+                            {
+                                <p class="habit-description">@habit.Description</p>
+                            }
+                            <div class="habit-meta">
+                                <span class="meta-item">
+                                    <span class="oi oi-clock"></span>@habit.Frequency
+                                </span>
+                                @if (!string.IsNullOrEmpty(habit.PreferredTimeOfDay))
+                                {
+                                    <span class="meta-item">
+                                        <span class="oi oi-sun"></span>@habit.PreferredTimeOfDay
+                                    </span>
+                                }
+                                @if (!string.IsNullOrEmpty(habit.Category))
+                                {
+                                    <span class="meta-item category">@habit.Category</span>
+                                }
+                            </div>
+                        </div>
+
+                        <details class="habit-details">
+                            <summary>Why this helps</summary>
+                            <p>@habit.Rationale</p>
+                            @if (!string.IsNullOrEmpty(habit.StartSmallTip))
+                            {
+                                <div class="start-small">
+                                    <strong>Start small:</strong> @habit.StartSmallTip
+                                </div>
+                            }
+                        </details>
+
+                        <div class="habit-actions">
+                            @if (isAccepted)
+                            {
+                                <span class="accepted-badge">
+                                    <span class="oi oi-check"></span> Added
+                                </span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick="() => AcceptHabit(habit)">
+                                    <span class="oi oi-plus me-1"></span>Add Habit
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => DismissHabit(habit)">
+                                    Dismiss
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="suggestion-actions mt-3">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSuggestions">
+                    Clear Suggestions
+                </button>
+            </div>
+        </div>
+    }
+
+    @* Linked Habits *@
+    @if (_linkedHabits.Any())
+    {
+        <div class="linked-habits mt-3">
+            <div class="linked-header">
+                <span class="text-muted small">Linked Habits (@_linkedHabits.Count)</span>
+            </div>
+            <div class="linked-list">
+                @foreach (var habit in _linkedHabits)
+                {
+                    <div class="linked-habit-item">
+                        <div class="habit-info">
+                            <span class="habit-name">@habit.Name</span>
+                            <span class="badge bg-secondary">@habit.Frequency</span>
+                            @if (habit.IsAiSuggested)
+                            {
+                                <span class="badge bg-primary-subtle text-primary" title="AI suggested">
+                                    <span class="oi oi-lightbulb"></span>
+                                </span>
+                            }
+                        </div>
+                        <button class="btn btn-sm btn-ghost" @onclick="() => UnlinkHabit(habit)" title="Unlink habit">
+                            <span class="oi oi-x"></span>
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (!_suggestedHabits.Any())
+    {
+        <div class="empty-state mt-3">
+            <p class="text-muted small mb-0">
+                No habits linked yet.
+                @if (_aiAvailable)
+                {
+                    <text>Click "Suggest Habits" to get AI recommendations.</text>
+                }
+            </p>
+        </div>
+    }
+
+    @* Link Existing Habit Modal *@
+    @if (_showLinkModal)
+    {
+        <div class="modal-backdrop fade show" @onclick="CloseLinkModal"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Link Existing Habit</h5>
+                        <button type="button" class="btn-close" @onclick="CloseLinkModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!_availableHabits.Any())
+                        {
+                            <p class="text-muted">No habits available to link. Create some habits first!</p>
+                        }
+                        else
+                        {
+                            <div class="available-habits-list">
+                                @foreach (var habit in _availableHabits)
+                                {
+                                    var isLinked = Goal?.LinkedHabitIds.Contains(habit.Id) ?? false;
+                                    <div class="available-habit-item @(isLinked ? "linked" : "")"
+                                         @onclick="() => ToggleHabitLink(habit)">
+                                        <div class="habit-check">
+                                            @if (isLinked)
+                                            {
+                                                <span class="oi oi-check"></span>
+                                            }
+                                        </div>
+                                        <div class="habit-details">
+                                            <span class="habit-name">@habit.Name</span>
+                                            <span class="badge bg-secondary">@habit.Frequency</span>
+                                            @if (!string.IsNullOrEmpty(habit.Category))
+                                            {
+                                                <span class="badge bg-info">@habit.Category</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseLinkModal">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .goal-habits-panel {
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        background: var(--bg-secondary);
+        margin-bottom: var(--space-lg);
+        overflow: hidden;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--space-sm);
+    }
+
+    .panel-header .d-flex {
+        flex-shrink: 0;
+    }
+
+    .suggestion-header {
+        padding-bottom: var(--space-sm);
+        border-bottom: 1px solid var(--border-muted);
+    }
+
+    .strategy-text {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-style: italic;
+    }
+
+    .habit-suggestions-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-md);
+    }
+
+    .suggested-habit-card {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        border: 1px solid var(--border-muted);
+        transition: all var(--transition-fast);
+    }
+
+    .suggested-habit-card.accepted {
+        border-color: var(--color-success);
+        background: var(--color-success-bg);
+    }
+
+    .habit-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        flex-wrap: wrap;
+    }
+
+    .habit-description {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: var(--space-xs) 0;
+    }
+
+    .habit-meta {
+        display: flex;
+        gap: var(--space-md);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: var(--space-xs);
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .meta-item.category {
+        background: var(--bg-secondary);
+        padding: 2px 8px;
+        border-radius: var(--radius-sm);
+    }
+
+    .habit-details {
+        margin-top: var(--space-sm);
+        font-size: 0.85rem;
+    }
+
+    .habit-details summary {
+        color: var(--color-primary);
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .habit-details p {
+        margin-top: var(--space-sm);
+        color: var(--text-secondary);
+    }
+
+    .start-small {
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+        background: var(--color-primary-subtle);
+        border-radius: var(--radius-sm);
+        font-size: 0.8rem;
+    }
+
+    .habit-actions {
+        display: flex;
+        gap: var(--space-sm);
+        margin-top: var(--space-md);
+        padding-top: var(--space-sm);
+        border-top: 1px solid var(--border-muted);
+    }
+
+    .accepted-badge {
+        color: var(--color-success);
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+
+    .impact-high {
+        background-color: #10b981;
+        color: #ffffff;
+    }
+
+    .impact-medium {
+        background-color: #6366f1;
+        color: #ffffff;
+    }
+
+    .impact-low {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    /* Override Bootstrap subtle badges for better contrast */
+    .goal-habits-panel .badge.bg-primary-subtle {
+        background-color: var(--color-primary) !important;
+        color: #ffffff !important;
+    }
+
+    .goal-habits-panel .badge.text-primary {
+        color: #ffffff !important;
+    }
+
+    .linked-habits {
+        border-top: 1px solid var(--border-muted);
+        padding-top: var(--space-md);
+    }
+
+    .linked-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+        margin-top: var(--space-sm);
+    }
+
+    .linked-habit-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-xs) var(--space-sm);
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+    }
+
+    .habit-info {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: var(--space-md);
+    }
+
+    /* Modal styles */
+    .available-habits-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+
+    .available-habit-item {
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-sm) var(--space-md);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .available-habit-item:hover {
+        border-color: var(--color-primary);
+        background: var(--color-primary-subtle);
+    }
+
+    .available-habit-item.linked {
+        border-color: var(--color-primary);
+        background: var(--color-primary-subtle);
+    }
+
+    .habit-check {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border-default);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-primary);
+    }
+
+    .available-habit-item.linked .habit-check {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: white;
+    }
+
+    .btn-ghost {
+        background: transparent;
+        border: none;
+        padding: 4px 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .btn-ghost:hover {
+        color: var(--color-danger);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Goal? Goal { get; set; }
+
+    [Parameter]
+    public EventCallback<Goal> GoalChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<Habit> OnHabitCreated { get; set; }
+
+    private bool _aiAvailable = false;
+    private bool _isGenerating = false;
+    private bool _showLinkModal = false;
+    private string _overallStrategy = "";
+    private List<SuggestedHabit> _suggestedHabits = new();
+    private HashSet<string> _acceptedHabitNames = new();
+    private List<Habit> _linkedHabits = new();
+    private List<Habit> _availableHabits = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _aiAvailable = await HabitAiService.IsAvailableAsync();
+        await LoadHabits();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadLinkedHabits();
+    }
+
+    private async Task LoadHabits()
+    {
+        var allHabits = await HabitRepository.GetAllAsync();
+        _availableHabits = allHabits.Where(h => h.IsActive).OrderBy(h => h.Name).ToList();
+        await LoadLinkedHabits();
+    }
+
+    private async Task LoadLinkedHabits()
+    {
+        if (Goal?.LinkedHabitIds == null || !Goal.LinkedHabitIds.Any())
+        {
+            _linkedHabits = new();
+            return;
+        }
+
+        var allHabits = await HabitRepository.GetAllAsync();
+        _linkedHabits = allHabits.Where(h => Goal.LinkedHabitIds.Contains(h.Id)).ToList();
+    }
+
+    private async Task GenerateHabits()
+    {
+        if (Goal == null || string.IsNullOrWhiteSpace(Goal.Title)) return;
+
+        _isGenerating = true;
+        _suggestedHabits.Clear();
+        _acceptedHabitNames.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var result = await HabitAiService.GenerateHabitsForGoalAsync(Goal);
+            if (result != null)
+            {
+                _overallStrategy = result.OverallStrategy;
+                _suggestedHabits = result.SuggestedHabits;
+            }
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private async Task AcceptHabit(SuggestedHabit suggestion)
+    {
+        if (Goal == null) return;
+
+        // Create the habit
+        var habit = new Habit
+        {
+            Id = Guid.NewGuid(),
+            Name = suggestion.Name,
+            Description = suggestion.Description,
+            Category = suggestion.Category,
+            Frequency = ParseFrequency(suggestion.Frequency),
+            TargetCount = suggestion.TargetCount,
+            PreferredTime = ParseTimeOfDay(suggestion.PreferredTimeOfDay),
+            IsActive = true,
+            IsAiSuggested = true,
+            AiRationale = suggestion.Rationale,
+            LinkedGoalIds = new List<Guid> { Goal.Id },
+            StartDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        await HabitRepository.AddAsync(habit);
+
+        // Link to goal
+        if (!Goal.LinkedHabitIds.Contains(habit.Id))
+        {
+            Goal.LinkedHabitIds.Add(habit.Id);
+            await GoalChanged.InvokeAsync(Goal);
+        }
+
+        _acceptedHabitNames.Add(suggestion.Name);
+        await LoadHabits();
+        await OnHabitCreated.InvokeAsync(habit);
+    }
+
+    private void DismissHabit(SuggestedHabit suggestion)
+    {
+        _suggestedHabits.Remove(suggestion);
+    }
+
+    private void ClearSuggestions()
+    {
+        _suggestedHabits.Clear();
+        _overallStrategy = "";
+        _acceptedHabitNames.Clear();
+    }
+
+    private async Task ToggleHabitLink(Habit habit)
+    {
+        if (Goal == null) return;
+
+        if (Goal.LinkedHabitIds.Contains(habit.Id))
+        {
+            Goal.LinkedHabitIds.Remove(habit.Id);
+            habit.LinkedGoalIds.Remove(Goal.Id);
+        }
+        else
+        {
+            Goal.LinkedHabitIds.Add(habit.Id);
+            if (!habit.LinkedGoalIds.Contains(Goal.Id))
+            {
+                habit.LinkedGoalIds.Add(Goal.Id);
+            }
+        }
+
+        await HabitRepository.UpdateAsync(habit);
+        await GoalChanged.InvokeAsync(Goal);
+        await LoadLinkedHabits();
+    }
+
+    private async Task UnlinkHabit(Habit habit)
+    {
+        if (Goal == null) return;
+
+        Goal.LinkedHabitIds.Remove(habit.Id);
+        habit.LinkedGoalIds.Remove(Goal.Id);
+
+        await HabitRepository.UpdateAsync(habit);
+        await GoalChanged.InvokeAsync(Goal);
+        await LoadLinkedHabits();
+    }
+
+    private void ShowLinkModal()
+    {
+        _showLinkModal = true;
+    }
+
+    private void CloseLinkModal()
+    {
+        _showLinkModal = false;
+    }
+
+    private HabitFrequency ParseFrequency(string frequency) => frequency?.ToLower() switch
+    {
+        "daily" => HabitFrequency.Daily,
+        "weekly" => HabitFrequency.Weekly,
+        "weekdays" => HabitFrequency.Weekdays,
+        "weekends" => HabitFrequency.Weekends,
+        "monthly" => HabitFrequency.Monthly,
+        _ => HabitFrequency.Daily
+    };
+
+    private TimeOnly? ParseTimeOfDay(string? timeOfDay) => timeOfDay?.ToLower() switch
+    {
+        "morning" => new TimeOnly(8, 0),
+        "afternoon" => new TimeOnly(14, 0),
+        "evening" => new TimeOnly(19, 0),
+        _ => null
+    };
+}

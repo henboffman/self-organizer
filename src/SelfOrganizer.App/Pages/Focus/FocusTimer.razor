@@ -6,147 +6,212 @@
 @inject IFocusTimerState FocusTimerService
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject SelfOrganizer.Core.Interfaces.IRepository<Project> ProjectRepository
 @inject IDataChangeNotificationService DataChangeNotification
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @inject SelfOrganizer.Core.Interfaces.IRepository<FocusSessionLog> FocusSessionRepository
 @implements IDisposable
 
-<div class="focus-container">
+<div class="focus-page">
     @if (_state.TaskTitle == null)
     {
-        <div class="text-center py-4">
-            <h2 class="mb-2">
-                <span class="oi oi-clock me-2"></span>Focus Timer
-            </h2>
-            <p class="text-muted mb-4">Select a task to focus on, or start a free focus session.</p>
+        <div class="focus-selection-layout">
+            <div class="focus-header">
+                <h2 class="mb-1">
+                    <span class="oi oi-clock me-2"></span>Focus Timer
+                </h2>
+                <p class="text-muted mb-0">Select a task to focus on, or start a free session.</p>
+            </div>
 
-            @* Task Search/Selection *@
-            <div class="task-selection-panel mb-4">
-                @* Search input *@
-                <div class="search-box mb-3">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0">
-                            <span class="oi oi-magnifying-glass text-muted"></span>
-                        </span>
-                        <input type="text"
-                               class="form-control border-start-0"
-                               placeholder="Search tasks or create new..."
-                               @bind="_searchQuery"
-                               @bind:event="oninput"
-                               @onkeydown="HandleSearchKeydown" />
-                        @if (!string.IsNullOrEmpty(_searchQuery))
-                        {
-                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">
-                                <span class="oi oi-x"></span>
+            <div class="focus-content">
+                @* Left side: Task selection *@
+                <div class="task-selection-area">
+                    @* Search input *@
+                    <div class="search-box mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <span class="oi oi-magnifying-glass"></span>
+                            </span>
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="Search tasks or create new..."
+                                   @bind="_searchQuery"
+                                   @bind:event="oninput"
+                                   @onkeydown="HandleSearchKeydown" />
+                            @if (!string.IsNullOrEmpty(_searchQuery))
+                            {
+                                <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+                                    <span class="oi oi-x"></span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @* Quick create option *@
+                    @if (!string.IsNullOrWhiteSpace(_searchQuery) && !_filteredTasks.Any(t => t.Title.Equals(_searchQuery, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        <button class="btn btn-outline-success w-100 mb-3 text-start" @onclick="CreateAndSelectTask">
+                            <span class="oi oi-plus me-2"></span>
+                            Create task: "<strong>@_searchQuery</strong>"
+                        </button>
+                    }
+
+                    @* Filter tabs *@
+                    <div class="filter-row mb-3">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-sm @(_taskFilter == "suggested" ? "btn-primary" : "btn-outline-secondary")"
+                                    @onclick='() => SetTaskFilter("suggested")'>
+                                <span class="oi oi-star me-1"></span>Suggested
                             </button>
+                            <button class="btn btn-sm @(_taskFilter == "all" ? "btn-primary" : "btn-outline-secondary")"
+                                    @onclick='() => SetTaskFilter("all")'>
+                                <span class="oi oi-list me-1"></span>All
+                            </button>
+                            <button class="btn btn-sm @(_taskFilter == "scheduled" ? "btn-primary" : "btn-outline-secondary")"
+                                    @onclick='() => SetTaskFilter("scheduled")'>
+                                <span class="oi oi-calendar me-1"></span>Today
+                            </button>
+                        </div>
+
+                        @* Project filter *@
+                        <select class="form-select form-select-sm filter-select" @bind="_selectedProjectId" @bind:after="ApplyFilter">
+                            <option value="">All Projects</option>
+                            @foreach (var project in _projects)
+                            {
+                                <option value="@project.Id">@project.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    @* Task list *@
+                    <div class="task-list">
+                        @if (_filteredTasks.Any())
+                        {
+                            <div class="task-cards">
+                                @foreach (var task in _filteredTasks.Take(_showAllTasks ? 50 : 12))
+                                {
+                                    var project = task.ProjectId.HasValue ? _projectLookup.GetValueOrDefault(task.ProjectId.Value) : null;
+                                    <div class="task-card @(_selectedPreviewTask?.Id == task.Id ? "selected" : "")"
+                                         @onclick="() => SelectTask(task)">
+                                        <div class="task-card-header">
+                                            <PriorityIndicator Priority="@task.Priority" />
+                                            <span class="task-card-title">@task.Title</span>
+                                        </div>
+
+                                        @if (!string.IsNullOrWhiteSpace(task.Description))
+                                        {
+                                            <div class="task-card-description">@TruncateText(task.Description, 80)</div>
+                                        }
+
+                                        <div class="task-card-meta">
+                                            @if (project != null)
+                                            {
+                                                <span class="meta-item" title="Project">
+                                                    <span class="oi oi-folder"></span>
+                                                    @project.Name
+                                                </span>
+                                            }
+                                            @if (task.DueDate.HasValue)
+                                            {
+                                                var isOverdue = task.DueDate.Value.Date < DateTime.Today;
+                                                var isDueToday = task.DueDate.Value.Date == DateTime.Today;
+                                                <span class="meta-item @(isOverdue ? "text-danger" : isDueToday ? "text-warning" : "")" title="Due date">
+                                                    <span class="oi oi-calendar"></span>
+                                                    @(isDueToday ? "Today" : task.DueDate.Value.ToString("MMM d"))
+                                                </span>
+                                            }
+                                            @if (task.EstimatedMinutes > 0)
+                                            {
+                                                <span class="meta-item" title="Estimated time">
+                                                    <span class="oi oi-clock"></span>
+                                                    @task.EstimatedMinutes min
+                                                </span>
+                                            }
+                                            @if (task.EnergyLevel.HasValue)
+                                            {
+                                                <span class="meta-item" title="Energy level @task.EnergyLevel">
+                                                    @(new string('⚡', Math.Min(task.EnergyLevel.Value, 3)))
+                                                </span>
+                                            }
+                                        </div>
+
+                                        @if (task.Contexts.Any())
+                                        {
+                                            <div class="task-card-contexts">
+                                                @foreach (var ctx in task.Contexts.Take(3))
+                                                {
+                                                    <span class="context-badge">@@@ctx</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            @if (_filteredTasks.Count > 12 && !_showAllTasks)
+                            {
+                                <button class="btn btn-link btn-sm w-100 mt-2" @onclick="() => _showAllTasks = true">
+                                    Show @(_filteredTasks.Count - 12) more tasks...
+                                </button>
+                            }
+                        }
+                        else if (!string.IsNullOrWhiteSpace(_searchQuery))
+                        {
+                            <div class="empty-state">
+                                <span class="oi oi-magnifying-glass"></span>
+                                <p>No tasks match your search</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="empty-state">
+                                <span class="oi oi-inbox"></span>
+                                <p>No tasks available</p>
+                            </div>
                         }
                     </div>
                 </div>
 
-                @* Quick create option *@
-                @if (!string.IsNullOrWhiteSpace(_searchQuery) && !_filteredTasks.Any(t => t.Title.Equals(_searchQuery, StringComparison.OrdinalIgnoreCase)))
-                {
-                    <button class="btn btn-outline-success w-100 mb-3 text-start" @onclick="CreateAndSelectTask">
-                        <span class="oi oi-plus me-2"></span>
-                        Create task: "<strong>@_searchQuery</strong>"
-                    </button>
-                }
+                @* Right side: Quick actions *@
+                <div class="focus-quick-actions">
+                    <div class="quick-action-card">
+                        <h6>Free Focus</h6>
+                        <p class="text-muted small">Work without a specific task</p>
+                        <button class="btn btn-outline-primary w-100" @onclick="StartFreeSession">
+                            <span class="oi oi-media-play me-2"></span>Start Session
+                        </button>
+                    </div>
 
-                @* Filter tabs *@
-                <div class="btn-group w-100 mb-3" role="group">
-                    <button class="btn btn-sm @(_taskFilter == "suggested" ? "btn-primary" : "btn-outline-secondary")"
-                            @onclick='() => SetTaskFilter("suggested")'>
-                        <span class="oi oi-star me-1"></span>Suggested
-                    </button>
-                    <button class="btn btn-sm @(_taskFilter == "all" ? "btn-primary" : "btn-outline-secondary")"
-                            @onclick='() => SetTaskFilter("all")'>
-                        <span class="oi oi-list me-1"></span>All Tasks
-                    </button>
-                    <button class="btn btn-sm @(_taskFilter == "scheduled" ? "btn-primary" : "btn-outline-secondary")"
-                            @onclick='() => SetTaskFilter("scheduled")'>
-                        <span class="oi oi-calendar me-1"></span>Today
-                    </button>
-                </div>
-
-                @* Task list *@
-                <div class="task-list">
-                    @if (_filteredTasks.Any())
+                    @if (_recentTasks.Any())
                     {
-                        <div class="list-group">
-                            @foreach (var task in _filteredTasks.Take(_showAllTasks ? 50 : 8))
+                        <div class="recent-tasks-card">
+                            <h6>Recent Tasks</h6>
+                            @foreach (var task in _recentTasks.Take(3))
                             {
-                                <button class="list-group-item list-group-item-action @(_selectedPreviewTask?.Id == task.Id ? "active" : "")"
-                                        @onclick="() => SelectTask(task)">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="task-info">
-                                            <div class="task-title">
-                                                <PriorityIndicator Priority="@task.Priority" />
-                                                <span class="ms-2">@task.Title</span>
-                                            </div>
-                                            @if (task.ProjectId.HasValue || task.Contexts.Any())
-                                            {
-                                                <div class="task-meta small text-muted mt-1">
-                                                    @foreach (var ctx in task.Contexts.Take(2))
-                                                    {
-                                                        <span class="badge bg-secondary bg-opacity-25 text-secondary me-1">@ctx</span>
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
-                                        <div class="task-badges">
-                                            @if (task.EstimatedMinutes > 0)
-                                            {
-                                                <span class="badge bg-primary bg-opacity-10 text-primary">@task.EstimatedMinutes min</span>
-                                            }
-                                            @if (task.EnergyLevel.HasValue)
-                                            {
-                                                <span class="badge bg-warning bg-opacity-10 text-warning ms-1" title="Energy level">
-                                                    @(new string('⚡', task.EnergyLevel.Value > 3 ? 3 : task.EnergyLevel.Value))
-                                                </span>
-                                            }
-                                        </div>
-                                    </div>
+                                <button class="recent-task-btn" @onclick="() => SelectTask(task)">
+                                    <PriorityIndicator Priority="@task.Priority" />
+                                    <span>@TruncateText(task.Title, 30)</span>
                                 </button>
                             }
                         </div>
+                    }
 
-                        @if (_filteredTasks.Count > 8 && !_showAllTasks)
-                        {
-                            <button class="btn btn-link btn-sm w-100 mt-2" @onclick="() => _showAllTasks = true">
-                                Show @(_filteredTasks.Count - 8) more tasks...
-                            </button>
-                        }
-                    }
-                    else if (!string.IsNullOrWhiteSpace(_searchQuery))
+                    @if (_state.SessionsCompleted > 0)
                     {
-                        <div class="text-muted text-center py-3">
-                            <span class="oi oi-magnifying-glass me-1"></span>
-                            No tasks match your search
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-muted text-center py-3">
-                            <span class="oi oi-inbox me-1"></span>
-                            No tasks available
+                        <div class="stats-card">
+                            <h6>Today's Progress</h6>
+                            <div class="stat-value">@_state.SessionsCompleted</div>
+                            <div class="stat-label">focus session@(_state.SessionsCompleted == 1 ? "" : "s")</div>
                         </div>
                     }
                 </div>
-            </div>
-
-            @* Free focus button *@
-            <div class="mt-4 pt-3 border-top">
-                <p class="text-muted small mb-2">Or work without a specific task:</p>
-                <button class="btn btn-outline-primary" @onclick="StartFreeSession">
-                    <span class="oi oi-media-play me-2"></span>Start Free Focus Session
-                </button>
             </div>
         </div>
     }
     else
     {
-        <div class="text-center">
+        <div class="focus-timer-active">
             @* Current Task *@
             <div class="mb-4">
                 <span class="badge @(_state.IsBreak ? "bg-success" : "bg-primary") fs-6 px-3 py-2">
@@ -353,6 +418,9 @@
     private List<TodoTask> _nextActionTasks = new();
     private List<TodoTask> _scheduledTasks = new();
     private List<TodoTask> _filteredTasks = new();
+    private List<TodoTask> _recentTasks = new();
+    private List<Project> _projects = new();
+    private Dictionary<Guid, Project> _projectLookup = new();
     private CelebrationEffect? _celebrationEffect;
     private bool _enableCelebrations = true;
 
@@ -360,6 +428,7 @@
     private string _taskFilter = "suggested";
     private bool _showAllTasks = false;
     private TodoTask? _selectedPreviewTask;
+    private string _selectedProjectId = "";
 
     // Session intention/reflection
     private string _sessionIntention = string.Empty;
@@ -376,7 +445,7 @@
         _state = FocusTimerService.State;
         FocusTimerService.OnStateChanged += OnTimerStateChanged;
 
-        await LoadTasks();
+        await LoadData();
 
         var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
         if (prefs != null)
@@ -397,8 +466,9 @@
         ApplyFilter();
     }
 
-    private async Task LoadTasks()
+    private async Task LoadData()
     {
+        // Load tasks
         _allTasks = (await TaskService.GetAllAsync())
             .Where(t => t.Status != TodoTaskStatus.Completed &&
                        t.Status != TodoTaskStatus.Deleted &&
@@ -414,6 +484,25 @@
         _scheduledTasks = _allTasks
             .Where(t => t.ScheduledDate?.Date == today || t.DueDate?.Date == today)
             .ToList();
+
+        // Get recent tasks (most recently modified)
+        _recentTasks = _allTasks
+            .OrderByDescending(t => t.ModifiedAt)
+            .Take(5)
+            .ToList();
+
+        // Load projects for filtering
+        var allProjects = await ProjectRepository.GetAllAsync();
+        _projects = allProjects
+            .Where(p => p.Status == ProjectStatus.Active)
+            .OrderBy(p => p.Name)
+            .ToList();
+        _projectLookup = allProjects.ToDictionary(p => p.Id);
+    }
+
+    private async Task LoadTasks()
+    {
+        await LoadData();
     }
 
     private void ApplyFilter()
@@ -425,6 +514,13 @@
             _ => _nextActionTasks
         };
 
+        // Apply project filter
+        if (!string.IsNullOrEmpty(_selectedProjectId) && Guid.TryParse(_selectedProjectId, out var projectId))
+        {
+            tasks = tasks.Where(t => t.ProjectId == projectId).ToList();
+        }
+
+        // Apply search filter
         if (!string.IsNullOrWhiteSpace(_searchQuery))
         {
             var query = _searchQuery.ToLowerInvariant();
@@ -438,6 +534,12 @@
 
         _filteredTasks = tasks;
         _showAllTasks = false;
+    }
+
+    private static string TruncateText(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length <= maxLength ? text : text.Substring(0, maxLength) + "...";
     }
 
     private void SetTaskFilter(string filter)

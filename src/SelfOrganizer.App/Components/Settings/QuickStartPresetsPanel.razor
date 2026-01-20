@@ -5,56 +5,150 @@
         Choose a preset to quickly configure settings for your needs. You can always customize individual settings afterward.
     </p>
 
-    @foreach (var category in SettingsPresets.GetCategories())
+    @* Search Box *@
+    <div class="preset-search mb-4">
+        <div class="search-input-wrapper">
+            <span class="oi oi-magnifying-glass search-icon"></span>
+            <input type="text"
+                   class="form-control"
+                   placeholder="Search presets (e.g., focus, calm, anxiety, timer...)"
+                   @bind="_searchQuery"
+                   @bind:event="oninput" />
+            @if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <button class="search-clear" @onclick="ClearSearch">
+                    <span class="oi oi-x"></span>
+                </button>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(_searchQuery))
+        {
+            <div class="search-results-count">
+                @GetFilteredPresets().Count() presets match "@_searchQuery"
+            </div>
+        }
+    </div>
+
+    @* Preset Cards *@
+    @{
+        var filteredPresets = GetFilteredPresets().ToList();
+        var categories = filteredPresets.Select(p => p.Category).Distinct().ToList();
+    }
+
+    @if (!filteredPresets.Any())
     {
-        <div class="preset-category mb-4">
-            <h6 class="preset-category-title text-muted mb-2">@category</h6>
-            <div class="preset-grid">
-                @foreach (var preset in SettingsPresets.GetByCategory(category))
-                {
-                    <div class="preset-card @(SelectedPresetId == preset.Id ? "selected" : "")"
-                         @onclick="() => SelectPreset(preset)">
-                        <div class="preset-header">
-                            <span class="oi oi-@preset.Icon preset-icon"></span>
-                            <span class="preset-name">@preset.Name</span>
+        <div class="no-results">
+            <span class="oi oi-magnifying-glass"></span>
+            <p>No presets match "<strong>@_searchQuery</strong>"</p>
+            <p class="text-muted small">Try searching for: focus, calm, anxiety, timer, routine, sensory, vision</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var category in categories)
+        {
+            <div class="preset-category mb-4">
+                <h6 class="preset-category-title text-muted mb-2">@category</h6>
+                <div class="preset-grid">
+                    @foreach (var preset in filteredPresets.Where(p => p.Category == category))
+                    {
+                        <div class="preset-card @(SelectedPresetId == preset.Id ? "selected" : "")"
+                             @onclick="() => SelectPreset(preset)">
+                            <div class="preset-header">
+                                <span class="oi oi-@preset.Icon preset-icon"></span>
+                                <span class="preset-name">@preset.Name</span>
+                            </div>
+                            <p class="preset-description">@preset.Description</p>
+                            @if (preset.Tags.Any())
+                            {
+                                <div class="preset-tags">
+                                    @foreach (var tag in preset.Tags.Take(4))
+                                    {
+                                        <span class="preset-tag">@tag</span>
+                                    }
+                                    @if (preset.Tags.Count > 4)
+                                    {
+                                        <span class="preset-tag more">+@(preset.Tags.Count - 4)</span>
+                                    }
+                                </div>
+                            }
+                            @if (SelectedPresetId == preset.Id)
+                            {
+                                <div class="preset-selected-indicator">
+                                    <span class="oi oi-check"></span> Selected
+                                </div>
+                            }
                         </div>
-                        <p class="preset-description">@preset.Description</p>
-                        @if (SelectedPresetId == preset.Id)
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    @* Selected Preset Details & Changes Preview *@
+    @if (_selectedPreset != null)
+    {
+        <div class="preset-details">
+            <div class="preset-details-header">
+                <div class="preset-details-title">
+                    <span class="oi oi-@_selectedPreset.Icon"></span>
+                    <h5>@_selectedPreset.Name</h5>
+                </div>
+                <button class="btn-close-preset" @onclick="ClearSelection" title="Close">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+
+            <p class="preset-details-description">@_selectedPreset.Description</p>
+
+            @if (_selectedPreset.Changes.Any())
+            {
+                <div class="changes-preview">
+                    <h6 class="changes-title">
+                        <span class="oi oi-list"></span>
+                        What this preset changes (@_selectedPreset.Changes.Count settings)
+                    </h6>
+
+                    <div class="changes-list">
+                        @foreach (var group in _selectedPreset.Changes.GroupBy(c => c.Category))
                         {
-                            <div class="preset-selected-indicator">
-                                <span class="oi oi-check"></span> Selected
+                            <div class="change-category">
+                                <span class="change-category-name">@group.Key</span>
+                                <ul class="change-items">
+                                    @foreach (var change in group)
+                                    {
+                                        <li class="change-item">
+                                            <span class="change-setting">@change.Setting</span>
+                                            <span class="change-arrow">→</span>
+                                            <span class="change-value">@change.NewValue</span>
+                                            @if (!string.IsNullOrEmpty(change.Description))
+                                            {
+                                                <span class="change-description">@change.Description</span>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
                             </div>
                         }
                     </div>
-                }
-            </div>
-        </div>
-    }
+                </div>
+            }
 
-    @if (_selectedPreset != null)
-    {
-        <div class="preset-actions mt-3 p-3 bg-light rounded">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <strong>@_selectedPreset.Name</strong>
-                    <br /><small class="text-muted">Ready to apply this preset?</small>
-                </div>
-                <div>
-                    <button class="btn btn-outline-secondary me-2" @onclick="ClearSelection">
-                        Cancel
-                    </button>
-                    <button class="btn btn-primary" @onclick="ApplySelectedPreset" disabled="@_isApplying">
-                        @if (_isApplying)
-                        {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-check me-1"></span>
-                        }
-                        Apply Preset
-                    </button>
-                </div>
+            <div class="preset-actions">
+                <button class="btn btn-outline-secondary" @onclick="ClearSelection">
+                    Cancel
+                </button>
+                <button class="btn btn-primary" @onclick="ApplySelectedPreset" disabled="@_isApplying">
+                    @if (_isApplying)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-check me-1"></span>
+                    }
+                    Apply Preset
+                </button>
             </div>
         </div>
     }
@@ -69,6 +163,65 @@
 </div>
 
 <style>
+    /* Search */
+    .preset-search {
+        position: relative;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        pointer-events: none;
+    }
+
+    .preset-search input {
+        padding-left: 38px;
+        padding-right: 38px;
+    }
+
+    .search-clear {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        padding: 4px 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-radius: var(--radius-sm);
+    }
+
+    .search-clear:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .search-results-count {
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    .no-results .oi {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    /* Preset Grid */
     .preset-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -77,7 +230,7 @@
 
     .preset-card {
         border: 2px solid var(--border-default, #dee2e6);
-        border-radius: 0.5rem;
+        border-radius: var(--radius-md);
         padding: 1rem;
         cursor: pointer;
         transition: all 0.2s ease;
@@ -114,12 +267,32 @@
     .preset-description {
         font-size: 0.85rem;
         color: var(--text-muted, #6c757d);
-        margin-bottom: 0;
+        margin-bottom: 0.5rem;
         line-height: 1.4;
     }
 
+    .preset-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 0.5rem;
+    }
+
+    .preset-tag {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-full);
+        color: var(--text-muted);
+    }
+
+    .preset-tag.more {
+        background: var(--color-primary-subtle);
+        color: var(--color-primary);
+    }
+
     .preset-selected-indicator {
-        margin-top: 0.75rem;
+        margin-top: 0.5rem;
         padding-top: 0.5rem;
         border-top: 1px solid var(--border-default, #dee2e6);
         color: var(--color-primary, #7c3aed);
@@ -133,6 +306,168 @@
         letter-spacing: 0.05em;
         border-bottom: 1px solid var(--border-default, #dee2e6);
         padding-bottom: 0.5rem;
+    }
+
+    /* Preset Details Panel */
+    .preset-details {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-lg);
+    }
+
+    .preset-details-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.75rem;
+    }
+
+    .preset-details-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .preset-details-title .oi {
+        font-size: 1.25rem;
+        color: var(--color-primary);
+    }
+
+    .preset-details-title h5 {
+        margin: 0;
+        font-size: 1.1rem;
+    }
+
+    .btn-close-preset {
+        background: none;
+        border: none;
+        padding: 4px 8px;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-radius: var(--radius-sm);
+    }
+
+    .btn-close-preset:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .preset-details-description {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Changes Preview */
+    .changes-preview {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        margin-bottom: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .changes-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0 0 0.75rem 0;
+    }
+
+    .changes-title .oi {
+        color: var(--color-primary);
+    }
+
+    .changes-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .change-category {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-muted);
+    }
+
+    .change-category:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .change-category-name {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--color-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .change-items {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+
+    .change-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.35rem;
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+
+    .change-setting {
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+
+    .change-arrow {
+        color: var(--text-muted);
+    }
+
+    .change-value {
+        color: var(--color-success, #059669);
+        font-weight: 500;
+    }
+
+    .change-description {
+        flex-basis: 100%;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        padding-left: 0.5rem;
+    }
+
+    /* Actions */
+    .preset-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    @@media (max-width: 768px) {
+        .preset-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .preset-actions {
+            flex-direction: column;
+        }
+
+        .preset-actions button {
+            width: 100%;
+        }
     }
 </style>
 
@@ -157,6 +492,17 @@
     private SettingsPreset? _selectedPreset;
     private bool _isApplying;
     private bool _applySuccess;
+    private string _searchQuery = "";
+
+    private IEnumerable<SettingsPreset> GetFilteredPresets()
+    {
+        return SettingsPresets.All.Where(p => p.MatchesSearch(_searchQuery));
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = "";
+    }
 
     private void SelectPreset(SettingsPreset preset)
     {
