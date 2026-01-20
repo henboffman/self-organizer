@@ -8,15 +8,28 @@ public class GoalService : IGoalService
     private readonly IRepository<Goal> _repository;
     private readonly ITaskService _taskService;
     private readonly IProjectService _projectService;
+    private readonly IUserPreferencesProvider _preferencesProvider;
 
     public GoalService(
         IRepository<Goal> repository,
         ITaskService taskService,
-        IProjectService projectService)
+        IProjectService projectService,
+        IUserPreferencesProvider preferencesProvider)
     {
         _repository = repository;
         _taskService = taskService;
         _projectService = projectService;
+        _preferencesProvider = preferencesProvider;
+    }
+
+    /// <summary>
+    /// Filters out sample data when ShowSampleData preference is false
+    /// </summary>
+    private async Task<IEnumerable<Goal>> FilterSampleDataAsync(IEnumerable<Goal> goals)
+    {
+        if (await _preferencesProvider.ShowSampleDataAsync())
+            return goals;
+        return goals.Where(g => !g.IsSampleData);
     }
 
     public async Task<Goal?> GetByIdAsync(Guid id)
@@ -26,17 +39,20 @@ public class GoalService : IGoalService
 
     public async Task<IEnumerable<Goal>> GetAllAsync()
     {
-        return await _repository.GetAllAsync();
+        var goals = await _repository.GetAllAsync();
+        return await FilterSampleDataAsync(goals);
     }
 
     public async Task<IEnumerable<Goal>> GetByStatusAsync(GoalStatus status)
     {
-        return await _repository.QueryAsync(g => g.Status == status);
+        var goals = await _repository.QueryAsync(g => g.Status == status);
+        return await FilterSampleDataAsync(goals);
     }
 
     public async Task<IEnumerable<Goal>> GetActiveGoalsAsync()
     {
-        return await _repository.QueryAsync(g => g.Status == GoalStatus.Active);
+        var goals = await _repository.QueryAsync(g => g.Status == GoalStatus.Active);
+        return await FilterSampleDataAsync(goals);
     }
 
     public async Task<Goal> CreateAsync(Goal goal)

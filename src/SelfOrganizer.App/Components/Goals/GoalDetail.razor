@@ -265,13 +265,13 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6 class="mb-0">Progress</h6>
-                <span class="fs-5 fw-bold @GetProgressTextClass()">@Goal.ProgressPercent%</span>
+                <span class="fs-5 fw-bold @GetProgressTextClass()">@CalculatedProgressPercent%</span>
             </div>
             <div class="progress" style="height: 12px;">
                 <div class="progress-bar @GetProgressBarClass()"
                      role="progressbar"
-                     style="width: @Goal.ProgressPercent%"
-                     aria-valuenow="@Goal.ProgressPercent"
+                     style="width: @CalculatedProgressPercent%"
+                     aria-valuenow="@CalculatedProgressPercent"
                      aria-valuemin="0"
                      aria-valuemax="100">
                 </div>
@@ -705,6 +705,11 @@
     private List<Project> _allProjects = new();
     private List<TodoTask> _allTasks = new();
 
+    // Calculate progress dynamically from linked tasks (more accurate than stored ProgressPercent)
+    private int CalculatedProgressPercent => _linkedTasks.Count > 0
+        ? (int)Math.Round((double)_linkedTasks.Count(t => t.Status == TodoTaskStatus.Completed) / _linkedTasks.Count * 100)
+        : Goal.ProgressPercent;
+
     // Link modal state
     private bool _showLinkProjectModal = false;
     private bool _showLinkTaskModal = false;
@@ -1121,18 +1126,18 @@
 
     private string GetProgressBarClass()
     {
-        if (Goal.ProgressPercent >= 100) return "bg-success";
-        if (Goal.ProgressPercent >= 75) return "bg-info";
-        if (Goal.ProgressPercent >= 50) return "bg-primary";
-        if (Goal.ProgressPercent >= 25) return "bg-warning";
+        if (CalculatedProgressPercent >= 100) return "bg-success";
+        if (CalculatedProgressPercent >= 75) return "bg-info";
+        if (CalculatedProgressPercent >= 50) return "bg-primary";
+        if (CalculatedProgressPercent >= 25) return "bg-warning";
         return "bg-secondary";
     }
 
     private string GetProgressTextClass()
     {
-        if (Goal.ProgressPercent >= 100) return "text-success";
-        if (Goal.ProgressPercent >= 75) return "text-info";
-        if (Goal.ProgressPercent >= 50) return "text-primary";
+        if (CalculatedProgressPercent >= 100) return "text-success";
+        if (CalculatedProgressPercent >= 75) return "text-info";
+        if (CalculatedProgressPercent >= 50) return "text-primary";
         return "text-secondary";
     }
 

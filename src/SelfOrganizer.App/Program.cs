@@ -57,6 +57,9 @@ builder.Services.AddScoped<IRepository<EntityLinkRule>>(sp =>
 builder.Services.AddScoped<IRepository<FocusSessionLog>>(sp =>
     new IndexedDbRepository<FocusSessionLog>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.FocusSessionLogs));
 
+// User Preferences Provider (must be registered before services that depend on it)
+builder.Services.AddScoped<IUserPreferencesProvider, UserPreferencesProvider>();
+
 // Domain Services
 builder.Services.AddScoped<ICaptureService, CaptureService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
@@ -73,6 +76,7 @@ builder.Services.AddScoped<IIdeaService, IdeaService>();
 builder.Services.AddScoped<ISummaryService, SummaryService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDataSyncService, DataSyncService>();
+builder.Services.AddScoped<ISampleDataService, SampleDataService>();
 
 // Intelligence Services
 builder.Services.AddScoped<ICategoryMatcherService, CategoryMatcherService>();

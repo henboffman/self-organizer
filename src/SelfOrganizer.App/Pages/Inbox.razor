@@ -7,6 +7,7 @@
 @inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
 @inject IDataChangeNotificationService DataChangeNotification
 @inject SelfOrganizer.Core.Interfaces.IRepository<UserPreferences> PreferencesRepository
+@inject NavigationManager Navigation
 
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
@@ -174,7 +175,7 @@ else
                 <h5>Can you do this in under 2 minutes?</h5>
                 <div class="d-grid gap-2 d-md-flex">
                     <button class="btn btn-success btn-lg flex-fill" @onclick="DoItNow">
-                        <span class="oi oi-check me-2"></span>Yes - Do it now!
+                        <span class="oi oi-timer me-2"></span>Yes - Start 2-min timer
                     </button>
                     <button class="btn btn-primary btn-lg flex-fill" @onclick="() => _processStep = 3">
                         <span class="oi oi-clock me-2"></span>No - needs more time
@@ -466,27 +467,21 @@ else
     {
         if (_selectedItem == null) return;
 
-        // Create task and immediately complete it
+        // Create task as NextAction with 2-minute estimate
         var task = new TodoTask
         {
             Title = _newTaskTitle,
-            Status = TodoTaskStatus.Completed,
-            CompletedAt = DateTime.UtcNow,
+            Status = TodoTaskStatus.NextAction,
             EstimatedMinutes = 2
         };
         var createdTask = await TaskService.CreateAsync(task);
         await CaptureService.MarkAsProcessedAsync(_selectedItem.Id, createdTask.Id, ProcessedItemType.Task);
 
         CloseProcessModal();
-
-        // Show celebration effect if enabled
-        if (_enableCelebrations && _celebrationEffect != null)
-        {
-            _ = _celebrationEffect.ShowAsync($"Done! {_newTaskTitle}");
-        }
-
         DataChangeNotification.NotifyDataChanged();
-        await LoadItems();
+
+        // Navigate to Focus Timer with this task to start a 2-minute focus session
+        Navigation.NavigateTo($"/focus/{createdTask.Id}");
     }
 
     private async Task MoveToReference()

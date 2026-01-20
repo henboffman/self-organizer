@@ -9,6 +9,17 @@ public class UserPreferences : BaseEntity
     public bool OnboardingCompleted { get; set; } = false;
     public CalendarProvider? PreferredCalendarProvider { get; set; }
 
+    /// <summary>
+    /// Whether to show sample/demo data in queries, stats, and lists.
+    /// Default true so sample data is visible after onboarding.
+    /// </summary>
+    public bool ShowSampleData { get; set; } = true;
+
+    /// <summary>
+    /// Whether sample data has been seeded (prevents re-seeding on subsequent app loads)
+    /// </summary>
+    public bool SampleDataSeeded { get; set; } = false;
+
     // Work Schedule Settings
     public TimeSpan WorkDayStart { get; set; } = TimeSpan.FromHours(9);
     public TimeSpan WorkDayEnd { get; set; } = TimeSpan.FromHours(17);

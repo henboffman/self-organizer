@@ -10,19 +10,59 @@ public class ReportService : IReportService
     private readonly IRepository<TimeBlock> _timeBlockRepository;
     private readonly IRepository<CaptureItem> _captureRepository;
     private readonly IRepository<DailySnapshot> _snapshotRepository;
+    private readonly IRepository<UserPreferences> _preferencesRepository;
 
     public ReportService(
         IRepository<TodoTask> taskRepository,
         IRepository<CalendarEvent> eventRepository,
         IRepository<TimeBlock> timeBlockRepository,
         IRepository<CaptureItem> captureRepository,
-        IRepository<DailySnapshot> snapshotRepository)
+        IRepository<DailySnapshot> snapshotRepository,
+        IRepository<UserPreferences> preferencesRepository)
     {
         _taskRepository = taskRepository;
         _eventRepository = eventRepository;
         _timeBlockRepository = timeBlockRepository;
         _captureRepository = captureRepository;
         _snapshotRepository = snapshotRepository;
+        _preferencesRepository = preferencesRepository;
+    }
+
+    /// <summary>
+    /// Gets the date when the user first started using the app.
+    /// Returns the earliest of: first capture, first task, or onboarding completion date.
+    /// </summary>
+    private async Task<DateOnly?> GetUserStartDateAsync()
+    {
+        var candidates = new List<DateTime>();
+
+        // Check first capture
+        var allCaptures = await _captureRepository.GetAllAsync();
+        if (allCaptures.Any())
+        {
+            candidates.Add(allCaptures.Min(c => c.CreatedAt));
+        }
+
+        // Check first task
+        var allTasks = await _taskRepository.GetAllAsync();
+        if (allTasks.Any())
+        {
+            candidates.Add(allTasks.Min(t => t.CreatedAt));
+        }
+
+        // Check preferences for onboarding completion
+        var prefs = (await _preferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (prefs != null)
+        {
+            candidates.Add(prefs.CreatedAt);
+        }
+
+        if (!candidates.Any())
+        {
+            return null; // User hasn't started using the app yet
+        }
+
+        return DateOnly.FromDateTime(candidates.Min());
     }
 
     public async Task<Dictionary<DateOnly, int>> GetTasksCompletedPerWeekAsync(int weeks = 8)
@@ -168,6 +208,9 @@ public class ReportService : IReportService
         var result = new List<DailyProductivityMetrics>();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+        // Get user start date to properly calculate inbox zero
+        var userStartDate = await GetUserStartDateAsync();
+
         // Get all data
         var allTasks = await _taskRepository.GetAllAsync();
         var allCaptures = await _captureRepository.GetAllAsync();
@@ -180,6 +223,9 @@ public class ReportService : IReportService
             var date = today.AddDays(-i);
             var dateTime = date.ToDateTime(TimeOnly.MinValue);
             var nextDateTime = date.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+            // Days before user started should not count as inbox zero
+            var isBeforeUserStarted = userStartDate == null || date < userStartDate.Value;
 
             // Check if we have a snapshot for this date
             var snapshot = allSnapshots.FirstOrDefault(s => s.Date == date);
@@ -195,7 +241,7 @@ public class ReportService : IReportService
                     MeetingMinutes = snapshot.MeetingMinutes,
                     DeepWorkMinutes = snapshot.DeepWorkMinutes,
                     CapturesProcessed = snapshot.CapturesProcessed,
-                    InboxCleared = !allCaptures.Any(c =>
+                    InboxCleared = isBeforeUserStarted ? false : !allCaptures.Any(c =>
                         !c.IsProcessed &&
                         c.CreatedAt < nextDateTime)
                 });
@@ -229,10 +275,16 @@ public class ReportService : IReportService
                 var totalMinutesWorked = timeBlocksOnDate.Sum(tb => tb.DurationMinutes);
 
                 // Check if inbox was cleared by end of day
-                var unprocessedAtEndOfDay = allCaptures.Any(c =>
-                    !c.IsProcessed &&
-                    c.CreatedAt < nextDateTime &&
-                    (!c.ModifiedAt.Date.Equals(c.CreatedAt.Date) || c.CreatedAt >= nextDateTime));
+                // Only calculate for days since user started
+                bool inboxCleared = false;
+                if (!isBeforeUserStarted)
+                {
+                    var unprocessedAtEndOfDay = allCaptures.Any(c =>
+                        !c.IsProcessed &&
+                        c.CreatedAt < nextDateTime &&
+                        (!c.ModifiedAt.Date.Equals(c.CreatedAt.Date) || c.CreatedAt >= nextDateTime));
+                    inboxCleared = !unprocessedAtEndOfDay;
+                }
 
                 result.Add(new DailyProductivityMetrics
                 {
@@ -243,7 +295,7 @@ public class ReportService : IReportService
                     MeetingMinutes = meetingMinutes,
                     DeepWorkMinutes = deepWorkMinutes,
                     CapturesProcessed = capturesProcessedOnDate,
-                    InboxCleared = !unprocessedAtEndOfDay
+                    InboxCleared = inboxCleared
                 });
             }
         }
@@ -253,12 +305,24 @@ public class ReportService : IReportService
 
     public async Task<int> GetInboxZeroStreakAsync()
     {
+        var userStartDate = await GetUserStartDateAsync();
+        if (userStartDate == null)
+        {
+            return 0; // User hasn't started using the app yet
+        }
+
         var trends = await GetProductivityTrendsAsync(90); // Check last 90 days
         var trendsList = trends.OrderByDescending(t => t.Date).ToList();
 
         int streak = 0;
         foreach (var day in trendsList)
         {
+            // Don't count days before user started using the app
+            if (day.Date < userStartDate.Value)
+            {
+                break;
+            }
+
             // For today, check current inbox status
             if (day.Date == DateOnly.FromDateTime(DateTime.UtcNow))
             {
@@ -323,7 +387,7 @@ public class ReportService : IReportService
 
         // Calculate longest inbox zero streak
         var trends = await GetProductivityTrendsAsync(90);
-        var longestStreak = CalculateLongestStreak(trends);
+        var longestStreak = await CalculateLongestStreakAsync(trends);
 
         // Calculate productivity scores (simple weighted score)
         var thisWeekScore = CalculateProductivityScore(thisWeekTasks, deepWorkMinutes / 7, meetingMinutes / 7);
@@ -345,9 +409,19 @@ public class ReportService : IReportService
         };
     }
 
-    private int CalculateLongestStreak(IEnumerable<DailyProductivityMetrics> trends)
+    private async Task<int> CalculateLongestStreakAsync(IEnumerable<DailyProductivityMetrics> trends)
     {
-        var trendsList = trends.OrderBy(t => t.Date).ToList();
+        var userStartDate = await GetUserStartDateAsync();
+        if (userStartDate == null)
+        {
+            return 0;
+        }
+
+        var trendsList = trends
+            .Where(t => t.Date >= userStartDate.Value)
+            .OrderBy(t => t.Date)
+            .ToList();
+
         int longestStreak = 0;
         int currentStreak = 0;
 

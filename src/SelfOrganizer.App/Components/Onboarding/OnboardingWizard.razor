@@ -5,6 +5,7 @@
 @inject IContextService ContextService
 @inject IBalanceDimensionService BalanceDimensionService
 @inject IThemeService ThemeService
+@inject ISampleDataService SampleDataService
 
 @if (IsVisible)
 {
@@ -716,6 +717,9 @@
 
             // Seed contexts for the selected mode
             await ContextService.SeedContextsForModeAsync(_selectedMode);
+
+            // Seed sample data to help users explore the app
+            await SampleDataService.SeedSampleDataAsync();
 
             // Small delay for visual feedback
             await Task.Delay(500);

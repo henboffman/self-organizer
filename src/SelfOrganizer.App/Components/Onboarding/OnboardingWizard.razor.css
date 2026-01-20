@@ -280,6 +280,7 @@
     margin: 0 0 0.25rem;
     font-size: 1rem;
     font-weight: 600;
+    color: #212529;
 }
 
 .mode-info p {
@@ -287,6 +288,15 @@
     font-size: 0.8rem;
     color: #6c757d;
     line-height: 1.4;
+}
+
+/* Ensure text visibility when card is selected */
+.mode-card.selected .mode-info h4 {
+    color: #0d6efd;
+}
+
+.mode-card.selected .mode-info p {
+    color: #495057;
 }
 
 .mode-check {

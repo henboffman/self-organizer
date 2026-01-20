@@ -1,0 +1,55 @@
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@inject ISampleDataService SampleDataService
+@inject IRepository<UserPreferences> PreferencesRepository
+@inject IUserPreferencesProvider PreferencesProvider
+@inject IDataChangeNotificationService DataChangeNotification
+
+@if (_hasSampleData)
+{
+    <div class="sample-data-toggle d-flex align-items-center gap-2 px-3 py-2 rounded @(_showSampleData ? "bg-info bg-opacity-10 border border-info border-opacity-25" : "bg-secondary bg-opacity-10 border border-secondary border-opacity-25")">
+        <span class="oi oi-lightbulb @(_showSampleData ? "text-info" : "text-muted")"></span>
+        <span class="small flex-grow-1 @(_showSampleData ? "text-info" : "text-muted")">
+            Sample data @(_showSampleData ? "visible" : "hidden")
+        </span>
+        <button class="btn btn-sm @(_showSampleData ? "btn-outline-info" : "btn-outline-secondary")"
+                @onclick="ToggleSampleData"
+                title="@(_showSampleData ? "Hide sample data from all views" : "Show sample data")">
+            <span class="oi @(_showSampleData ? "oi-eye" : "oi-ban")"></span>
+            <span class="ms-1">@(_showSampleData ? "Hide" : "Show")</span>
+        </button>
+    </div>
+}
+
+@code {
+    private bool _showSampleData = true;
+    private bool _hasSampleData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasSampleData = await SampleDataService.HasSampleDataAsync();
+        if (_hasSampleData)
+        {
+            var prefs = await PreferencesProvider.GetPreferencesAsync();
+            _showSampleData = prefs.ShowSampleData;
+        }
+    }
+
+    private async Task ToggleSampleData()
+    {
+        _showSampleData = !_showSampleData;
+
+        var allPrefs = await PreferencesRepository.GetAllAsync();
+        var prefs = allPrefs.FirstOrDefault();
+        if (prefs != null)
+        {
+            prefs.ShowSampleData = _showSampleData;
+            await PreferencesRepository.UpdateAsync(prefs);
+        }
+
+        // Invalidate cache and notify all components to refresh
+        PreferencesProvider.InvalidateCache();
+        DataChangeNotification.NotifyDataChanged();
+    }
+}

@@ -53,13 +53,13 @@
         <div class="progress-section mt-3">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <small class="text-muted">Progress</small>
-                <small class="fw-bold">@Goal.ProgressPercent%</small>
+                <small class="fw-bold">@CalculatedProgressPercent%</small>
             </div>
             <div class="progress" style="height: 8px;">
                 <div class="progress-bar @GetProgressBarClass()"
                      role="progressbar"
-                     style="width: @Goal.ProgressPercent%"
-                     aria-valuenow="@Goal.ProgressPercent"
+                     style="width: @CalculatedProgressPercent%"
+                     aria-valuenow="@CalculatedProgressPercent"
                      aria-valuemin="0"
                      aria-valuemax="100">
                 </div>
@@ -136,6 +136,11 @@
 
     private int CompletedTaskCount => LinkedTasks.Count(t => t.Status == TodoTaskStatus.Completed);
 
+    // Calculate progress dynamically from linked tasks (more accurate than stored ProgressPercent)
+    private int CalculatedProgressPercent => LinkedTasks.Count > 0
+        ? (int)Math.Round((double)CompletedTaskCount / LinkedTasks.Count * 100)
+        : Goal.ProgressPercent;
+
     private string GetTaskCompletionClass()
     {
         if (!LinkedTasks.Any()) return "text-muted";
@@ -181,10 +186,10 @@
 
     private string GetProgressBarClass()
     {
-        if (Goal.ProgressPercent >= 100) return "bg-success";
-        if (Goal.ProgressPercent >= 75) return "bg-info";
-        if (Goal.ProgressPercent >= 50) return "bg-primary";
-        if (Goal.ProgressPercent >= 25) return "bg-warning";
+        if (CalculatedProgressPercent >= 100) return "bg-success";
+        if (CalculatedProgressPercent >= 75) return "bg-info";
+        if (CalculatedProgressPercent >= 50) return "bg-primary";
+        if (CalculatedProgressPercent >= 25) return "bg-warning";
         return "bg-secondary";
     }
 

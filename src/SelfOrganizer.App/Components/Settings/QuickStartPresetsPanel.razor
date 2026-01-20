@@ -59,16 +59,21 @@
                                 <span class="preset-name">@preset.Name</span>
                             </div>
                             <p class="preset-description">@preset.Description</p>
-                            @if (preset.Tags.Any())
+                            @if (preset.Changes.Any())
                             {
-                                <div class="preset-tags">
-                                    @foreach (var tag in preset.Tags.Take(4))
+                                <div class="preset-changes-preview">
+                                    @foreach (var change in preset.Changes.Take(5))
                                     {
-                                        <span class="preset-tag">@tag</span>
+                                        <div class="preset-change-item">
+                                            <span class="change-name">@change.Setting</span>
+                                            <span class="change-value-preview">@change.NewValue</span>
+                                        </div>
                                     }
-                                    @if (preset.Tags.Count > 4)
+                                    @if (preset.Changes.Count > 5)
                                     {
-                                        <span class="preset-tag more">+@(preset.Tags.Count - 4)</span>
+                                        <div class="preset-change-more">
+                                            +@(preset.Changes.Count - 5) more settings...
+                                        </div>
                                     }
                                 </div>
                             }
@@ -271,24 +276,47 @@
         line-height: 1.4;
     }
 
-    .preset-tags {
+    .preset-changes-preview {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 4px;
         margin-bottom: 0.5rem;
-    }
-
-    .preset-tag {
-        font-size: 0.7rem;
-        padding: 2px 6px;
+        padding: 8px;
         background: var(--bg-tertiary);
-        border-radius: var(--radius-full);
-        color: var(--text-muted);
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
     }
 
-    .preset-tag.more {
-        background: var(--color-primary-subtle);
-        color: var(--color-primary);
+    .preset-change-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .change-name {
+        color: var(--text-secondary);
+        flex-shrink: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .change-value-preview {
+        color: var(--color-success, #059669);
+        font-weight: 500;
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .preset-change-more {
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+        padding-top: 4px;
+        border-top: 1px solid var(--border-muted);
+        margin-top: 4px;
     }
 
     .preset-selected-indicator {

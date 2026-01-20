@@ -8,15 +8,28 @@ public class ProjectService : IProjectService
     private readonly IRepository<Project> _repository;
     private readonly IRepository<Goal> _goalRepository;
     private readonly ITaskService _taskService;
+    private readonly IUserPreferencesProvider _preferencesProvider;
 
     public ProjectService(
         IRepository<Project> repository,
         IRepository<Goal> goalRepository,
-        ITaskService taskService)
+        ITaskService taskService,
+        IUserPreferencesProvider preferencesProvider)
     {
         _repository = repository;
         _goalRepository = goalRepository;
         _taskService = taskService;
+        _preferencesProvider = preferencesProvider;
+    }
+
+    /// <summary>
+    /// Filters out sample data when ShowSampleData preference is false
+    /// </summary>
+    private async Task<IEnumerable<Project>> FilterSampleDataAsync(IEnumerable<Project> projects)
+    {
+        if (await _preferencesProvider.ShowSampleDataAsync())
+            return projects;
+        return projects.Where(p => !p.IsSampleData);
     }
 
     public async Task<Project?> GetByIdAsync(Guid id)
@@ -26,22 +39,26 @@ public class ProjectService : IProjectService
 
     public async Task<IEnumerable<Project>> GetAllAsync()
     {
-        return await _repository.GetAllAsync();
+        var projects = await _repository.GetAllAsync();
+        return await FilterSampleDataAsync(projects);
     }
 
     public async Task<IEnumerable<Project>> GetByStatusAsync(ProjectStatus status)
     {
-        return await _repository.QueryAsync(p => p.Status == status);
+        var projects = await _repository.QueryAsync(p => p.Status == status);
+        return await FilterSampleDataAsync(projects);
     }
 
     public async Task<IEnumerable<Project>> GetActiveAsync()
     {
-        return await _repository.QueryAsync(p => p.Status == ProjectStatus.Active);
+        var projects = await _repository.QueryAsync(p => p.Status == ProjectStatus.Active);
+        return await FilterSampleDataAsync(projects);
     }
 
     public async Task<IEnumerable<Project>> GetStalledProjectsAsync()
     {
         // Load all datasets in parallel - eliminates N+1 query problem
+        // Note: GetActiveAsync and _taskService.GetAllAsync already filter sample data
         var activeProjectsTask = GetActiveAsync();
         var allTasksTask = _taskService.GetAllAsync();
         var allGoalsTask = _goalRepository.GetAllAsync();
@@ -51,6 +68,12 @@ public class ProjectService : IProjectService
         var activeProjects = (await activeProjectsTask).ToList();
         var allTasks = (await allTasksTask).ToList();
         var allGoals = (await allGoalsTask).ToList();
+
+        // Filter sample goals if ShowSampleData is false
+        if (!await _preferencesProvider.ShowSampleDataAsync())
+        {
+            allGoals = allGoals.Where(g => !g.IsSampleData).ToList();
+        }
 
         // Build a set of project IDs that have at least one NextAction task (direct tasks)
         var projectsWithNextActions = allTasks

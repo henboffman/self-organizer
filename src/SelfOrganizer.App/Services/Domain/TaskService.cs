@@ -6,10 +6,22 @@ namespace SelfOrganizer.App.Services.Domain;
 public class TaskService : ITaskService
 {
     private readonly IRepository<TodoTask> _repository;
+    private readonly IUserPreferencesProvider _preferencesProvider;
 
-    public TaskService(IRepository<TodoTask> repository)
+    public TaskService(IRepository<TodoTask> repository, IUserPreferencesProvider preferencesProvider)
     {
         _repository = repository;
+        _preferencesProvider = preferencesProvider;
+    }
+
+    /// <summary>
+    /// Filters out sample data when ShowSampleData preference is false
+    /// </summary>
+    private async Task<IEnumerable<TodoTask>> FilterSampleDataAsync(IEnumerable<TodoTask> tasks)
+    {
+        if (await _preferencesProvider.ShowSampleDataAsync())
+            return tasks;
+        return tasks.Where(t => !t.IsSampleData);
     }
 
     public async Task<TodoTask?> GetByIdAsync(Guid id)
@@ -19,32 +31,38 @@ public class TaskService : ITaskService
 
     public async Task<IEnumerable<TodoTask>> GetAllAsync()
     {
-        return await _repository.GetAllAsync();
+        var tasks = await _repository.GetAllAsync();
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetByStatusAsync(TodoTaskStatus status)
     {
-        return await _repository.QueryAsync(t => t.Status == status);
+        var tasks = await _repository.QueryAsync(t => t.Status == status);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetByProjectAsync(Guid projectId)
     {
-        return await _repository.QueryAsync(t => t.ProjectId == projectId);
+        var tasks = await _repository.QueryAsync(t => t.ProjectId == projectId);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetNextActionsAsync()
     {
-        return await _repository.QueryAsync(t => t.Status == TodoTaskStatus.NextAction);
+        var tasks = await _repository.QueryAsync(t => t.Status == TodoTaskStatus.NextAction);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetWaitingForAsync()
     {
-        return await _repository.QueryAsync(t => t.Status == TodoTaskStatus.WaitingFor);
+        var tasks = await _repository.QueryAsync(t => t.Status == TodoTaskStatus.WaitingFor);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetScheduledAsync(DateTime? fromDate = null, DateTime? toDate = null)
     {
         var tasks = await _repository.QueryAsync(t => t.Status == TodoTaskStatus.Scheduled && t.ScheduledDate != null);
+        tasks = await FilterSampleDataAsync(tasks);
 
         if (fromDate.HasValue)
             tasks = tasks.Where(t => t.ScheduledDate >= fromDate.Value);
@@ -56,26 +74,29 @@ public class TaskService : ITaskService
 
     public async Task<IEnumerable<TodoTask>> GetSomedayMaybeAsync()
     {
-        return await _repository.QueryAsync(t => t.Status == TodoTaskStatus.SomedayMaybe);
+        var tasks = await _repository.QueryAsync(t => t.Status == TodoTaskStatus.SomedayMaybe);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> GetOverdueAsync()
     {
         var now = DateTime.UtcNow;
-        return await _repository.QueryAsync(t =>
+        var tasks = await _repository.QueryAsync(t =>
             t.DueDate.HasValue &&
             t.DueDate.Value < now &&
             t.Status != TodoTaskStatus.Completed &&
             t.Status != TodoTaskStatus.Deleted);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<IEnumerable<TodoTask>> SearchAsync(string query)
     {
         var lowerQuery = query.ToLowerInvariant();
-        return await _repository.QueryAsync(t =>
+        var tasks = await _repository.QueryAsync(t =>
             t.Title.ToLower().Contains(lowerQuery) ||
             (t.Description != null && t.Description.ToLower().Contains(lowerQuery)) ||
             (t.Notes != null && t.Notes.ToLower().Contains(lowerQuery)));
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<TodoTask> CreateAsync(TodoTask task)
@@ -149,10 +170,12 @@ public class TaskService : ITaskService
     public async Task<int> GetCompletedTodayCountAsync()
     {
         var today = DateTime.UtcNow.Date;
+        var showSample = await _preferencesProvider.ShowSampleDataAsync();
         return await _repository.CountAsync(t =>
             t.Status == TodoTaskStatus.Completed &&
             t.CompletedAt.HasValue &&
-            t.CompletedAt.Value.Date == today);
+            t.CompletedAt.Value.Date == today &&
+            (showSample || !t.IsSampleData));
     }
 
     // Subtask operations
@@ -235,6 +258,7 @@ public class TaskService : ITaskService
     public async Task<IEnumerable<TodoTask>> GetBlockedTasksAsync()
     {
         var allTasks = await _repository.GetAllAsync();
+        allTasks = await FilterSampleDataAsync(allTasks);
         var taskList = allTasks.ToList();
 
         var completedTaskIds = taskList
@@ -253,6 +277,7 @@ public class TaskService : ITaskService
     public async Task<IEnumerable<TodoTask>> GetAvailableTasksAsync()
     {
         var allTasks = await _repository.GetAllAsync();
+        allTasks = await FilterSampleDataAsync(allTasks);
         var taskList = allTasks.ToList();
 
         var completedTaskIds = taskList
@@ -312,7 +337,8 @@ public class TaskService : ITaskService
     // Recurring task operations
     public async Task<IEnumerable<TodoTask>> GetRecurringTasksAsync()
     {
-        return await _repository.QueryAsync(t => t.IsRecurring);
+        var tasks = await _repository.QueryAsync(t => t.IsRecurring);
+        return await FilterSampleDataAsync(tasks);
     }
 
     public async Task<TodoTask> CompleteRecurringTaskAsync(Guid id)
