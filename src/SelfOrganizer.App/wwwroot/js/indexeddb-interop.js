@@ -33,22 +33,56 @@ window.indexedDbInterop = {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-            request.onerror = () => reject(request.error);
+            request.onerror = (event) => {
+                console.error("IndexedDB open error:", event.target.error);
+                reject(request.error);
+            };
+
             request.onsuccess = () => {
                 db = request.result;
+
+                // Handle version change from other tabs
+                db.onversionchange = () => {
+                    db.close();
+                    console.log("Database version changed, please reload");
+                };
+
                 resolve(true);
+            };
+
+            // Handle blocked upgrade (another tab has db open)
+            request.onblocked = (event) => {
+                console.warn("IndexedDB upgrade blocked - close other tabs with this app");
+                // Still resolve after a delay to allow app to work
+                setTimeout(() => {
+                    if (db) resolve(true);
+                }, 1000);
             };
 
             request.onupgradeneeded = (event) => {
                 const database = event.target.result;
+                const transaction = event.target.transaction;
+
+                // Handle upgrade errors
+                transaction.onerror = (e) => {
+                    console.error("IndexedDB upgrade transaction error:", e.target.error);
+                };
+
+                transaction.onabort = (e) => {
+                    console.error("IndexedDB upgrade aborted:", e.target.error);
+                };
 
                 for (const [storeName, config] of Object.entries(stores)) {
                     if (!database.objectStoreNames.contains(storeName)) {
-                        const store = database.createObjectStore(storeName, { keyPath: config.keyPath });
-                        if (config.indexes) {
-                            config.indexes.forEach(indexName => {
-                                store.createIndex(indexName, indexName, { unique: false });
-                            });
+                        try {
+                            const store = database.createObjectStore(storeName, { keyPath: config.keyPath });
+                            if (config.indexes) {
+                                config.indexes.forEach(indexName => {
+                                    store.createIndex(indexName, indexName, { unique: false });
+                                });
+                            }
+                        } catch (e) {
+                            console.error(`Failed to create store ${storeName}:`, e);
                         }
                     }
                 }
