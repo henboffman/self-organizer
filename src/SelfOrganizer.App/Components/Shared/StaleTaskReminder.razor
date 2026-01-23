@@ -1,0 +1,284 @@
+@using SelfOrganizer.App.Services.Domain
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.Core.Models
+@inject IStaleTaskReminderService StaleTaskService
+@inject IToastService ToastService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (_staleTasks.Any() && _isVisible)
+{
+    <div class="stale-task-reminder @(_isCollapsed ? "collapsed" : "")">
+        <div class="reminder-header" @onclick="ToggleCollapse">
+            <div class="d-flex align-items-center gap-2">
+                <span class="oi oi-bell text-warning"></span>
+                <span class="reminder-title">@_staleTasks.Count Task@(_staleTasks.Count > 1 ? "s" : "") Need@(_staleTasks.Count == 1 ? "s" : "") Attention</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-link text-muted p-0" @onclick="DismissAll" @onclick:stopPropagation="true" title="Dismiss all">
+                    <span class="oi oi-x"></span>
+                </button>
+                <span class="oi @(_isCollapsed ? "oi-chevron-bottom" : "oi-chevron-top")"></span>
+            </div>
+        </div>
+
+        @if (!_isCollapsed)
+        {
+            <div class="reminder-content">
+                @foreach (var task in _staleTasks)
+                {
+                    <div class="stale-task-item">
+                        <div class="task-info">
+                            <div class="task-title">@task.Title</div>
+                            <div class="task-meta">
+                                <span class="badge @GetReasonBadgeClass(task.Reason)">
+                                    @GetReasonText(task.Reason)
+                                </span>
+                                <span class="text-muted">@task.DaysStale day@(task.DaysStale != 1 ? "s" : "")</span>
+                                @if (!string.IsNullOrEmpty(task.ProjectName))
+                                {
+                                    <span class="text-muted">• @task.ProjectName</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => GoToTask(task.TaskId)" title="View task">
+                                <span class="oi oi-eye"></span>
+                            </button>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Snooze options">
+                                    <span class="oi oi-clock"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><button class="dropdown-item" @onclick="() => SnoozeTask(task.TaskId, 1)">Snooze 1 day</button></li>
+                                    <li><button class="dropdown-item" @onclick="() => SnoozeTask(task.TaskId, 3)">Snooze 3 days</button></li>
+                                    <li><button class="dropdown-item" @onclick="() => SnoozeTask(task.TaskId, 7)">Snooze 1 week</button></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><button class="dropdown-item" @onclick="() => MarkReviewed(task.TaskId)">Mark as reviewed</button></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (_expandedTaskId == task.TaskId && task.SuggestedActions.Any())
+                    {
+                        <div class="suggested-actions">
+                            <div class="small text-muted mb-1">Suggested actions:</div>
+                            <ul class="mb-0">
+                                @foreach (var action in task.SuggestedActions)
+                                {
+                                    <li class="small">@action</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                }
+
+                @if (_staleTasks.Count > 0)
+                {
+                    <div class="reminder-footer">
+                        <button class="btn btn-sm btn-link" @onclick="GoToReview">
+                            Review all stale tasks
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .stale-task-reminder {
+        background: var(--bs-warning-bg-subtle, #fff3cd);
+        border: 1px solid var(--bs-warning-border-subtle, #ffecb5);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .stale-task-reminder.collapsed {
+        border-radius: 0.5rem;
+    }
+
+    .reminder-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .reminder-header:hover {
+        background: rgba(0, 0, 0, 0.03);
+    }
+
+    .reminder-title {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .reminder-content {
+        border-top: 1px solid var(--bs-warning-border-subtle, #ffecb5);
+        padding: 0.5rem;
+    }
+
+    .stale-task-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        background: white;
+        margin-bottom: 0.5rem;
+    }
+
+    .stale-task-item:last-of-type {
+        margin-bottom: 0;
+    }
+
+    .task-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .task-title {
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .task-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+    }
+
+    .task-actions {
+        display: flex;
+        gap: 0.25rem;
+        margin-left: 0.5rem;
+    }
+
+    .suggested-actions {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .suggested-actions ul {
+        padding-left: 1.25rem;
+        margin-bottom: 0;
+    }
+
+    .suggested-actions li {
+        color: var(--bs-secondary);
+    }
+
+    .reminder-footer {
+        text-align: center;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--bs-warning-border-subtle, #ffecb5);
+    }
+</style>
+
+@code {
+    private List<StaleTaskInfo> _staleTasks = new();
+    private bool _isVisible = true;
+    private bool _isCollapsed = false;
+    private Guid? _expandedTaskId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckForStaleTasks();
+        StaleTaskService.OnStaleTasksDetected += HandleStaleTasksDetected;
+    }
+
+    private async Task CheckForStaleTasks()
+    {
+        try
+        {
+            _staleTasks = await StaleTaskService.GetStaleTasksAsync();
+        }
+        catch
+        {
+            _staleTasks = new List<StaleTaskInfo>();
+        }
+    }
+
+    private void HandleStaleTasksDetected(List<StaleTaskInfo> staleTasks)
+    {
+        _staleTasks = staleTasks;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleCollapse()
+    {
+        _isCollapsed = !_isCollapsed;
+    }
+
+    private void ToggleExpanded(Guid taskId)
+    {
+        _expandedTaskId = _expandedTaskId == taskId ? null : taskId;
+    }
+
+    private void GoToTask(Guid taskId)
+    {
+        Navigation.NavigateTo($"/tasks/{taskId}");
+    }
+
+    private void GoToReview()
+    {
+        Navigation.NavigateTo("/review");
+    }
+
+    private async Task SnoozeTask(Guid taskId, int days)
+    {
+        await StaleTaskService.SnoozeTaskReminderAsync(taskId, days);
+        _staleTasks = _staleTasks.Where(t => t.TaskId != taskId).ToList();
+        ToastService.ShowInfo($"Reminder snoozed for {days} day{(days > 1 ? "s" : "")}");
+        StateHasChanged();
+    }
+
+    private async Task MarkReviewed(Guid taskId)
+    {
+        await StaleTaskService.MarkTaskReviewedAsync(taskId);
+        _staleTasks = _staleTasks.Where(t => t.TaskId != taskId).ToList();
+        ToastService.ShowSuccess("Task marked as reviewed");
+        StateHasChanged();
+    }
+
+    private void DismissAll()
+    {
+        _isVisible = false;
+    }
+
+    private string GetReasonBadgeClass(StaleReason reason) => reason switch
+    {
+        StaleReason.OverdueWithNoProgress => "bg-danger",
+        StaleReason.InboxTooLong => "bg-warning text-dark",
+        StaleReason.WaitingForTooLong => "bg-info",
+        StaleReason.NotModifiedRecently => "bg-secondary",
+        StaleReason.SomedayMaybeNeedsReview => "bg-primary",
+        _ => "bg-secondary"
+    };
+
+    private string GetReasonText(StaleReason reason) => reason switch
+    {
+        StaleReason.OverdueWithNoProgress => "Overdue",
+        StaleReason.InboxTooLong => "Unprocessed",
+        StaleReason.WaitingForTooLong => "Waiting",
+        StaleReason.NotModifiedRecently => "Stale",
+        StaleReason.SomedayMaybeNeedsReview => "Review",
+        _ => "Stale"
+    };
+
+    public void Dispose()
+    {
+        StaleTaskService.OnStaleTasksDetected -= HandleStaleTasksDetected;
+    }
+}

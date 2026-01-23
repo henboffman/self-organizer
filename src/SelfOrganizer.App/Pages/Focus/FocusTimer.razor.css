@@ -414,6 +414,85 @@
     border-color: var(--color-primary);
 }
 
+/* Extension Controls */
+.extension-controls {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+}
+
+/* Elapsed Time Display */
+.elapsed-time-display {
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+}
+
+/* Task Card Actions */
+.task-card-actions {
+    display: flex;
+    gap: var(--space-sm);
+    border-top: 1px solid var(--border-muted);
+    padding-top: var(--space-sm);
+}
+
+/* Task Queue Section */
+.task-queue-section {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid transparent;
+}
+
+.queue-item.next-up {
+    border-left-color: var(--color-primary);
+    background-color: var(--color-primary-subtle);
+}
+
+.queue-item-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+.queue-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queue-item-actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.queue-item-actions .btn-link {
+    color: var(--text-muted);
+}
+
+.queue-item-actions .btn-link:hover {
+    color: var(--text-primary);
+}
+
 /* Responsive adjustments */
 @media (max-width: 992px) {
     .focus-content {

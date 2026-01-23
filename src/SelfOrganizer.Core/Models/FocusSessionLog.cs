@@ -69,4 +69,24 @@ public class FocusSessionLog : BaseEntity
     /// Context/location where the session was completed.
     /// </summary>
     public string? Context { get; set; }
+
+    /// <summary>
+    /// Actual elapsed time in seconds (may differ from planned duration due to extensions/early completion).
+    /// </summary>
+    public int ActualElapsedSeconds { get; set; }
+
+    /// <summary>
+    /// Original estimated time in minutes (from task or selected duration before extensions).
+    /// </summary>
+    public int OriginalEstimatedMinutes { get; set; }
+
+    /// <summary>
+    /// Number of times the timer was extended during this session.
+    /// </summary>
+    public int ExtensionCount { get; set; }
+
+    /// <summary>
+    /// Total minutes added via extensions.
+    /// </summary>
+    public int TotalExtensionMinutes { get; set; }
 }

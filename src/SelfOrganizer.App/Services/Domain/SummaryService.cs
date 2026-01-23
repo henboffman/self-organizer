@@ -514,6 +514,16 @@ public class SummaryService : ISummaryService
                 {
                     sb.AppendLine($"- **Related Projects Worked On:** {goal.LinkedProjectsWorkedOn}");
                 }
+                if (goal.LinkedHabits.Any())
+                {
+                    sb.AppendLine($"- **Linked Habits:** {goal.LinkedHabits.Count}");
+                    foreach (var habit in goal.LinkedHabits.Take(3))
+                    {
+                        var aiTag = habit.IsAiSuggested ? " *(AI)*" : "";
+                        var streak = habit.CurrentStreak > 0 ? $" 🔥{habit.CurrentStreak}" : "";
+                        sb.AppendLine($"  - {habit.Name}{aiTag}: {habit.CompletionRate:F0}% completion{streak}");
+                    }
+                }
                 sb.AppendLine();
             }
         }
@@ -524,10 +534,27 @@ public class SummaryService : ISummaryService
             sb.AppendLine("## Focus Sessions");
             sb.AppendLine();
             sb.AppendLine($"- **Total Sessions:** {report.TotalFocusSessions}");
-            sb.AppendLine($"- **Total Time:** {FormatMinutes(report.TotalFocusMinutes)}");
+            sb.AppendLine($"- **Deep Focus Time:** {FormatMinutes(report.TotalFocusMinutes)}");
             sb.AppendLine($"- **Average Rating:** {report.AverageFocusRating:F1}/5");
             sb.AppendLine($"- **Distracted Sessions:** {report.FocusSessionsDistracted}");
             sb.AppendLine();
+
+            // Recent sessions table
+            if (report.FocusSessions.Count > 0)
+            {
+                sb.AppendLine("### Recent Sessions");
+                sb.AppendLine();
+                sb.AppendLine("| Session | Duration | Date | Rating | Status |");
+                sb.AppendLine("|---------|----------|------|--------|--------|");
+                foreach (var session in report.FocusSessions.Take(10))
+                {
+                    var title = session.TaskTitle ?? "Untitled Session";
+                    var status = session.TaskCompleted ? "Completed" : (session.WasDistracted ? "Distracted" : "-");
+                    var stars = new string('★', session.FocusRating) + new string('☆', 5 - session.FocusRating);
+                    sb.AppendLine($"| {EscapeMarkdown(title)} | {session.DurationMinutes}min | {session.StartedAt:MMM d} | {stars} | {status} |");
+                }
+                sb.AppendLine();
+            }
         }
 
         // Habits
@@ -535,12 +562,19 @@ public class SummaryService : ISummaryService
         {
             sb.AppendLine("## Habit Progress");
             sb.AppendLine();
-            sb.AppendLine($"Overall completion rate: **{report.HabitCompletionRate:F0}%**");
+            sb.AppendLine($"**Overall Completion Rate:** {report.HabitCompletionRate:F0}%");
             sb.AppendLine();
+            sb.AppendLine("| Habit | Completions | Rate | Streak | Linked Goals |");
+            sb.AppendLine("|-------|-------------|------|--------|--------------|");
             foreach (var habit in report.HabitProgress)
             {
-                var streakBadge = habit.CurrentStreak > 0 ? $" 🔥 {habit.CurrentStreak}" : "";
-                sb.AppendLine($"- **{habit.Name}:** {habit.CompletionsInPeriod} completions ({habit.CompletionRate:F0}%){streakBadge}");
+                var icon = !string.IsNullOrEmpty(habit.Icon) ? $"{habit.Icon} " : "";
+                var aiTag = habit.IsAiSuggested ? " *(AI)* " : "";
+                var streak = habit.CurrentStreak > 0 ? $"🔥 {habit.CurrentStreak}" : "-";
+                var linkedGoals = habit.LinkedGoalTitles.Any()
+                    ? string.Join(", ", habit.LinkedGoalTitles.Take(2).Select(g => TruncateForMarkdown(g, 15)))
+                    : "-";
+                sb.AppendLine($"| {icon}{EscapeMarkdown(habit.Name)}{aiTag} | {habit.CompletionsInPeriod} | {habit.CompletionRate:F0}% | {streak} | {linkedGoals} |");
             }
             sb.AppendLine();
         }
@@ -774,6 +808,99 @@ public class SummaryService : ISummaryService
             sb.AppendLine("        </section>");
         }
 
+        // Focus Sessions Section
+        if (report.FocusSessions.Any())
+        {
+            sb.AppendLine("        <section class=\"focus-section\">");
+            sb.AppendLine("            <h2>Focus Sessions</h2>");
+            sb.AppendLine("            <div class=\"focus-stats\">");
+            sb.AppendLine($"                <div class=\"stat-card\">");
+            sb.AppendLine($"                    <span class=\"stat-value\">{report.TotalFocusSessions}</span>");
+            sb.AppendLine($"                    <span class=\"stat-label\">Sessions</span>");
+            sb.AppendLine($"                </div>");
+            sb.AppendLine($"                <div class=\"stat-card\">");
+            sb.AppendLine($"                    <span class=\"stat-value\">{FormatMinutes(report.TotalFocusMinutes)}</span>");
+            sb.AppendLine($"                    <span class=\"stat-label\">Deep Focus Time</span>");
+            sb.AppendLine($"                </div>");
+            sb.AppendLine($"                <div class=\"stat-card\">");
+            sb.AppendLine($"                    <span class=\"stat-value\">{report.AverageFocusRating:F1}</span>");
+            sb.AppendLine($"                    <span class=\"stat-label\">Avg Rating</span>");
+            sb.AppendLine($"                </div>");
+            sb.AppendLine($"                <div class=\"stat-card\">");
+            sb.AppendLine($"                    <span class=\"stat-value {(report.FocusSessionsDistracted > 0 ? "warning" : "")}\">{report.FocusSessionsDistracted}</span>");
+            sb.AppendLine($"                    <span class=\"stat-label\">Distracted</span>");
+            sb.AppendLine($"                </div>");
+            sb.AppendLine("            </div>");
+
+            if (report.FocusSessions.Count > 0)
+            {
+                sb.AppendLine("            <h3>Recent Sessions</h3>");
+                sb.AppendLine("            <div class=\"session-list\">");
+                foreach (var session in report.FocusSessions.Take(10))
+                {
+                    var statusClass = session.TaskCompleted ? "completed" : (session.WasDistracted ? "distracted" : "");
+                    sb.AppendLine($"                <div class=\"session-item {statusClass}\">");
+                    sb.AppendLine($"                    <div class=\"session-title\">{HtmlEncode(session.TaskTitle ?? "Untitled Session")}</div>");
+                    sb.AppendLine($"                    <div class=\"session-meta\">");
+                    sb.AppendLine($"                        <span>{session.StartedAt:MMM d, h:mm tt}</span>");
+                    sb.AppendLine($"                        <span>{session.DurationMinutes} min</span>");
+                    sb.AppendLine($"                        <span class=\"rating\">{new string('★', session.FocusRating)}{new string('☆', 5 - session.FocusRating)}</span>");
+                    if (session.TaskCompleted)
+                        sb.AppendLine($"                        <span class=\"badge completed\">Completed</span>");
+                    if (session.WasDistracted)
+                        sb.AppendLine($"                        <span class=\"badge warning\">Distracted</span>");
+                    sb.AppendLine($"                    </div>");
+                    sb.AppendLine($"                </div>");
+                }
+                sb.AppendLine("            </div>");
+            }
+            sb.AppendLine("        </section>");
+        }
+
+        // Habits Section
+        if (report.HabitProgress.Any())
+        {
+            sb.AppendLine("        <section class=\"habits-section\">");
+            sb.AppendLine($"            <h2>Habit Progress <span class=\"completion-badge\">{report.HabitCompletionRate:F0}% overall</span></h2>");
+            sb.AppendLine("            <div class=\"habits-grid\">");
+            foreach (var habit in report.HabitProgress)
+            {
+                var progressColor = habit.CompletionRate >= 80 ? "#28a745" : (habit.CompletionRate >= 50 ? "#ffc107" : "#dc3545");
+                sb.AppendLine($"                <div class=\"habit-card\" style=\"border-left: 4px solid {habit.Color ?? progressColor}\">");
+                sb.AppendLine($"                    <div class=\"habit-header\">");
+                if (!string.IsNullOrEmpty(habit.Icon))
+                    sb.AppendLine($"                        <span class=\"habit-icon\">{habit.Icon}</span>");
+                sb.AppendLine($"                        <span class=\"habit-name\">{HtmlEncode(habit.Name)}</span>");
+                if (habit.IsAiSuggested)
+                    sb.AppendLine($"                        <span class=\"ai-badge\">AI</span>");
+                if (habit.CurrentStreak > 0)
+                    sb.AppendLine($"                        <span class=\"streak-badge\">🔥 {habit.CurrentStreak}</span>");
+                sb.AppendLine($"                    </div>");
+                sb.AppendLine($"                    <div class=\"progress-bar-container\" style=\"height: 8px;\">");
+                sb.AppendLine($"                        <div class=\"progress-bar\" style=\"width: {habit.CompletionRate}%; background-color: {habit.Color ?? progressColor};\"></div>");
+                sb.AppendLine($"                    </div>");
+                sb.AppendLine($"                    <div class=\"habit-stats\">");
+                sb.AppendLine($"                        <span>{habit.CompletionsInPeriod} completions</span>");
+                sb.AppendLine($"                        <span>{habit.CompletionRate:F0}%</span>");
+                sb.AppendLine($"                    </div>");
+                if (habit.LinkedGoalTitles.Any())
+                {
+                    sb.AppendLine($"                    <div class=\"habit-goals\">");
+                    sb.AppendLine($"                        <span class=\"goals-label\">Linked Goals:</span>");
+                    foreach (var goalTitle in habit.LinkedGoalTitles.Take(2))
+                    {
+                        sb.AppendLine($"                        <span class=\"goal-tag\">{HtmlEncode(goalTitle)}</span>");
+                    }
+                    if (habit.LinkedGoalTitles.Count > 2)
+                        sb.AppendLine($"                        <span class=\"more\">+{habit.LinkedGoalTitles.Count - 2}</span>");
+                    sb.AppendLine($"                    </div>");
+                }
+                sb.AppendLine($"                </div>");
+            }
+            sb.AppendLine("            </div>");
+            sb.AppendLine("        </section>");
+        }
+
         // Time Allocation
         if (report.TimeByContext.Any() || report.TimeByCategory.Any())
         {
@@ -978,6 +1105,13 @@ public class SummaryService : ISummaryService
     private static string EscapeMarkdown(string text)
     {
         return text.Replace("|", "\\|").Replace("\n", " ").Replace("\r", "");
+    }
+
+    private static string TruncateForMarkdown(string text, int maxLength)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        var escaped = EscapeMarkdown(text);
+        return escaped.Length <= maxLength ? escaped : escaped.Substring(0, maxLength - 3) + "...";
     }
 
     private static string HtmlEncode(string text)
@@ -1300,6 +1434,152 @@ public class SummaryService : ISummaryService
         .more-items {
             margin-top: 16px;
             font-style: italic;
+            color: #666;
+        }
+        /* Focus Sessions Styles */
+        .focus-section .focus-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stat-card .stat-value.warning {
+            color: #dc3545;
+        }
+        .stat-card .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .session-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .session-item {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        .session-item.completed {
+            border-left-color: #28a745;
+        }
+        .session-item.distracted {
+            border-left-color: #ffc107;
+        }
+        .session-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .session-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .session-meta .rating {
+            color: #ffc107;
+        }
+        .session-meta .badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: white;
+        }
+        .session-meta .badge.completed {
+            background: #28a745;
+        }
+        .session-meta .badge.warning {
+            background: #ffc107;
+            color: #333;
+        }
+        /* Habits Styles */
+        .habits-section h2 .completion-badge {
+            font-size: 0.9rem;
+            font-weight: normal;
+            padding: 4px 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            margin-left: 12px;
+        }
+        .habits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .habit-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .habit-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .habit-icon {
+            font-size: 1.25rem;
+        }
+        .habit-name {
+            font-weight: 500;
+            flex: 1;
+        }
+        .ai-badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            background: #e9ecef;
+            color: #666;
+            border-radius: 4px;
+        }
+        .streak-badge {
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            background: #fff3cd;
+            color: #856404;
+            border-radius: 12px;
+        }
+        .habit-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .habit-goals {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .goals-label {
+            font-size: 0.75rem;
+            color: #666;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .goal-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+        .habit-goals .more {
+            font-size: 0.75rem;
             color: #666;
         }
         .report-footer {

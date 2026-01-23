@@ -1,4 +1,12 @@
 @* Context badges use CSS variable for dynamic color when provided *@
-<span class="badge context-badge" style="@GetStyleAttribute()">
-    @Context
+<span class="badge context-badge @(ShowRemove ? "removable" : "")" style="@GetStyleAttribute()" @onclick="HandleClick" title="@GetTooltip()">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <span class="context-icon">@GetIconDisplay()</span>
+    }
+    <span class="context-name">@@@Context</span>
+    @if (ShowRemove)
+    {
+        <span class="remove-btn">&times;</span>
+    }
 </span>

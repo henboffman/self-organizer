@@ -18,6 +18,42 @@ public class FocusTimerStateData
     public int BreakMinutes { get; set; } = 5;
     public int SessionsCompleted { get; set; }
     public DateTime? LastUpdated { get; set; }
+
+    /// <summary>
+    /// Original estimated minutes for the task (if from task)
+    /// </summary>
+    public int OriginalEstimatedMinutes { get; set; }
+
+    /// <summary>
+    /// Total elapsed seconds in this session (including any extensions)
+    /// </summary>
+    public int ElapsedSeconds { get; set; }
+
+    /// <summary>
+    /// Number of times the timer has been extended in current session
+    /// </summary>
+    public int ExtensionCount { get; set; }
+
+    /// <summary>
+    /// Total minutes added via extensions
+    /// </summary>
+    public int TotalExtensionMinutes { get; set; }
+
+    /// <summary>
+    /// Queue of tasks to work on next
+    /// </summary>
+    public List<QueuedTask> TaskQueue { get; set; } = new();
+}
+
+/// <summary>
+/// Represents a task queued for focus work
+/// </summary>
+public class QueuedTask
+{
+    public Guid TaskId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int? EstimatedMinutes { get; set; }
+    public int Priority { get; set; }
 }
 
 /// <summary>
@@ -71,9 +107,44 @@ public interface IFocusTimerState
     Task SetBreakDurationAsync(int minutes);
 
     /// <summary>
+    /// Extend the current timer by specified minutes
+    /// </summary>
+    Task ExtendTimerAsync(int minutes);
+
+    /// <summary>
+    /// Get the actual time spent in current session
+    /// </summary>
+    int GetActualElapsedSeconds();
+
+    /// <summary>
     /// Clear the current focus session
     /// </summary>
     Task ClearFocusAsync();
+
+    /// <summary>
+    /// Add a task to the focus queue
+    /// </summary>
+    Task AddToQueueAsync(TodoTask task);
+
+    /// <summary>
+    /// Remove a task from the queue
+    /// </summary>
+    Task RemoveFromQueueAsync(Guid taskId);
+
+    /// <summary>
+    /// Move to the next task in the queue
+    /// </summary>
+    Task StartNextInQueueAsync();
+
+    /// <summary>
+    /// Reorder task in queue
+    /// </summary>
+    Task ReorderQueueAsync(Guid taskId, int newIndex);
+
+    /// <summary>
+    /// Clear the task queue
+    /// </summary>
+    Task ClearQueueAsync();
 
     /// <summary>
     /// Open the mini timer window
@@ -149,8 +220,12 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
             : State.FocusMinutes);
 
         State.FocusMinutes = duration;
+        State.OriginalEstimatedMinutes = task?.EstimatedMinutes ?? duration;
         State.RemainingSeconds = duration * 60;
         State.TotalSeconds = State.RemainingSeconds;
+        State.ElapsedSeconds = 0;
+        State.ExtensionCount = 0;
+        State.TotalExtensionMinutes = 0;
         State.IsBreak = false;
         State.IsRunning = false;
         State.LastUpdated = DateTime.UtcNow;
@@ -235,6 +310,25 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
         NotifyStateChanged();
     }
 
+    public async Task ExtendTimerAsync(int minutes)
+    {
+        if (State.IsBreak) return; // Don't extend breaks
+
+        State.RemainingSeconds += minutes * 60;
+        State.TotalSeconds += minutes * 60;
+        State.ExtensionCount++;
+        State.TotalExtensionMinutes += minutes;
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public int GetActualElapsedSeconds()
+    {
+        return State.ElapsedSeconds;
+    }
+
     public async Task ClearFocusAsync()
     {
         await PauseAsync();
@@ -244,6 +338,91 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
         State.IsBreak = false;
         State.RemainingSeconds = State.FocusMinutes * 60;
         State.TotalSeconds = State.RemainingSeconds;
+        State.ElapsedSeconds = 0;
+        State.ExtensionCount = 0;
+        State.TotalExtensionMinutes = 0;
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public async Task AddToQueueAsync(TodoTask task)
+    {
+        // Don't add duplicates
+        if (State.TaskQueue.Any(t => t.TaskId == task.Id))
+            return;
+
+        // Don't add the current task
+        if (State.TaskId == task.Id)
+            return;
+
+        State.TaskQueue.Add(new QueuedTask
+        {
+            TaskId = task.Id,
+            Title = task.Title,
+            EstimatedMinutes = task.EstimatedMinutes > 0 ? task.EstimatedMinutes : null,
+            Priority = task.Priority
+        });
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public async Task RemoveFromQueueAsync(Guid taskId)
+    {
+        State.TaskQueue.RemoveAll(t => t.TaskId == taskId);
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public async Task StartNextInQueueAsync()
+    {
+        if (!State.TaskQueue.Any())
+            return;
+
+        var nextTask = State.TaskQueue.First();
+        State.TaskQueue.RemoveAt(0);
+
+        State.TaskId = nextTask.TaskId;
+        State.TaskTitle = nextTask.Title;
+        State.OriginalEstimatedMinutes = nextTask.EstimatedMinutes ?? State.FocusMinutes;
+
+        var duration = nextTask.EstimatedMinutes ?? State.FocusMinutes;
+        State.FocusMinutes = Math.Min(duration, 60); // Cap at 60 minutes
+        State.RemainingSeconds = State.FocusMinutes * 60;
+        State.TotalSeconds = State.RemainingSeconds;
+        State.ElapsedSeconds = 0;
+        State.ExtensionCount = 0;
+        State.TotalExtensionMinutes = 0;
+        State.IsBreak = false;
+        State.IsRunning = false;
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public async Task ReorderQueueAsync(Guid taskId, int newIndex)
+    {
+        var taskIndex = State.TaskQueue.FindIndex(t => t.TaskId == taskId);
+        if (taskIndex < 0) return;
+
+        var task = State.TaskQueue[taskIndex];
+        State.TaskQueue.RemoveAt(taskIndex);
+        State.TaskQueue.Insert(Math.Max(0, Math.Min(newIndex, State.TaskQueue.Count)), task);
+        State.LastUpdated = DateTime.UtcNow;
+
+        await BroadcastStateAsync();
+        NotifyStateChanged();
+    }
+
+    public async Task ClearQueueAsync()
+    {
+        State.TaskQueue.Clear();
         State.LastUpdated = DateTime.UtcNow;
 
         await BroadcastStateAsync();
@@ -312,6 +491,11 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
             State.FocusMinutes = newState.FocusMinutes;
             State.BreakMinutes = newState.BreakMinutes;
             State.SessionsCompleted = newState.SessionsCompleted;
+            State.OriginalEstimatedMinutes = newState.OriginalEstimatedMinutes;
+            State.ElapsedSeconds = newState.ElapsedSeconds;
+            State.ExtensionCount = newState.ExtensionCount;
+            State.TotalExtensionMinutes = newState.TotalExtensionMinutes;
+            State.TaskQueue = newState.TaskQueue ?? new List<QueuedTask>();
             State.LastUpdated = newState.LastUpdated;
 
             // Handle timer state changes
@@ -333,6 +517,10 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
     private async void TimerTick(object? state)
     {
         State.RemainingSeconds--;
+        if (!State.IsBreak)
+        {
+            State.ElapsedSeconds++;
+        }
         State.LastUpdated = DateTime.UtcNow;
 
         if (State.RemainingSeconds <= 0)

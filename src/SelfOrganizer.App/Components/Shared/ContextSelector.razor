@@ -3,89 +3,353 @@
 @inject IContextService ContextService
 
 <div class="context-selector">
-    <label class="form-label">@Label</label>
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label class="form-label">@Label</label>
+    }
 
-    @* Selected contexts *@
+    @* Selected contexts with visual badges *@
     <div class="selected-contexts mb-2">
         @foreach (var contextName in SelectedContexts)
         {
             var ctx = _availableContexts.FirstOrDefault(c => c.Name == contextName);
-            <span class="badge me-1 mb-1" style="background-color: @(ctx?.Color ?? "#6c757d"); cursor: pointer;"
-                  @onclick="() => RemoveContext(contextName)"
-                  title="Click to remove">
-                @contextName
-                <span class="ms-1">&times;</span>
-            </span>
+            <ContextBadge Context="@contextName"
+                          Color="@ctx?.Color"
+                          Icon="@ctx?.Icon"
+                          ShowRemove="true"
+                          OnRemove="() => RemoveContext(contextName)" />
         }
-        @if (!SelectedContexts.Any())
+        @if (!SelectedContexts.Any() && !string.IsNullOrEmpty(Placeholder))
         {
-            <span class="text-muted small">No contexts selected</span>
+            <span class="text-muted small">@Placeholder</span>
         }
     </div>
 
-    @* Context picker dropdown *@
+    @* Quick context suggestions *@
+    @if (ShowQuickSuggestions && !_showDropdown)
+    {
+        <div class="quick-contexts mb-2">
+            @foreach (var context in GetQuickSuggestions())
+            {
+                var isSelected = SelectedContexts.Contains(context.Name);
+                @if (!isSelected)
+                {
+                    <button class="quick-context-btn" @onclick="() => AddContext(context.Name)"
+                            style="--ctx-color: @context.Color;">
+                        @GetContextEmoji(context.Name) @context.Name
+                    </button>
+                }
+            }
+        </div>
+    }
+
+    @* Context picker dropdown/modal *@
     <div class="dropdown">
-        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button"
+        <button class="btn btn-outline-secondary btn-sm" type="button"
                 @onclick="ToggleDropdown" @onclick:stopPropagation="true">
             <span class="oi oi-plus me-1"></span> Add Context
         </button>
 
         @if (_showDropdown)
         {
-            <div class="dropdown-menu show context-dropdown" @onclick:stopPropagation="true">
-                @* New context input *@
-                <div class="px-2 py-1">
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control" placeholder="New context..."
+            <div class="context-dropdown-panel" @onclick:stopPropagation="true">
+                @* Search/Create input *@
+                <div class="context-search-area">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <span class="oi oi-magnifying-glass"></span>
+                        </span>
+                        <input type="text" class="form-control" placeholder="Search or create context..."
                                @bind="_newContextName" @bind:event="oninput"
                                @onkeydown="HandleKeyDown" />
-                        <button class="btn btn-outline-success" type="button" @onclick="CreateNewContext"
-                                disabled="@string.IsNullOrWhiteSpace(_newContextName)">
-                            <span class="oi oi-plus"></span>
-                        </button>
+                        @if (!string.IsNullOrWhiteSpace(_newContextName) && !_availableContexts.Any(c => c.Name.Equals(_newContextName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <button class="btn btn-success" type="button" @onclick="CreateNewContext" title="Create new context">
+                                <span class="oi oi-plus me-1"></span>Create
+                            </button>
+                        }
                     </div>
                 </div>
-                <div class="dropdown-divider"></div>
 
-                @* Available contexts (MRU sorted) *@
-                <div class="context-list">
-                    @foreach (var context in GetFilteredContexts())
-                    {
-                        var isSelected = SelectedContexts.Contains(context.Name);
-                        <button class="dropdown-item d-flex align-items-center @(isSelected ? "disabled" : "")"
-                                @onclick="() => AddContext(context.Name)"
-                                disabled="@isSelected">
-                            <span class="context-color-dot me-2" style="background-color: @context.Color;"></span>
-                            <span class="flex-grow-1">@context.Name</span>
-                            @if (context.UsageCount > 0)
-                            {
-                                <small class="text-muted ms-2">@context.UsageCount</small>
-                            }
-                            @if (isSelected)
-                            {
-                                <span class="oi oi-check ms-2 text-success"></span>
-                            }
-                        </button>
+                @* Context categories *@
+                <div class="context-categories">
+                    @* Recent/Frequently Used *@
+                    @{
+                        var recentContexts = GetRecentContexts().ToList();
+                        var allFiltered = GetFilteredContexts().ToList();
                     }
-                    @if (!GetFilteredContexts().Any())
+
+                    @if (recentContexts.Any() && string.IsNullOrWhiteSpace(_newContextName))
                     {
-                        <div class="dropdown-item text-muted">No matching contexts</div>
+                        <div class="context-category">
+                            <div class="category-header">
+                                <span class="oi oi-clock me-1"></span> Recent
+                            </div>
+                            <div class="context-grid">
+                                @foreach (var context in recentContexts.Take(6))
+                                {
+                                    var isSelected = SelectedContexts.Contains(context.Name);
+                                    <button class="context-tile @(isSelected ? "selected" : "")"
+                                            @onclick="() => AddContext(context.Name)"
+                                            style="--tile-color: @context.Color;"
+                                            disabled="@isSelected">
+                                        <span class="tile-emoji">@GetContextEmoji(context.Name)</span>
+                                        <span class="tile-name">@context.Name</span>
+                                        @if (isSelected)
+                                        {
+                                            <span class="oi oi-check tile-check"></span>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        </div>
                     }
+
+                    @* All Contexts *@
+                    <div class="context-category">
+                        <div class="category-header">
+                            <span class="oi oi-list me-1"></span>
+                            @(string.IsNullOrWhiteSpace(_newContextName) ? "All Contexts" : "Matching")
+                        </div>
+                        <div class="context-grid">
+                            @foreach (var context in allFiltered)
+                            {
+                                var isSelected = SelectedContexts.Contains(context.Name);
+                                <button class="context-tile @(isSelected ? "selected" : "")"
+                                        @onclick="() => AddContext(context.Name)"
+                                        style="--tile-color: @context.Color;"
+                                        disabled="@isSelected">
+                                    <span class="tile-emoji">@GetContextEmoji(context.Name)</span>
+                                    <span class="tile-name">@context.Name</span>
+                                    @if (isSelected)
+                                    {
+                                        <span class="oi oi-check tile-check"></span>
+                                    }
+                                </button>
+                            }
+                            @if (!allFiltered.Any())
+                            {
+                                <div class="no-results">
+                                    <span class="oi oi-magnifying-glass"></span>
+                                    <p>No matching contexts</p>
+                                    @if (!string.IsNullOrWhiteSpace(_newContextName))
+                                    {
+                                        <p class="small">Press Enter to create "@_newContextName"</p>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* Footer with close button *@
+                <div class="context-dropdown-footer">
+                    <button class="btn btn-sm btn-link text-muted" @onclick="CloseDropdown">
+                        Close
+                    </button>
                 </div>
             </div>
         }
     </div>
 </div>
 
+<style>
+    .context-selector {
+        position: relative;
+    }
+
+    .selected-contexts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+
+    .quick-contexts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .quick-context-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.125rem 0.5rem;
+        border: 1px dashed var(--border-default);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .quick-context-btn:hover {
+        border-color: var(--ctx-color);
+        background-color: var(--ctx-color);
+        color: white;
+    }
+
+    .context-dropdown-panel {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1050;
+        min-width: 320px;
+        max-width: 400px;
+        max-height: 400px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .context-search-area {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-muted);
+    }
+
+    .context-search-area .input-group-text {
+        background: var(--bg-tertiary);
+        border-color: var(--input-border);
+        color: var(--text-muted);
+    }
+
+    .context-search-area .form-control {
+        background: var(--input-bg);
+        border-color: var(--input-border);
+        color: var(--text-primary);
+    }
+
+    .context-categories {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .context-category {
+        margin-bottom: 0.75rem;
+    }
+
+    .category-header {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        padding: 0.25rem 0.5rem;
+        margin-bottom: 0.375rem;
+    }
+
+    .context-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 0.375rem;
+    }
+
+    .context-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        padding: 0.5rem;
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-sm);
+        background: var(--bg-tertiary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        position: relative;
+    }
+
+    .context-tile:hover:not(:disabled) {
+        border-color: var(--tile-color);
+        background: var(--tile-color);
+        color: white;
+    }
+
+    .context-tile.selected {
+        border-color: var(--color-success);
+        background: var(--color-success-bg);
+    }
+
+    .context-tile:disabled {
+        cursor: default;
+        opacity: 0.7;
+    }
+
+    .tile-emoji {
+        font-size: 1.25rem;
+    }
+
+    .tile-name {
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-align: center;
+        word-break: break-word;
+    }
+
+    .tile-check {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 0.6rem;
+        color: var(--color-success);
+    }
+
+    .no-results {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 1rem;
+        color: var(--text-muted);
+    }
+
+    .no-results .oi {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.5;
+    }
+
+    .no-results p {
+        margin: 0;
+    }
+
+    .context-dropdown-footer {
+        padding: 0.5rem;
+        border-top: 1px solid var(--border-muted);
+        text-align: center;
+    }
+</style>
+
 @code {
     [Parameter]
     public string Label { get; set; } = "Contexts";
+
+    [Parameter]
+    public string Placeholder { get; set; } = "No contexts selected";
 
     [Parameter]
     public List<string> SelectedContexts { get; set; } = new();
 
     [Parameter]
     public EventCallback<List<string>> SelectedContextsChanged { get; set; }
+
+    [Parameter]
+    public bool ShowQuickSuggestions { get; set; } = true;
+
+    // Icon mappings for common contexts
+    private static readonly Dictionary<string, string> ContextEmojis = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "deep-work", "🎯" }, { "meetings", "👥" }, { "1-on-1", "👤" }, { "planning", "📅" },
+        { "admin", "📁" }, { "review", "✓" }, { "email", "📧" }, { "calls", "📞" }, { "call", "📞" },
+        { "collaborate", "🤝" }, { "research", "🔍" }, { "home", "🏠" }, { "errands", "🚗" },
+        { "errand", "🚗" }, { "computer", "💻" }, { "phone", "📱" }, { "read", "📚" },
+        { "think", "💡" }, { "weekend", "☀️" }, { "evening", "🌙" }, { "outdoors", "🌳" },
+        { "anywhere", "🌍" }, { "work", "💼" }, { "do", "🔧" },
+    };
 
     private List<Context> _availableContexts = new();
     private bool _showDropdown = false;
@@ -110,9 +374,43 @@
             c.Name.Contains(_newContextName, StringComparison.OrdinalIgnoreCase));
     }
 
+    private IEnumerable<Context> GetRecentContexts()
+    {
+        return _availableContexts
+            .Where(c => c.LastUsedAt.HasValue)
+            .OrderByDescending(c => c.LastUsedAt)
+            .Take(6);
+    }
+
+    private IEnumerable<Context> GetQuickSuggestions()
+    {
+        // Return top 4 most used contexts that aren't already selected
+        return _availableContexts
+            .Where(c => !SelectedContexts.Contains(c.Name))
+            .OrderByDescending(c => c.UsageCount)
+            .ThenByDescending(c => c.LastUsedAt)
+            .Take(4);
+    }
+
+    private string GetContextEmoji(string contextName)
+    {
+        if (ContextEmojis.TryGetValue(contextName, out var emoji))
+            return emoji;
+        return "📌";
+    }
+
     private void ToggleDropdown()
     {
         _showDropdown = !_showDropdown;
+        if (_showDropdown)
+        {
+            _newContextName = string.Empty;
+        }
+    }
+
+    private void CloseDropdown()
+    {
+        _showDropdown = false;
     }
 
     private async Task AddContext(string contextName)
@@ -154,13 +452,24 @@
 
         await AddContext(name);
         _newContextName = string.Empty;
+        _showDropdown = false;
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
-            await CreateNewContext();
+            // If there's an exact match or one result, select it
+            var filtered = GetFilteredContexts().ToList();
+            if (filtered.Count == 1)
+            {
+                await AddContext(filtered[0].Name);
+                _newContextName = string.Empty;
+            }
+            else if (!string.IsNullOrWhiteSpace(_newContextName))
+            {
+                await CreateNewContext();
+            }
         }
         else if (e.Key == "Escape")
         {

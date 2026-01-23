@@ -82,4 +82,5 @@ public static class StoreNames
     public const string WeeklySnapshots = "weeklySnapshots";
     public const string EntityLinkRules = "entityLinkRules";
     public const string FocusSessionLogs = "focusSessionLogs";
+    public const string TaskReminderSnoozes = "taskReminderSnoozes";
 }

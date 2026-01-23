@@ -145,6 +145,22 @@
                                                 }
                                             </div>
                                         }
+
+                                        <div class="task-card-actions mt-2">
+                                            <button class="btn btn-sm btn-primary" @onclick="() => SelectTask(task)" @onclick:stopPropagation="true">
+                                                <span class="oi oi-media-play me-1"></span>Focus Now
+                                            </button>
+                                            @if (!_state.TaskQueue.Any(q => q.TaskId == task.Id))
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => AddToQueue(task)" @onclick:stopPropagation="true">
+                                                    <span class="oi oi-plus me-1"></span>Queue
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">In Queue</span>
+                                            }
+                                        </div>
                                     </div>
                                 }
                             </div>
@@ -277,6 +293,65 @@
                 </button>
             </div>
 
+            @* Extension Controls - show when timer is running or paused with time *@
+            @if (!_state.IsBreak && (_state.IsRunning || _state.RemainingSeconds < _state.TotalSeconds))
+            {
+                <div class="extension-controls mb-4">
+                    <div class="d-flex justify-content-center align-items-center gap-2">
+                        <span class="text-muted small">Need more time?</span>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-success" @onclick="() => ExtendTimer(5)" title="Add 5 minutes">
+                                <span class="oi oi-plus me-1"></span>5m
+                            </button>
+                            <button class="btn btn-outline-success" @onclick="() => ExtendTimer(10)" title="Add 10 minutes">
+                                +10m
+                            </button>
+                            <button class="btn btn-outline-success" @onclick="() => ExtendTimer(15)" title="Add 15 minutes">
+                                +15m
+                            </button>
+                        </div>
+                    </div>
+                    @if (_state.ExtensionCount > 0)
+                    {
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                <span class="oi oi-clock me-1"></span>
+                                Extended @_state.ExtensionCount time@(_state.ExtensionCount > 1 ? "s" : "") (+@_state.TotalExtensionMinutes min)
+                            </small>
+                        </div>
+                    }
+                </div>
+            }
+
+            @* Elapsed Time Display *@
+            @if (!_state.IsBreak && _state.ElapsedSeconds > 0)
+            {
+                <div class="elapsed-time-display mb-3">
+                    <div class="d-flex justify-content-center gap-4 small">
+                        <div class="text-center">
+                            <div class="text-muted">Elapsed</div>
+                            <div class="fw-bold text-primary">@FormatTime(_state.ElapsedSeconds)</div>
+                        </div>
+                        @if (_state.OriginalEstimatedMinutes > 0)
+                        {
+                            <div class="text-center">
+                                <div class="text-muted">Estimated</div>
+                                <div class="fw-bold">@(_state.OriginalEstimatedMinutes)m</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-muted">Actual vs Est</div>
+                                @{
+                                    var elapsedMinutes = _state.ElapsedSeconds / 60.0;
+                                    var ratio = elapsedMinutes / _state.OriginalEstimatedMinutes;
+                                    var diffClass = ratio <= 1.0 ? "text-success" : ratio <= 1.25 ? "text-warning" : "text-danger";
+                                }
+                                <div class="fw-bold @diffClass">@((ratio * 100).ToString("F0"))%</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
             @* Session Intention *@
             @if (!_state.IsRunning && !_state.IsBreak)
             {
@@ -340,6 +415,53 @@
                         <span class="oi oi-star me-1"></span>
                         @_state.SessionsCompleted focus session@(_state.SessionsCompleted == 1 ? "" : "s") today
                     </small>
+                </div>
+            }
+
+            @* Task Queue Section *@
+            @if (_state.TaskQueue.Any())
+            {
+                <div class="task-queue-section mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">
+                            <span class="oi oi-list me-1"></span>Up Next (@_state.TaskQueue.Count)
+                        </h6>
+                        <button class="btn btn-sm btn-link text-muted p-0" @onclick="ClearQueue" title="Clear queue">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </div>
+                    <div class="queue-list">
+                        @foreach (var (task, index) in _state.TaskQueue.Select((t, i) => (t, i)))
+                        {
+                            <div class="queue-item @(index == 0 ? "next-up" : "")">
+                                <div class="queue-item-info">
+                                    @if (index == 0)
+                                    {
+                                        <span class="badge bg-primary me-1">Next</span>
+                                    }
+                                    <span class="queue-title">@task.Title</span>
+                                    @if (task.EstimatedMinutes.HasValue)
+                                    {
+                                        <span class="text-muted small">(@task.EstimatedMinutes min)</span>
+                                    }
+                                </div>
+                                <div class="queue-item-actions">
+                                    @if (index > 0)
+                                    {
+                                        <button class="btn btn-sm btn-link p-0" @onclick="() => MoveQueueItem(task.TaskId, index - 1)" title="Move up">
+                                            <span class="oi oi-arrow-top"></span>
+                                        </button>
+                                    }
+                                    <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoveFromQueue(task.TaskId)" title="Remove">
+                                        <span class="oi oi-x"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm w-100 mt-2" @onclick="StartNextTask">
+                        <span class="oi oi-media-step-forward me-1"></span>Start Next Task
+                    </button>
                 </div>
             }
         </div>
@@ -638,6 +760,11 @@
         await FocusTimerService.SetDurationAsync(minutes);
     }
 
+    private async Task ExtendTimer(int minutes)
+    {
+        await FocusTimerService.ExtendTimerAsync(minutes);
+    }
+
     private async Task StartTimer()
     {
         _sessionStartTime = DateTime.UtcNow;
@@ -693,6 +820,31 @@
         await FocusTimerService.ClearFocusAsync();
     }
 
+    private async Task AddToQueue(TodoTask task)
+    {
+        await FocusTimerService.AddToQueueAsync(task);
+    }
+
+    private async Task RemoveFromQueue(Guid taskId)
+    {
+        await FocusTimerService.RemoveFromQueueAsync(taskId);
+    }
+
+    private async Task MoveQueueItem(Guid taskId, int newIndex)
+    {
+        await FocusTimerService.ReorderQueueAsync(taskId, newIndex);
+    }
+
+    private async Task StartNextTask()
+    {
+        await FocusTimerService.StartNextInQueueAsync();
+    }
+
+    private async Task ClearQueue()
+    {
+        await FocusTimerService.ClearQueueAsync();
+    }
+
     private static string FormatTime(int totalSeconds)
     {
         var minutes = totalSeconds / 60;
@@ -735,7 +887,11 @@
             FocusRating = _focusRating,
             WasDistracted = _wasDistracted,
             Notes = string.IsNullOrWhiteSpace(_reflectionNotes) ? null : _reflectionNotes,
-            TaskCompleted = false // Will be set to true if task was completed during session
+            TaskCompleted = false, // Will be set to true if task was completed during session
+            ActualElapsedSeconds = _state.ElapsedSeconds,
+            OriginalEstimatedMinutes = _state.OriginalEstimatedMinutes,
+            ExtensionCount = _state.ExtensionCount,
+            TotalExtensionMinutes = _state.TotalExtensionMinutes
         };
 
         // Try to get the task's project if linked

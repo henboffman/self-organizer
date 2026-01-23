@@ -56,6 +56,8 @@ builder.Services.AddScoped<IRepository<EntityLinkRule>>(sp =>
     new IndexedDbRepository<EntityLinkRule>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.EntityLinkRules));
 builder.Services.AddScoped<IRepository<FocusSessionLog>>(sp =>
     new IndexedDbRepository<FocusSessionLog>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.FocusSessionLogs));
+builder.Services.AddScoped<IRepository<TaskReminderSnooze>>(sp =>
+    new IndexedDbRepository<TaskReminderSnooze>(sp.GetRequiredService<IIndexedDbService>(), StoreNames.TaskReminderSnoozes));
 
 // User Preferences Provider (must be registered before services that depend on it)
 builder.Services.AddScoped<IUserPreferencesProvider, UserPreferencesProvider>();
@@ -77,6 +79,7 @@ builder.Services.AddScoped<ISummaryService, SummaryService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDataSyncService, DataSyncService>();
 builder.Services.AddScoped<ISampleDataService, SampleDataService>();
+builder.Services.AddScoped<IStaleTaskReminderService, StaleTaskReminderService>();
 
 // Intelligence Services
 builder.Services.AddScoped<ICategoryMatcherService, CategoryMatcherService>();
