@@ -22,7 +22,7 @@ else
 {
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/projects">Projects</a></li>
+            <li class="breadcrumb-item"><a href="projects">Projects</a></li>
             <li class="breadcrumb-item active">@_project.Name</li>
         </ol>
     </nav>
@@ -109,7 +109,7 @@ else
                                 </button>
                                 <div class="flex-grow-1 min-width-0">
                                     <div class="d-flex align-items-center gap-2 mb-1">
-                                        <a href="/tasks/@task.Id" class="fw-medium @(task.Status == TodoTaskStatus.Completed ? "text-decoration-line-through text-muted" : "")">
+                                        <a href="tasks/@task.Id" class="fw-medium @(task.Status == TodoTaskStatus.Completed ? "text-decoration-line-through text-muted" : "")">
                                             @task.Title
                                         </a>
                                         @if (task.Priority == 1)
@@ -145,7 +145,7 @@ else
                                         {
                                             @foreach (var tag in task.Tags.Take(2))
                                             {
-                                                <a href="/tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
+                                                <a href="tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
                                             }
                                             @if (task.Tags.Count > 2)
                                             {
@@ -159,7 +159,7 @@ else
                                         <span class="oi oi-cog"></span>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" href="/tasks/@task.Id"><span class="oi oi-eye me-2"></span>View Details</a></li>
+                                        <li><a class="dropdown-item" href="tasks/@task.Id"><span class="oi oi-eye me-2"></span>View Details</a></li>
                                         <li><button class="dropdown-item" @onclick="() => ShowEditTaskModal(task)"><span class="oi oi-pencil me-2"></span>Quick Edit</button></li>
                                         <li><hr class="dropdown-divider"></li>
                                         @if (task.Status != TodoTaskStatus.NextAction)
@@ -241,7 +241,7 @@ else
                             <div class="d-flex flex-wrap gap-1">
                                 @foreach (var tag in _project.Tags)
                                 {
-                                    <a href="/tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
+                                    <a href="tags/@tag" class="badge bg-primary text-decoration-none">#@tag</a>
                                 }
                             </div>
                         </li>
@@ -276,7 +276,7 @@ else
                             @foreach (var goal in _linkedGoals)
                             {
                                 <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                    <a href="/goals" class="text-decoration-none">
+                                    <a href="goals" class="text-decoration-none">
                                         <span class="oi oi-target me-1"></span>
                                         @goal.Title
                                     </a>
@@ -761,7 +761,7 @@ else
         if (_project != null)
         {
             await ProjectService.DeleteAsync(_project.Id);
-            Navigation.NavigateTo("/projects");
+            Navigation.NavigateTo("projects");
         }
     }
 

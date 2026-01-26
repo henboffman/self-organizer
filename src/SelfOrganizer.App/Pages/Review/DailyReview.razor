@@ -35,7 +35,7 @@
                 else
                 {
                     <p>You have @_inboxCount unprocessed items in your inbox.</p>
-                    <a href="/inbox" class="btn btn-warning">Process Inbox</a>
+                    <a href="inbox" class="btn btn-warning">Process Inbox</a>
                 }
             </div>
         </div>
@@ -58,7 +58,7 @@
                     {
                         <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
                             <div>
-                                <a href="/tasks/@task.Id">@task.Title</a>
+                                <a href="tasks/@task.Id">@task.Title</a>
                             </div>
                             <div class="btn-group btn-group-sm">
                                 <button class="btn btn-outline-success" @onclick="() => CompleteTask(task)">Complete</button>
@@ -91,7 +91,7 @@
                             : 0;
                         <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
                             <div>
-                                <a href="/tasks/@task.Id">@task.Title</a>
+                                <a href="tasks/@task.Id">@task.Title</a>
                                 <small class="d-block text-muted">Waiting for @(task.WaitingForNote ?? "someone") (@days days)</small>
                             </div>
                             <button class="btn btn-sm btn-outline-primary">Follow Up</button>

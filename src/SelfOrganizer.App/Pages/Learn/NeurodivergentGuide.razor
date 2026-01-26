@@ -12,7 +12,7 @@
                 can work with your unique brain, not against it.
             </p>
             <div class="hero-cta">
-                <button class="btn btn-light btn-lg" @onclick='() => Navigation.NavigateTo("/settings#quick-start")'>
+                <button class="btn btn-light btn-lg" @onclick='() => Navigation.NavigateTo("settings#quick-start")'>
                     <span class="oi oi-bolt me-2"></span>Find Your Preset
                 </button>
             </div>
@@ -72,7 +72,7 @@
 
                             <div class="condition-cta">
                                 <button class="btn btn-sm btn-outline-primary"
-                                        @onclick='() => Navigation.NavigateTo($"/settings#quick-start")'>
+                                        @onclick='() => Navigation.NavigateTo($"settings#quick-start")'>
                                     View @condition.Name Presets
                                 </button>
                             </div>
@@ -123,10 +123,10 @@
             <h2>Ready to Get Started?</h2>
             <p>Find a preset that matches your needs, or customize your own experience.</p>
             <div class="cta-buttons">
-                <button class="btn btn-primary btn-lg" @onclick='() => Navigation.NavigateTo("/settings#quick-start")'>
+                <button class="btn btn-primary btn-lg" @onclick='() => Navigation.NavigateTo("settings#quick-start")'>
                     <span class="oi oi-bolt me-2"></span>Browse Presets
                 </button>
-                <button class="btn btn-outline-primary btn-lg" @onclick='() => Navigation.NavigateTo("/settings")'>
+                <button class="btn btn-outline-primary btn-lg" @onclick='() => Navigation.NavigateTo("settings")'>
                     <span class="oi oi-cog me-2"></span>All Settings
                 </button>
             </div>

@@ -141,7 +141,7 @@ else
                                 <span class="text-muted small me-1"><span class="oi oi-target"></span> Goals:</span>
                                 @foreach (var goal in linkedGoals)
                                 {
-                                    <a href="/goals/@goal.Id/edit" class="badge bg-primary-subtle text-primary goal-link" title="@goal.Title">
+                                    <a href="goals/@goal.Id/edit" class="badge bg-primary-subtle text-primary goal-link" title="@goal.Title">
                                         @TruncateTitle(goal.Title, 25)
                                     </a>
                                 }

@@ -43,7 +43,7 @@
                 <div class="offline-state">
                     <span class="oi oi-warning"></span>
                     <p>AI features require Ollama to be running locally.</p>
-                    <a href="/settings" class="btn btn-sm btn-outline-primary">Configure in Settings</a>
+                    <a href="settings" class="btn btn-sm btn-outline-primary">Configure in Settings</a>
                 </div>
             }
             else if (_isGenerating)
@@ -525,7 +525,7 @@
         };
 
         var queryString = string.Join("&", queryParams.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}"));
-        NavigationManager.NavigateTo($"/goals/new?{queryString}");
+        NavigationManager.NavigateTo($"goals/new?{queryString}");
     }
 
     private int GetTotalSuggestionsCount()

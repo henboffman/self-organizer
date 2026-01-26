@@ -40,7 +40,7 @@ else if (!_tasks.Any())
     <div class="text-center py-5">
         <h5 class="text-muted">No next actions defined</h5>
         <p class="text-muted">Process your inbox or add new tasks to get started.</p>
-        <a href="/inbox" class="btn btn-outline-primary">
+        <a href="inbox" class="btn btn-outline-primary">
             <span class="oi oi-inbox me-1"></span> Go to Inbox
         </a>
     </div>
@@ -396,7 +396,7 @@ else
     private async Task FocusOnTask(TodoTask task)
     {
         await FocusTimer.StartFocusAsync(task);
-        Navigation.NavigateTo("/focus");
+        Navigation.NavigateTo("focus");
     }
 
     private void ShowAddModal()

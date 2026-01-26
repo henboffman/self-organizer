@@ -32,7 +32,7 @@
     @if (_focusState.TaskTitle != null && _focusState.IsRunning)
     {
         <button class="fab-focus @(_focusState.IsBreak ? "break" : "")"
-                @onclick='() => NavigateTo("/focus")'
+                @onclick='() => NavigateTo("focus")'
                 title="Focus Timer">
             <span class="focus-time">@FormatTime(_focusState.RemainingSeconds)</span>
         </button>
@@ -42,7 +42,7 @@
     @if (_inboxCount > 0)
     {
         <button class="fab-badge"
-                @onclick='() => NavigateTo("/inbox")'
+                @onclick='() => NavigateTo("inbox")'
                 title="@_inboxCount items in inbox">
             <span class="oi oi-inbox"></span>
             <span class="badge-count">@_inboxCount</span>

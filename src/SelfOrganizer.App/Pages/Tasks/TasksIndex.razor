@@ -24,7 +24,7 @@
 @* Status Tabs *@
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link @(CurrentStatus == "next" ? "active" : "")" href="/tasks/next">
+        <a class="nav-link @(CurrentStatus == "next" ? "active" : "")" href="tasks/next">
             Next Actions
             @if (_nextCount > 0)
             {
@@ -33,7 +33,7 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link @(CurrentStatus == "waiting" ? "active" : "")" href="/tasks/waiting">
+        <a class="nav-link @(CurrentStatus == "waiting" ? "active" : "")" href="tasks/waiting">
             Waiting For
             @if (_waitingCount > 0)
             {
@@ -42,7 +42,7 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link @(CurrentStatus == "scheduled" ? "active" : "")" href="/tasks/scheduled">
+        <a class="nav-link @(CurrentStatus == "scheduled" ? "active" : "")" href="tasks/scheduled">
             Scheduled
             @if (_scheduledCount > 0)
             {
@@ -51,7 +51,7 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link @(CurrentStatus == "someday" ? "active" : "")" href="/tasks/someday">
+        <a class="nav-link @(CurrentStatus == "someday" ? "active" : "")" href="tasks/someday">
             Someday/Maybe
             @if (_somedayCount > 0)
             {
@@ -60,7 +60,7 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link @(CurrentStatus == "completed" ? "active" : "")" href="/tasks/completed">
+        <a class="nav-link @(CurrentStatus == "completed" ? "active" : "")" href="tasks/completed">
             Completed
         </a>
     </li>
@@ -75,7 +75,7 @@
             <strong>@GetFilterLabel()</strong>
             <span class="ms-2">(@_filteredTasks.Count task@(_filteredTasks.Count != 1 ? "s" : ""))</span>
         </div>
-        <a href="/tasks" class="btn btn-sm btn-outline-secondary">
+        <a href="tasks" class="btn btn-sm btn-outline-secondary">
             <span class="oi oi-x me-1"></span>Clear Filter
         </a>
     </div>
@@ -168,7 +168,7 @@ else
                             title="@(task.Status == TodoTaskStatus.Completed ? "Mark incomplete" : "Mark complete")">
                         <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-circle-check")"></span>
                     </button>
-                    <a href="/tasks/@task.Id" class="flex-grow-1 text-decoration-none text-reset min-width-0">
+                    <a href="tasks/@task.Id" class="flex-grow-1 text-decoration-none text-reset min-width-0">
                         <div class="d-flex align-items-center gap-2 mb-1">
                             <span class="fw-bold @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
                                 @task.Title
@@ -208,7 +208,7 @@ else
                             {
                                 @foreach (var tag in task.Tags.Take(3))
                                 {
-                                    <a href="/tags/@tag" class="badge bg-primary text-decoration-none" @onclick:stopPropagation="true">#@tag</a>
+                                    <a href="tags/@tag" class="badge bg-primary text-decoration-none" @onclick:stopPropagation="true">#@tag</a>
                                 }
                                 @if (task.Tags.Count > 3)
                                 {
@@ -730,7 +730,7 @@ else
             if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
             {
                 var task = _cachedDisplayTasks[_keyboardFocusIndex];
-                NavigationManager.NavigateTo($"/tasks/{task.Id}");
+                NavigationManager.NavigateTo($"tasks/{task.Id}");
             }
         }
     }
@@ -768,7 +768,7 @@ else
             if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
             {
                 var task = _cachedDisplayTasks[_keyboardFocusIndex];
-                NavigationManager.NavigateTo($"/tasks/{task.Id}");
+                NavigationManager.NavigateTo($"tasks/{task.Id}");
             }
         }
     }

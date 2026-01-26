@@ -17,7 +17,7 @@
     <div>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
-                <li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+                <li class="breadcrumb-item"><a href="settings">Settings</a></li>
                 <li class="breadcrumb-item active">Calendar Providers</li>
             </ol>
         </nav>
@@ -299,7 +299,7 @@
                 <h6>Automatic Entity Linking</h6>
                 <p class="text-muted">
                     When events are imported, they're automatically analyzed and linked to your projects and goals
-                    based on your <a href="/settings/linking-rules">entity linking rules</a>.
+                    based on your <a href="settings/linking-rules">entity linking rules</a>.
                 </p>
 
                 <h6>Event Sources</h6>
@@ -481,7 +481,7 @@
                 _googleEmail = result.Email;
 
                 // Clear the query string
-                Navigation.NavigateTo("/settings/calendar-providers", replace: true);
+                Navigation.NavigateTo("settings/calendar-providers", replace: true);
 
                 // Load calendars
                 await LoadCalendars();

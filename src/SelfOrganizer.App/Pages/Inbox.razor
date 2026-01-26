@@ -40,7 +40,7 @@ else if (_totalCount == 0)
         </div>
         <h4 class="text-muted">Inbox Zero!</h4>
         <p class="text-muted">All captured items have been processed.</p>
-        <a href="/capture" class="btn btn-primary mt-3">
+        <a href="capture" class="btn btn-primary mt-3">
             <span class="oi oi-plus me-1"></span> Capture Something
         </a>
     </div>
@@ -481,7 +481,7 @@ else
         DataChangeNotification.NotifyDataChanged();
 
         // Navigate to Focus Timer with this task to start a 2-minute focus session
-        Navigation.NavigateTo($"/focus/{createdTask.Id}");
+        Navigation.NavigateTo($"focus/{createdTask.Id}");
     }
 
     private async Task MoveToReference()

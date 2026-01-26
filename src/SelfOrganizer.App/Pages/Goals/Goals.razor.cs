@@ -130,12 +130,12 @@ public partial class Goals : IDisposable
     // Navigation Methods
     private void NavigateToNewGoal()
     {
-        NavigationManager.NavigateTo("/goals/new");
+        NavigationManager.NavigateTo("goals/new");
     }
 
     private void NavigateToEditGoal(Guid goalId)
     {
-        NavigationManager.NavigateTo($"/goals/{goalId}/edit");
+        NavigationManager.NavigateTo($"goals/{goalId}/edit");
     }
 
     private void ShowDetailModal(Goal goal)

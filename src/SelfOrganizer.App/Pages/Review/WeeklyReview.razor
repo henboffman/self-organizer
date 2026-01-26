@@ -30,10 +30,10 @@
             <p class="text-muted">You've reflected on your week. Great job staying intentional!</p>
 
             <div class="mt-4 d-flex gap-3 justify-content-center flex-wrap">
-                <a href="/tasks" class="btn btn-primary">
+                <a href="tasks" class="btn btn-primary">
                     <span class="oi oi-task me-1"></span>View Tasks
                 </a>
-                <a href="/goals" class="btn btn-outline-secondary">
+                <a href="goals" class="btn btn-outline-secondary">
                     <span class="oi oi-target me-1"></span>Goals
                 </a>
                 <button class="btn btn-outline-primary" @onclick="ResetReview">
@@ -226,12 +226,12 @@
                                     <label class="gtd-check">
                                         <input type="checkbox" @bind="_inboxCleared" />
                                         <span>Process inbox to zero</span>
-                                        <a href="/inbox" class="btn btn-sm btn-link">Go</a>
+                                        <a href="inbox" class="btn btn-sm btn-link">Go</a>
                                     </label>
                                     <label class="gtd-check">
                                         <input type="checkbox" @bind="_calendarReviewed" />
                                         <span>Review past & upcoming calendar</span>
-                                        <a href="/calendar" class="btn btn-sm btn-link">Go</a>
+                                        <a href="calendar" class="btn btn-sm btn-link">Go</a>
                                     </label>
                                 </div>
                             </div>
@@ -242,17 +242,17 @@
                                     <label class="gtd-check">
                                         <input type="checkbox" @bind="_projectsReviewed" />
                                         <span>Review all projects (@_activeProjects.Count active)</span>
-                                        <a href="/projects" class="btn btn-sm btn-link">Go</a>
+                                        <a href="projects" class="btn btn-sm btn-link">Go</a>
                                     </label>
                                     <label class="gtd-check">
                                         <input type="checkbox" @bind="_waitingForReviewed" />
                                         <span>Review Waiting For items (@_waitingForCount)</span>
-                                        <a href="/tasks?filter=waiting" class="btn btn-sm btn-link">Go</a>
+                                        <a href="tasks?filter=waiting" class="btn btn-sm btn-link">Go</a>
                                     </label>
                                     <label class="gtd-check">
                                         <input type="checkbox" @bind="_somedayMaybeReviewed" />
                                         <span>Review Someday/Maybe (@_somedayMaybeCount)</span>
-                                        <a href="/tasks?filter=someday" class="btn btn-sm btn-link">Go</a>
+                                        <a href="tasks?filter=someday" class="btn btn-sm btn-link">Go</a>
                                     </label>
                                 </div>
                             </div>

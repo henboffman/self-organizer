@@ -39,7 +39,7 @@
     else if (_notFound)
     {
         <div class="alert alert-danger">
-            Goal not found. <a href="/goals">Return to Goals</a>
+            Goal not found. <a href="goals">Return to Goals</a>
         </div>
     }
     else
@@ -480,12 +480,12 @@
         }
 
         DataChangeNotification.NotifyDataChanged();
-        NavigationManager.NavigateTo("/goals");
+        NavigationManager.NavigateTo("goals");
     }
 
     private void GoBack()
     {
-        NavigationManager.NavigateTo("/goals");
+        NavigationManager.NavigateTo("goals");
     }
 
     private List<string> ParseTags(string input)

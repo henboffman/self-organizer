@@ -100,7 +100,7 @@
                 <div class="text-muted">
                     <span class="oi oi-warning me-1"></span>
                     AI features require Ollama to be running locally.
-                    <a href="/settings" class="text-primary">Configure in Settings</a>
+                    <a href="settings" class="text-primary">Configure in Settings</a>
                 </div>
             }
         </div>
@@ -390,7 +390,7 @@
                             {
                                 <li class="linked-item d-flex justify-content-between align-items-center">
                                     <div>
-                                        <a href="/projects/@project.Id" class="text-decoration-none">
+                                        <a href="projects/@project.Id" class="text-decoration-none">
                                             <span class="oi oi-folder me-1"></span>
                                             @project.Name
                                         </a>
@@ -461,7 +461,7 @@
                                         {
                                             <span class="oi oi-folder text-muted" title="Assigned to another project"></span>
                                         }
-                                        <a href="/tasks/@task.Id" class="text-decoration-none text-truncate @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                        <a href="tasks/@task.Id" class="text-decoration-none text-truncate @(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
                                             <span class="oi @(task.Status == TodoTaskStatus.Completed ? "oi-check" : "oi-task") me-1"></span>
                                             @task.Title
                                         </a>
@@ -536,7 +536,7 @@
                         <div class="tags-list">
                             @foreach (var tag in Goal.Tags)
                             {
-                                <a href="/tags/@tag" class="badge bg-primary text-decoration-none me-1 mb-1">#@tag</a>
+                                <a href="tags/@tag" class="badge bg-primary text-decoration-none me-1 mb-1">#@tag</a>
                             }
                         </div>
                     </div>

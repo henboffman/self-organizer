@@ -27,7 +27,7 @@
                     <span class="oi oi-inbox fs-1 opacity-50"></span>
                 </div>
             </div>
-            <a href="/inbox" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
+            <a href="inbox" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
                 Process Inbox <span class="oi oi-arrow-right"></span>
             </a>
         </div>
@@ -61,7 +61,7 @@
                     <span class="oi oi-task fs-1 opacity-50 text-dark"></span>
                 </div>
             </div>
-            <a href="/tasks/next" class="card-footer text-dark text-decoration-none d-flex justify-content-between align-items-center">
+            <a href="tasks/next" class="card-footer text-dark text-decoration-none d-flex justify-content-between align-items-center">
                 View Tasks <span class="oi oi-arrow-right"></span>
             </a>
         </div>
@@ -78,7 +78,7 @@
                     <span class="oi oi-warning fs-1 opacity-50"></span>
                 </div>
             </div>
-            <a href="/tasks/scheduled" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
+            <a href="tasks/scheduled" class="card-footer text-white text-decoration-none d-flex justify-content-between align-items-center">
                 Review <span class="oi oi-arrow-right"></span>
             </a>
         </div>
@@ -184,7 +184,7 @@
                         }
                         @if (!pick.IsCompleted)
                         {
-                            <a href="/focus" class="btn btn-sm btn-outline-primary" title="Start focus session">
+                            <a href="focus" class="btn btn-sm btn-outline-primary" title="Start focus session">
                                 <span class="oi oi-clock"></span>
                             </a>
                         }
@@ -266,8 +266,8 @@
                     @foreach (var project in _stalledProjects.Take(3))
                     {
                         <div class="d-flex justify-content-between align-items-center py-1">
-                            <a href="/projects/@project.Id">@project.Name</a>
-                            <a href="/projects/@project.Id" class="btn btn-sm btn-warning">Add Action</a>
+                            <a href="projects/@project.Id">@project.Name</a>
+                            <a href="projects/@project.Id" class="btn btn-sm btn-warning">Add Action</a>
                         </div>
                     }
                 }
@@ -289,7 +289,7 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><span class="oi oi-task me-2"></span>Top Next Actions</span>
-                <a href="/tasks/next" class="btn btn-sm btn-outline-primary">View All</a>
+                <a href="tasks/next" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
             <div class="card-body">
                 @if (_topNextActions.Any())
@@ -298,7 +298,7 @@
                     {
                         <div class="d-flex align-items-center py-2 border-bottom">
                             <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@task.Priority" />
-                            <a href="/tasks/@task.Id" class="ms-2 text-decoration-none flex-grow-1">@task.Title</a>
+                            <a href="tasks/@task.Id" class="ms-2 text-decoration-none flex-grow-1">@task.Title</a>
                             @if (task.EstimatedMinutes > 0)
                             {
                                 <small class="text-muted">
@@ -321,7 +321,7 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><span class="oi oi-calendar me-2"></span>Today's Schedule</span>
-                <a href="/calendar" class="btn btn-sm btn-outline-primary">View Calendar</a>
+                <a href="calendar" class="btn btn-sm btn-outline-primary">View Calendar</a>
             </div>
             <div class="card-body">
                 @if (_todayEvents.Any())
@@ -332,7 +332,7 @@
                             <span class="text-muted me-2" style="min-width: 70px;">
                                 @evt.StartTime.ToString("h:mm tt")
                             </span>
-                            <a href="/events/@evt.Id" class="text-decoration-none flex-grow-1">@evt.Title</a>
+                            <a href="events/@evt.Id" class="text-decoration-none flex-grow-1">@evt.Title</a>
                             <small class="text-muted">
                                 @((evt.EndTime - evt.StartTime).TotalMinutes)min
                             </small>
@@ -354,7 +354,7 @@
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><span class="oi oi-clock me-2"></span>Waiting For</span>
-                <a href="/tasks/waiting" class="btn btn-sm btn-outline-primary">View All</a>
+                <a href="tasks/waiting" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
             <div class="card-body">
                 @if (_waitingFor.Any())
@@ -367,7 +367,7 @@
 
                         <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                             <div>
-                                <a href="/tasks/@task.Id" class="text-decoration-none">@task.Title</a>
+                                <a href="tasks/@task.Id" class="text-decoration-none">@task.Title</a>
                                 <small class="d-block text-muted">@(task.WaitingForNote ?? "Someone")</small>
                             </div>
                             <span class="badge @(days > 7 ? "bg-warning text-dark" : "bg-secondary")">
@@ -392,10 +392,10 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-3">
-                    <a href="/review/daily" class="btn btn-lg btn-outline-primary">
+                    <a href="review/daily" class="btn btn-lg btn-outline-primary">
                         <span class="oi oi-check me-2"></span>Daily Review
                     </a>
-                    <a href="/review/weekly" class="btn btn-lg btn-outline-secondary">
+                    <a href="review/weekly" class="btn btn-lg btn-outline-secondary">
                         <span class="oi oi-list-rich me-2"></span>Weekly Review
                     </a>
                 </div>

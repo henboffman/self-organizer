@@ -73,7 +73,7 @@ public partial class MainLayout : IDisposable
     [JSInvokable]
     public void OnQuickCaptureShortcut()
     {
-        NavigationManager.NavigateTo("/capture");
+        NavigationManager.NavigateTo("capture");
     }
 
     [JSInvokable]
@@ -114,7 +114,7 @@ public partial class MainLayout : IDisposable
     public void OnNewItemShortcut()
     {
         // Navigate to quick capture for new items
-        NavigationManager.NavigateTo("/capture");
+        NavigationManager.NavigateTo("capture");
     }
 
     [JSInvokable]

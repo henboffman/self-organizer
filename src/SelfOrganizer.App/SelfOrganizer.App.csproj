@@ -4,7 +4,17 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- PathBase for deployment (default "/" for local dev) -->
+    <PathBase Condition="'$(PathBase)' == ''">/</PathBase>
   </PropertyGroup>
+
+  <!-- Replace base href in index.html during publish -->
+  <Target Name="UpdateBaseHref" AfterTargets="Publish" Condition="'$(PathBase)' != '/'">
+    <Exec Command="pwsh -Command &quot;(Get-Content '$(PublishDir)wwwroot/index.html') -replace '&lt;base href=&quot;&quot;/&quot;&quot; /&gt;', '&lt;base href=&quot;&quot;$(PathBase)&quot;&quot; /&gt;' | Set-Content '$(PublishDir)wwwroot/index.html'&quot;"
+          Condition="'$(OS)' == 'Windows_NT'" />
+    <Exec Command="sed -i '' 's|&lt;base href=&quot;/&quot; /&gt;|&lt;base href=&quot;$(PathBase)&quot; /&gt;|g' '$(PublishDir)wwwroot/index.html'"
+          Condition="'$(OS)' != 'Windows_NT'" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.9" />

@@ -214,7 +214,7 @@
                     <div class="d-flex flex-wrap gap-2">
                         @foreach (var tag in _allTags.OrderByDescending(t => t.TotalCount).Take(10))
                         {
-                            <a href="/tags/@tag.Name" class="badge bg-primary text-decoration-none tag-badge">
+                            <a href="tags/@tag.Name" class="badge bg-primary text-decoration-none tag-badge">
                                 #@tag.Name
                                 <span class="badge status-badge ms-1">@tag.TotalCount</span>
                             </a>
@@ -248,7 +248,7 @@
                     <div class="d-flex flex-wrap gap-2">
                         @foreach (var tag in _recentTags)
                         {
-                            <a href="/tags/@tag" class="badge bg-secondary text-decoration-none">#@tag</a>
+                            <a href="tags/@tag" class="badge bg-secondary text-decoration-none">#@tag</a>
                         }
                     </div>
                 }
@@ -440,7 +440,7 @@
 
     private void NavigateToTag(string tag)
     {
-        NavigationManager.NavigateTo($"/tags/{tag}");
+        NavigationManager.NavigateTo($"tags/{tag}");
     }
 
     public void Dispose()

@@ -11,8 +11,8 @@
     <div>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-2">
-                <li class="breadcrumb-item"><a href="/">Home</a></li>
-                <li class="breadcrumb-item"><a href="/tags">Tags</a></li>
+                <li class="breadcrumb-item"><a href="">Home</a></li>
+                <li class="breadcrumb-item"><a href="tags">Tags</a></li>
                 <li class="breadcrumb-item active">@TagName</li>
             </ol>
         </nav>
@@ -56,7 +56,7 @@ else
                     <div class="list-group list-group-flush">
                         @foreach (var task in _taggedTasks.OrderByDescending(t => t.CreatedAt))
                         {
-                            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                            <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <div class="fw-bold">
@@ -116,7 +116,7 @@ else
                     <div class="list-group list-group-flush">
                         @foreach (var evt in _taggedEvents.OrderByDescending(e => e.StartTime))
                         {
-                            <a href="/calendar/day/@evt.StartTime.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
+                            <a href="calendar/day/@evt.StartTime.ToString("yyyy-MM-dd")" class="list-group-item list-group-item-action">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <div class="fw-bold">@evt.Title</div>
@@ -151,7 +151,7 @@ else
                     <div class="list-group list-group-flush">
                         @foreach (var project in _taggedProjects)
                         {
-                            <a href="/projects/@project.Id" class="list-group-item list-group-item-action">
+                            <a href="projects/@project.Id" class="list-group-item list-group-item-action">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="fw-bold">@project.Name</span>
                                     <span class="badge bg-secondary">@project.Status</span>
@@ -183,7 +183,7 @@ else
                         <div class="d-flex flex-wrap gap-2">
                             @foreach (var tag in _relatedTags)
                             {
-                                <a href="/tags/@tag.Key" class="badge bg-primary text-decoration-none">
+                                <a href="tags/@tag.Key" class="badge bg-primary text-decoration-none">
                                     #@tag.Key <span class="badge status-badge ms-1">@tag.Value</span>
                                 </a>
                             }

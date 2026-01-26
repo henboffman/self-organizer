@@ -23,7 +23,7 @@
     </h3>
     @if (!string.IsNullOrEmpty(Context))
     {
-        <a href="/workspaces" class="btn btn-outline-secondary">
+        <a href="workspaces" class="btn btn-outline-secondary">
             <span class="oi oi-chevron-left me-1"></span>All Workspaces
         </a>
     }
@@ -116,7 +116,7 @@ else if (string.IsNullOrEmpty(Context))
                     <div class="list-group list-group-flush">
                         @foreach (var task in _tasksWithoutContext.Take(5))
                         {
-                            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action py-2">
+                            <a href="tasks/@task.Id" class="list-group-item list-group-item-action py-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span>@task.Title</span>
                                     <span class="badge status-badge">@task.Status</span>
@@ -151,7 +151,7 @@ else
                     <div class="list-group list-group-flush">
                         @foreach (var task in _selectedWorkspace.Tasks.Where(t => t.Status == TodoTaskStatus.NextAction).OrderBy(t => t.Priority))
                         {
-                            <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                            <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div>
                                         <div class="fw-bold">@task.Title</div>
@@ -196,7 +196,7 @@ else
                         <div class="list-group list-group-flush">
                             @foreach (var task in waitingTasks)
                             {
-                                <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                                <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
                                     <div class="d-flex justify-content-between">
                                         <span>@task.Title</span>
                                         @if (!string.IsNullOrEmpty(task.WaitingForNote))
@@ -224,7 +224,7 @@ else
                         <div class="list-group list-group-flush">
                             @foreach (var task in scheduledTasks.OrderBy(t => t.ScheduledDate))
                             {
-                                <a href="/tasks/@task.Id" class="list-group-item list-group-item-action">
+                                <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
                                     <div class="d-flex justify-content-between">
                                         <span>@task.Title</span>
                                         @if (task.ScheduledDate.HasValue)
@@ -305,7 +305,7 @@ else
                         <div class="list-group list-group-flush">
                             @foreach (var evt in _todayEvents.OrderBy(e => e.StartTime))
                             {
-                                <a href="/calendar" class="list-group-item list-group-item-action">
+                                <a href="calendar" class="list-group-item list-group-item-action">
                                     <div class="small">
                                         <span class="fw-bold">@evt.StartTime.ToString("h:mm tt")</span>
                                         <span class="ms-2">@evt.Title</span>
@@ -417,7 +417,7 @@ else
 
     private void NavigateToContext(string context)
     {
-        NavigationManager.NavigateTo($"/workspaces/{context}");
+        NavigationManager.NavigateTo($"workspaces/{context}");
     }
 
     public void Dispose()

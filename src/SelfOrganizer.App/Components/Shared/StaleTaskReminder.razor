@@ -228,12 +228,12 @@
 
     private void GoToTask(Guid taskId)
     {
-        Navigation.NavigateTo($"/tasks/{taskId}");
+        Navigation.NavigateTo($"tasks/{taskId}");
     }
 
     private void GoToReview()
     {
-        Navigation.NavigateTo("/review");
+        Navigation.NavigateTo("review");
     }
 
     private async Task SnoozeTask(Guid taskId, int days)
