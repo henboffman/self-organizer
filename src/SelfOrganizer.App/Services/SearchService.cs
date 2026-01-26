@@ -95,7 +95,7 @@ public class SearchService : ISearchService
                             Subtitle = GetTaskSubtitle(task),
                             MatchedField = matchedField,
                             Icon = "oi-task",
-                            NavigationUrl = $"/tasks/{task.Id}"
+                            NavigationUrl = $"tasks/{task.Id}"
                         });
                     }
                 }
@@ -136,7 +136,7 @@ public class SearchService : ISearchService
                             Subtitle = GetProjectSubtitle(project),
                             MatchedField = matchedField,
                             Icon = "oi-folder",
-                            NavigationUrl = $"/projects/{project.Id}"
+                            NavigationUrl = $"projects/{project.Id}"
                         });
                     }
                 }
@@ -177,7 +177,7 @@ public class SearchService : ISearchService
                             Subtitle = GetEventSubtitle(evt),
                             MatchedField = matchedField,
                             Icon = "oi-calendar",
-                            NavigationUrl = $"/calendar?date={evt.StartTime:yyyy-MM-dd}"
+                            NavigationUrl = $"calendar?date={evt.StartTime:yyyy-MM-dd}"
                         });
                     }
                 }
@@ -204,7 +204,7 @@ public class SearchService : ISearchService
                             Subtitle = "Inbox item",
                             MatchedField = "text",
                             Icon = "oi-inbox",
-                            NavigationUrl = "/inbox"
+                            NavigationUrl = "inbox"
                         });
                     }
                 }
@@ -245,7 +245,7 @@ public class SearchService : ISearchService
                             Subtitle = GetGoalSubtitle(goal),
                             MatchedField = matchedField,
                             Icon = "oi-target",
-                            NavigationUrl = "/goals"
+                            NavigationUrl = "goals"
                         });
                     }
                 }

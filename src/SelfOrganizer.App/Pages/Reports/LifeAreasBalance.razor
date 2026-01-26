@@ -630,7 +630,7 @@
 
     private void NavigateToGoal(Guid goalId)
     {
-        Navigation.NavigateTo($"/goals/{goalId}");
+        Navigation.NavigateTo($"goals/{goalId}");
     }
 
     private void StartAssessment()
@@ -750,12 +750,12 @@
 
     private void NavigateToProject(Guid projectId)
     {
-        Navigation.NavigateTo($"/projects/{projectId}");
+        Navigation.NavigateTo($"projects/{projectId}");
     }
 
     private void NavigateToTask(Guid taskId)
     {
-        Navigation.NavigateTo($"/tasks/{taskId}");
+        Navigation.NavigateTo($"tasks/{taskId}");
     }
 
     private string GetProjectStatusBadge(ProjectStatus status) => status switch

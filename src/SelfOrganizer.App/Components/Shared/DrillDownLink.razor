@@ -11,10 +11,10 @@
 
         return Type.ToLower() switch
         {
-            "task" => $"/tasks/{Id}",
-            "project" => $"/projects/{Id}",
-            "event" => $"/events/{Id}",
-            "reference" => $"/reference/{Id}",
+            "task" => $"tasks/{Id}",
+            "project" => $"projects/{Id}",
+            "event" => $"events/{Id}",
+            "reference" => $"reference/{Id}",
             _ => "#"
         };
     }
