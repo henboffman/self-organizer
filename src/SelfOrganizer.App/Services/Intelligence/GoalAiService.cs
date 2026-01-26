@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
@@ -33,13 +34,17 @@ public class GoalClarificationResult
 
     // These can come as either strings or arrays from the LLM
     // Using JsonPropertyName to match what the LLM returns
+    // Using custom converter to handle both string and array formats
     [JsonPropertyName("successCriteria")]
+    [JsonConverter(typeof(StringOrArrayConverter))]
     public List<string> SuccessCriteriaList { get; set; } = new();
 
     [JsonPropertyName("obstacles")]
+    [JsonConverter(typeof(StringOrArrayConverter))]
     public List<string> ObstaclesList { get; set; } = new();
 
     [JsonPropertyName("resources")]
+    [JsonConverter(typeof(StringOrArrayConverter))]
     public List<string> ResourcesList { get; set; } = new();
 
     // Computed properties that convert lists to strings for the Goal model
@@ -150,7 +155,8 @@ public class GoalAiService : IGoalAiService
                     Title = generatedTask.Title,
                     Description = generatedTask.Description,
                     EstimatedMinutes = generatedTask.EstimatedMinutes,
-                    Contexts = generatedTask.Contexts,
+                    // Strip @ prefix from AI-generated contexts (ContextBadge adds it for display)
+                    Contexts = generatedTask.Contexts.Select(c => c.TrimStart('@')).ToList(),
                     EnergyLevel = generatedTask.EnergyLevel,
                     RequiresDeepWork = generatedTask.RequiresDeepWork,
                     Status = TodoTaskStatus.NextAction,
@@ -304,4 +310,88 @@ Important: For suggestedBalanceDimensions, use the exact dimension IDs provided 
 
 Goal Information:
 {0}";
+}
+
+/// <summary>
+/// JSON converter that handles both string and array inputs for List&lt;string&gt; properties.
+/// LLMs sometimes return a single string instead of an array.
+/// </summary>
+public class StringOrArrayConverter : JsonConverter<List<string>>
+{
+    public override List<string>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return new List<string>();
+        }
+
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            // Single string - convert to list by splitting on common delimiters or keeping as single item
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new List<string>();
+            }
+
+            // If it contains newlines or bullet points, split into multiple items
+            if (value.Contains('\n') || value.Contains("•") || value.Contains("- "))
+            {
+                var items = value
+                    .Split(new[] { '\n', '•' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.TrimStart('-', ' ', '\t').Trim())
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+                return items.Count > 0 ? items : new List<string> { value };
+            }
+
+            // If it contains commas, split on commas
+            if (value.Contains(','))
+            {
+                var items = value
+                    .Split(',')
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+                return items.Count > 0 ? items : new List<string> { value };
+            }
+
+            return new List<string> { value };
+        }
+
+        if (reader.TokenType == JsonTokenType.StartArray)
+        {
+            var list = new List<string>();
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                {
+                    break;
+                }
+
+                if (reader.TokenType == JsonTokenType.String)
+                {
+                    var item = reader.GetString();
+                    if (!string.IsNullOrWhiteSpace(item))
+                    {
+                        list.Add(item);
+                    }
+                }
+            }
+            return list;
+        }
+
+        // Unexpected token type - return empty list
+        return new List<string>();
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<string> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var item in value)
+        {
+            writer.WriteStringValue(item);
+        }
+        writer.WriteEndArray();
+    }
 }

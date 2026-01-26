@@ -1,10 +1,10 @@
 @if (IsVisible)
 {
-    <div class="modal fade show d-block modal-overlay" tabindex="-1">
+    <div class="modal fade show d-block modal-overlay" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="modalTitle" @onkeydown="HandleKeyDown">
         <div class="modal-dialog @Size">
-            <div class="modal-content">
+            <div class="modal-content" data-testid="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">@Title</h5>
+                    <h5 class="modal-title" id="modalTitle">@Title</h5>
                     <button type="button" class="btn-close" @onclick="OnClose" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

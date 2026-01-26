@@ -881,52 +881,164 @@
 
     private async Task ApplySuggestion(string field, string value)
     {
-        switch (field)
-        {
-            case "title":
-                Goal.Title = value;
-                break;
-            case "desiredOutcome":
-                Goal.DesiredOutcome = value;
-                break;
-            case "successCriteria":
-                Goal.SuccessCriteria = value;
-                break;
-            case "obstacles":
-                Goal.Obstacles = value;
-                break;
-            case "resources":
-                Goal.Resources = value;
-                break;
-        }
+        // Store original values so we can restore on failure
+        var originalTitle = Goal.Title;
+        var originalDesiredOutcome = Goal.DesiredOutcome;
+        var originalSuccessCriteria = Goal.SuccessCriteria;
+        var originalObstacles = Goal.Obstacles;
+        var originalResources = Goal.Resources;
+        var originalModifiedAt = Goal.ModifiedAt;
 
-        Goal.ModifiedAt = DateTime.UtcNow;
-        await GoalService.UpdateAsync(Goal);
-        await OnGoalUpdated.InvokeAsync();
-        StateHasChanged();
+        try
+        {
+            // Create a copy of the goal with the updated field
+            var updatedGoal = new Goal
+            {
+                Id = Goal.Id,
+                Title = Goal.Title,
+                Description = Goal.Description,
+                DesiredOutcome = Goal.DesiredOutcome,
+                SuccessCriteria = Goal.SuccessCriteria,
+                Obstacles = Goal.Obstacles,
+                Resources = Goal.Resources,
+                Status = Goal.Status,
+                Category = Goal.Category,
+                Timeframe = Goal.Timeframe,
+                TargetDate = Goal.TargetDate,
+                StartDate = Goal.StartDate,
+                CompletedAt = Goal.CompletedAt,
+                Priority = Goal.Priority,
+                ProgressPercent = Goal.ProgressPercent,
+                Tags = Goal.Tags.ToList(),
+                Notes = Goal.Notes,
+                AiGeneratedPlan = Goal.AiGeneratedPlan,
+                LinkedProjectIds = Goal.LinkedProjectIds.ToList(),
+                LinkedTaskIds = Goal.LinkedTaskIds.ToList(),
+                LinkedHabitIds = Goal.LinkedHabitIds.ToList(),
+                CreatedAt = Goal.CreatedAt,
+                ModifiedAt = DateTime.UtcNow
+            };
+
+            // Apply the field change to the copy
+            switch (field)
+            {
+                case "title":
+                    updatedGoal.Title = value;
+                    break;
+                case "desiredOutcome":
+                    updatedGoal.DesiredOutcome = value;
+                    break;
+                case "successCriteria":
+                    updatedGoal.SuccessCriteria = value;
+                    break;
+                case "obstacles":
+                    updatedGoal.Obstacles = value;
+                    break;
+                case "resources":
+                    updatedGoal.Resources = value;
+                    break;
+            }
+
+            // Save the copy first
+            await GoalService.UpdateAsync(updatedGoal);
+
+            // Only after successful save, update the parameter
+            Goal.Title = updatedGoal.Title;
+            Goal.DesiredOutcome = updatedGoal.DesiredOutcome;
+            Goal.SuccessCriteria = updatedGoal.SuccessCriteria;
+            Goal.Obstacles = updatedGoal.Obstacles;
+            Goal.Resources = updatedGoal.Resources;
+            Goal.ModifiedAt = updatedGoal.ModifiedAt;
+
+            await OnGoalUpdated.InvokeAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // Restore original values on failure (in case partial mutation occurred)
+            Goal.Title = originalTitle;
+            Goal.DesiredOutcome = originalDesiredOutcome;
+            Goal.SuccessCriteria = originalSuccessCriteria;
+            Goal.Obstacles = originalObstacles;
+            Goal.Resources = originalResources;
+            Goal.ModifiedAt = originalModifiedAt;
+
+            _errorMessage = $"Failed to apply suggestion: {ex.Message}";
+            StateHasChanged();
+        }
     }
 
     private async Task ApplyAllSuggestions()
     {
         if (_clarificationResult == null) return;
 
-        if (!string.IsNullOrEmpty(_clarificationResult.ClarifiedGoal))
-            Goal.Title = _clarificationResult.ClarifiedGoal;
-        if (!string.IsNullOrEmpty(_clarificationResult.DesiredOutcome))
-            Goal.DesiredOutcome = _clarificationResult.DesiredOutcome;
-        if (!string.IsNullOrEmpty(_clarificationResult.SuccessCriteria))
-            Goal.SuccessCriteria = _clarificationResult.SuccessCriteria;
-        if (!string.IsNullOrEmpty(_clarificationResult.Obstacles))
-            Goal.Obstacles = _clarificationResult.Obstacles;
-        if (!string.IsNullOrEmpty(_clarificationResult.Resources))
-            Goal.Resources = _clarificationResult.Resources;
+        // Store original values so we can restore on failure
+        var originalTitle = Goal.Title;
+        var originalDesiredOutcome = Goal.DesiredOutcome;
+        var originalSuccessCriteria = Goal.SuccessCriteria;
+        var originalObstacles = Goal.Obstacles;
+        var originalResources = Goal.Resources;
+        var originalModifiedAt = Goal.ModifiedAt;
 
-        Goal.ModifiedAt = DateTime.UtcNow;
-        await GoalService.UpdateAsync(Goal);
-        await OnGoalUpdated.InvokeAsync();
+        try
+        {
+            // Create a copy of the goal with all updates applied
+            var updatedGoal = new Goal
+            {
+                Id = Goal.Id,
+                Title = !string.IsNullOrEmpty(_clarificationResult.ClarifiedGoal) ? _clarificationResult.ClarifiedGoal : Goal.Title,
+                Description = Goal.Description,
+                DesiredOutcome = !string.IsNullOrEmpty(_clarificationResult.DesiredOutcome) ? _clarificationResult.DesiredOutcome : Goal.DesiredOutcome,
+                SuccessCriteria = !string.IsNullOrEmpty(_clarificationResult.SuccessCriteria) ? _clarificationResult.SuccessCriteria : Goal.SuccessCriteria,
+                Obstacles = !string.IsNullOrEmpty(_clarificationResult.Obstacles) ? _clarificationResult.Obstacles : Goal.Obstacles,
+                Resources = !string.IsNullOrEmpty(_clarificationResult.Resources) ? _clarificationResult.Resources : Goal.Resources,
+                Status = Goal.Status,
+                Category = Goal.Category,
+                Timeframe = Goal.Timeframe,
+                TargetDate = Goal.TargetDate,
+                StartDate = Goal.StartDate,
+                CompletedAt = Goal.CompletedAt,
+                Priority = Goal.Priority,
+                ProgressPercent = Goal.ProgressPercent,
+                Tags = Goal.Tags.ToList(),
+                Notes = Goal.Notes,
+                AiGeneratedPlan = Goal.AiGeneratedPlan,
+                LinkedProjectIds = Goal.LinkedProjectIds.ToList(),
+                LinkedTaskIds = Goal.LinkedTaskIds.ToList(),
+                LinkedHabitIds = Goal.LinkedHabitIds.ToList(),
+                CreatedAt = Goal.CreatedAt,
+                ModifiedAt = DateTime.UtcNow
+            };
 
-        _clarificationResult = null;
-        StateHasChanged();
+            // Save the copy first
+            await GoalService.UpdateAsync(updatedGoal);
+
+            // Only after successful save, update the parameter
+            Goal.Title = updatedGoal.Title;
+            Goal.DesiredOutcome = updatedGoal.DesiredOutcome;
+            Goal.SuccessCriteria = updatedGoal.SuccessCriteria;
+            Goal.Obstacles = updatedGoal.Obstacles;
+            Goal.Resources = updatedGoal.Resources;
+            Goal.ModifiedAt = updatedGoal.ModifiedAt;
+
+            await OnGoalUpdated.InvokeAsync();
+
+            _clarificationResult = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // Restore original values on failure
+            Goal.Title = originalTitle;
+            Goal.DesiredOutcome = originalDesiredOutcome;
+            Goal.SuccessCriteria = originalSuccessCriteria;
+            Goal.Obstacles = originalObstacles;
+            Goal.Resources = originalResources;
+            Goal.ModifiedAt = originalModifiedAt;
+
+            _errorMessage = $"Failed to apply suggestions: {ex.Message}";
+            StateHasChanged();
+        }
     }
 
     private void DismissClarification()
@@ -1189,10 +1301,21 @@
     // Link/Unlink Project Methods
     private async void ShowLinkProjectModal()
     {
-        _projectSearchQuery = string.Empty;
-        await LoadLinkedItems(); // Refresh to get latest data
-        _showLinkProjectModal = true;
-        StateHasChanged();
+        try
+        {
+            _projectSearchQuery = string.Empty;
+            await LoadLinkedItems(); // Refresh to get latest data
+            _showLinkProjectModal = true;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while showing link project modal
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash
+        }
     }
 
     private IEnumerable<Project> GetFilteredProjectsForLinking()
@@ -1229,10 +1352,21 @@
     // Link/Unlink Task Methods
     private async void ShowLinkTaskModal()
     {
-        _taskSearchQuery = string.Empty;
-        await LoadLinkedItems(); // Refresh to get latest data
-        _showLinkTaskModal = true;
-        StateHasChanged();
+        try
+        {
+            _taskSearchQuery = string.Empty;
+            await LoadLinkedItems(); // Refresh to get latest data
+            _showLinkTaskModal = true;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while showing link task modal
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash
+        }
     }
 
     private IEnumerable<TodoTask> GetFilteredTasksForLinking()

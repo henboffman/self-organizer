@@ -22,6 +22,12 @@ public partial class MainLayout : IDisposable
     [Inject]
     private KeyboardNavigationService KeyboardNavigation { get; set; } = default!;
 
+    [Inject]
+    private ICommandHistory CommandHistory { get; set; } = default!;
+
+    [Inject]
+    private IToastService ToastService { get; set; } = default!;
+
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private ErrorBoundary? _errorBoundary;
     private bool _showOnboarding = false;
@@ -112,17 +118,45 @@ public partial class MainLayout : IDisposable
     }
 
     [JSInvokable]
-    public void OnUndoShortcut()
+    public async Task OnUndoShortcut()
     {
-        // TODO: Implement undo functionality
-        Console.WriteLine("Undo shortcut triggered");
+        if (!CommandHistory.CanUndo)
+        {
+            ToastService.ShowInfo("Nothing to undo");
+            return;
+        }
+
+        try
+        {
+            var description = CommandHistory.NextUndoDescription;
+            await CommandHistory.UndoAsync();
+            ToastService.ShowSuccess($"Undone: {description}");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to undo: {ex.Message}");
+        }
     }
 
     [JSInvokable]
-    public void OnRedoShortcut()
+    public async Task OnRedoShortcut()
     {
-        // TODO: Implement redo functionality
-        Console.WriteLine("Redo shortcut triggered");
+        if (!CommandHistory.CanRedo)
+        {
+            ToastService.ShowInfo("Nothing to redo");
+            return;
+        }
+
+        try
+        {
+            var description = CommandHistory.NextRedoDescription;
+            await CommandHistory.RedoAsync();
+            ToastService.ShowSuccess($"Redone: {description}");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to redo: {ex.Message}");
+        }
     }
 
     [JSInvokable]

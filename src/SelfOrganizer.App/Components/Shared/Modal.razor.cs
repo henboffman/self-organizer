@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace SelfOrganizer.App.Components.Shared;
 
@@ -24,4 +25,15 @@ public partial class Modal
     /// </summary>
     [Parameter]
     public string Size { get; set; } = "";
+
+    /// <summary>
+    /// Handle keyboard events for accessibility - close modal on Escape key
+    /// </summary>
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
 }

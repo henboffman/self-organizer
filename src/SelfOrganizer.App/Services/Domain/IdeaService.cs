@@ -51,6 +51,7 @@ public class IdeaService : IIdeaService
 
     public async Task<Idea> CreateAsync(Idea idea)
     {
+        ArgumentNullException.ThrowIfNull(idea);
         var result = await _repository.AddAsync(idea);
         _notificationService.NotifyDataChanged();
         return result;
@@ -58,6 +59,7 @@ public class IdeaService : IIdeaService
 
     public async Task<Idea> UpdateAsync(Idea idea)
     {
+        ArgumentNullException.ThrowIfNull(idea);
         var result = await _repository.UpdateAsync(idea);
         _notificationService.NotifyDataChanged();
         return result;
@@ -95,6 +97,7 @@ public class IdeaService : IIdeaService
 
     public async Task<TodoTask> ConvertToTaskAsync(Guid ideaId, TodoTask taskTemplate)
     {
+        ArgumentNullException.ThrowIfNull(taskTemplate);
         var idea = await _repository.GetByIdAsync(ideaId);
         if (idea == null)
             throw new InvalidOperationException($"Idea {ideaId} not found");

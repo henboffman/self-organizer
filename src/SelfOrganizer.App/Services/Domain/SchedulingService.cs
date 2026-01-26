@@ -156,11 +156,13 @@ public class SchedulingService : ISchedulingService
 
     public async Task<TimeBlock> CreateTimeBlockAsync(TimeBlock timeBlock)
     {
+        ArgumentNullException.ThrowIfNull(timeBlock);
         return await _repository.AddAsync(timeBlock);
     }
 
     public async Task<TimeBlock> UpdateTimeBlockAsync(TimeBlock timeBlock)
     {
+        ArgumentNullException.ThrowIfNull(timeBlock);
         return await _repository.UpdateAsync(timeBlock);
     }
 
@@ -171,6 +173,7 @@ public class SchedulingService : ISchedulingService
 
     public async Task<IEnumerable<TimeBlock>> AutoScheduleTasksAsync(DateOnly date, IEnumerable<TodoTask> tasks)
     {
+        ArgumentNullException.ThrowIfNull(tasks);
         var preferences = (await _preferencesRepository.GetAllAsync()).FirstOrDefault() ?? new UserPreferences();
         var categories = (await _categoryRepository.GetAllAsync()).ToList();
         var events = (await _calendarService.GetEventsForDateAsync(date)).ToList();

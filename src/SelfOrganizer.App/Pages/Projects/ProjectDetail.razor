@@ -28,16 +28,19 @@ else
     </nav>
 
     <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h3 class="mb-1">
-                <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@_project.Priority" />
-                @_project.Name
-            </h3>
-            <span class="badge bg-secondary">@_project.Status</span>
-            @if (!_hasNextAction && _project.Status == ProjectStatus.Active)
-            {
-                <span class="badge bg-warning text-dark ms-2">No Next Action</span>
-            }
+        <div class="d-flex align-items-center gap-3">
+            <SelfOrganizer.App.Components.Shared.ProjectIcon Project="@_project" Size="SelfOrganizer.App.Components.Shared.IconDisplay.IconSize.Large" />
+            <div>
+                <h3 class="mb-1">
+                    <SelfOrganizer.App.Components.Shared.PriorityIndicator Priority="@_project.Priority" />
+                    @_project.Name
+                </h3>
+                <span class="badge bg-secondary">@_project.Status</span>
+                @if (!_hasNextAction && _project.Status == ProjectStatus.Active)
+                {
+                    <span class="badge bg-warning text-dark ms-2">No Next Action</span>
+                }
+            </div>
         </div>
         <div class="btn-group">
             @if (_project.Status == ProjectStatus.Active)
@@ -313,27 +316,33 @@ else
 @* Add Task Modal *@
 <SelfOrganizer.App.Components.Shared.Modal Title="Add Task to Project" IsVisible="@_showAddTaskModal" OnClose="() => _showAddTaskModal = false">
     <ChildContent>
-        <div class="mb-3">
-            <label class="form-label">Title</label>
-            <input type="text" class="form-control" @bind="_newTaskTitle" />
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label class="form-label">Estimated Minutes</label>
-                <input type="number" class="form-control" @bind="_newTaskMinutes" min="1" />
+        <div @onkeydown="HandleAddTaskKeyDown">
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="_newTaskTitle" @ref="_newTaskTitleInput" />
             </div>
-            <div class="col-md-6">
-                <label class="form-label">Priority</label>
-                <select class="form-select" @bind="_newTaskPriority">
-                    <option value="1">High</option>
-                    <option value="2">Normal</option>
-                    <option value="3">Low</option>
-                </select>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Estimated Minutes</label>
+                    <input type="number" class="form-control" @bind="_newTaskMinutes" min="1" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Priority</label>
+                    <select class="form-select" @bind="_newTaskPriority">
+                        <option value="1">High</option>
+                        <option value="2">Normal</option>
+                        <option value="3">Low</option>
+                    </select>
+                </div>
             </div>
         </div>
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="() => _showAddTaskModal = false">Cancel</button>
+        <button class="btn btn-outline-primary" @onclick="AddTaskAndContinue" disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)">
+            Save & Add Another
+            <small class="text-muted ms-2">@(_isMac ? "⌘" : "Ctrl")+Enter</small>
+        </button>
         <button class="btn btn-primary" @onclick="AddTask" disabled="@string.IsNullOrWhiteSpace(_newTaskTitle)">Add Task</button>
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
@@ -408,6 +417,18 @@ else
         <div class="mb-3">
             <label class="form-label">External URL</label>
             <input type="url" class="form-control" @bind="_editUrl" placeholder="https://..." />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Project Icon</label>
+            <div class="d-flex align-items-center gap-2">
+                <SelfOrganizer.App.Components.Shared.IconPicker
+                    SelectedIcon="@_editIcon"
+                    SelectedIconChanged="@((value) => _editIcon = value)"
+                    SelectedImageUrl="@_editIconImageUrl"
+                    SelectedImageUrlChanged="@((value) => _editIconImageUrl = value)"
+                    Mode="SelfOrganizer.App.Components.Shared.IconPicker.IconPickerMode.ProjectsOnly" />
+                <span class="text-muted small">Choose an icon or upload a custom image</span>
+            </div>
         </div>
     </ChildContent>
     <Footer>
@@ -597,6 +618,8 @@ else
     private string _editTags = string.Empty;
     private string? _editUrl;
     private string? _editColor;
+    private string? _editIcon;
+    private string? _editIconImageUrl;
 
     // Predefined project colors
     private static readonly string[] _projectColors = new[]
@@ -617,6 +640,8 @@ else
     private string _newTaskTitle = string.Empty;
     private int _newTaskMinutes = 30;
     private int _newTaskPriority = 2;
+    private ElementReference _newTaskTitleInput;
+    private bool _isMac = false;
 
     // Edit task fields
     private bool _showEditTaskModal = false;
@@ -633,8 +658,19 @@ else
     private bool _showDeleteTaskConfirm = false;
     private TodoTask? _taskToDelete = null;
 
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
     protected override async Task OnInitializedAsync()
     {
+        // Detect if running on Mac for keyboard shortcut display
+        try
+        {
+            _isMac = await JS.InvokeAsync<bool>("eval", "navigator.platform.toUpperCase().indexOf('MAC') >= 0");
+        }
+        catch
+        {
+            _isMac = false;
+        }
         await LoadProject();
     }
 
@@ -675,6 +711,8 @@ else
                 _editTags = _project.Tags.Any() ? string.Join(" ", _project.Tags.Select(t => $"#{t}")) : string.Empty;
                 _editUrl = _project.Url;
                 _editColor = _project.Color;
+                _editIcon = _project.Icon;
+                _editIconImageUrl = _project.IconImageUrl;
             }
         }
         finally
@@ -705,6 +743,8 @@ else
             _project.Tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_editTags);
             _project.Url = string.IsNullOrWhiteSpace(_editUrl) ? null : _editUrl;
             _project.Color = _editColor;
+            _project.Icon = _editIcon;
+            _project.IconImageUrl = _editIconImageUrl;
             await ProjectService.UpdateAsync(_project);
             _isEditing = false;
             await LoadProject();
@@ -748,6 +788,46 @@ else
         await TaskService.CreateAsync(task);
         _showAddTaskModal = false;
         await LoadProject();
+    }
+
+    private async Task AddTaskAndContinue()
+    {
+        if (_project == null || string.IsNullOrWhiteSpace(_newTaskTitle)) return;
+
+        var task = new TodoTask
+        {
+            Title = _newTaskTitle,
+            ProjectId = _project.Id,
+            Status = TodoTaskStatus.NextAction,
+            EstimatedMinutes = _newTaskMinutes,
+            Priority = _newTaskPriority
+        };
+        await TaskService.CreateAsync(task);
+
+        // Reset form but keep modal open
+        _newTaskTitle = string.Empty;
+        // Keep the same minutes and priority for convenience when adding multiple similar tasks
+
+        await LoadProject();
+
+        // Focus back on the title input for quick entry
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.querySelector('.modal input[type=\"text\"]')?.focus()");
+        }
+        catch
+        {
+            // Ignore focus errors
+        }
+    }
+
+    private async Task HandleAddTaskKeyDown(KeyboardEventArgs e)
+    {
+        // Check for Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+        if (e.Key == "Enter" && (e.MetaKey || e.CtrlKey))
+        {
+            await AddTaskAndContinue();
+        }
     }
 
     private async Task ToggleComplete(TodoTask task)

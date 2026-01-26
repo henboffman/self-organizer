@@ -1,8 +1,9 @@
 @code {
     [Parameter] public int Priority { get; set; } = 2;
+    [Parameter] public string? CssClass { get; set; }
 }
 
-<span class="priority-indicator priority-@Priority" title="Priority @Priority">
+<span class="priority-indicator priority-@Priority @CssClass" title="Priority @Priority">
     @switch (Priority)
     {
         case 1:

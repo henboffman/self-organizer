@@ -1,0 +1,88 @@
+@using SelfOrganizer.Core.Models
+
+@* Project icon display with fallback to color-based initial *@
+<span class="project-icon @SizeClass" data-testid="project-icon">
+    @if (!string.IsNullOrEmpty(Project?.IconImageUrl))
+    {
+        <img src="@Project.IconImageUrl"
+             alt="@(Project?.Name ?? "Project")"
+             class="project-icon-image"
+             style="@ImageStyle" />
+    }
+    else if (!string.IsNullOrEmpty(Project?.Icon))
+    {
+        <IconDisplay Icon="@Project.Icon" Size="@DisplaySize" AltText="@Project?.Name" />
+    }
+    else if (!string.IsNullOrEmpty(Icon))
+    {
+        <IconDisplay Icon="@Icon" Size="@DisplaySize" AltText="@Project?.Name" />
+    }
+    else if (!string.IsNullOrEmpty(IconImageUrl))
+    {
+        <img src="@IconImageUrl"
+             alt="@(Project?.Name ?? "Project")"
+             class="project-icon-image"
+             style="@ImageStyle" />
+    }
+    else
+    {
+        @* Fallback: Color-based initial *@
+        <span class="project-icon-initial"
+              style="@InitialStyle"
+              title="@(Project?.Name ?? "Project")">
+            @GetInitial()
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter] public Project? Project { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? IconImageUrl { get; set; }
+    [Parameter] public string? Color { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public IconDisplay.IconSize Size { get; set; } = IconDisplay.IconSize.Medium;
+
+    private IconDisplay.IconSize DisplaySize => Size;
+
+    private string SizeClass => Size switch
+    {
+        IconDisplay.IconSize.Small => "project-icon-sm",
+        IconDisplay.IconSize.Large => "project-icon-lg",
+        _ => "project-icon-md"
+    };
+
+    private string SizePixels => Size switch
+    {
+        IconDisplay.IconSize.Small => "24px",
+        IconDisplay.IconSize.Large => "48px",
+        _ => "32px"
+    };
+
+    private string FontSize => Size switch
+    {
+        IconDisplay.IconSize.Small => "0.75rem",
+        IconDisplay.IconSize.Large => "1.5rem",
+        _ => "1rem"
+    };
+
+    private string ImageStyle => $"width: {SizePixels}; height: {SizePixels}; object-fit: cover; border-radius: 4px;";
+
+    private string InitialStyle
+    {
+        get
+        {
+            var bgColor = Project?.Color ?? Color ?? "#6c757d";
+            return $"background-color: {bgColor}; width: {SizePixels}; height: {SizePixels}; font-size: {FontSize};";
+        }
+    }
+
+    private string GetInitial()
+    {
+        var name = Project?.Name ?? Name;
+        if (string.IsNullOrEmpty(name))
+            return "P";
+
+        return name[0].ToString().ToUpperInvariant();
+    }
+}

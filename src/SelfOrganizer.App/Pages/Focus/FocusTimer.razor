@@ -236,8 +236,8 @@
             </div>
 
             @* Timer Display *@
-            <div class="timer-display mb-4">
-                <div class="timer-digits @(_state.IsBreak ? "text-success" : "")">
+            <div class="timer-display mb-4" role="timer" aria-live="polite" aria-atomic="true" data-testid="timer-display">
+                <div class="timer-digits @(_state.IsBreak ? "text-success" : "")" aria-label="@FormatTime(_state.RemainingSeconds) remaining">
                     @FormatTime(_state.RemainingSeconds)
                 </div>
                 <div class="timer-label text-muted">

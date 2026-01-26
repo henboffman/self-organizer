@@ -51,13 +51,19 @@ public partial class NavMenu : IDisposable
     {
         try
         {
-            await RefreshCounts();
-            await InvokeAsync(StateHasChanged);
+            await InvokeAsync(async () =>
+            {
+                await RefreshCounts();
+                StateHasChanged();
+            });
         }
-        catch (Exception ex)
+        catch (ObjectDisposedException)
         {
-            // Log error - async void methods swallow exceptions so we need to handle them here
-            Console.Error.WriteLine($"Error refreshing nav menu counts: {ex.Message}");
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
         }
     }
 

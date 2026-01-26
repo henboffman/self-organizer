@@ -1,0 +1,91 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject ITaskIconIntelligenceService IconIntelligence
+
+@* Intelligent task icon display with priority: manual icon -> category icon -> status icon *@
+<span class="task-icon @SizeClass" title="@GetTooltip()" data-testid="task-icon">
+    <IconDisplay Icon="@ResolvedIcon"
+                 Size="@DisplaySize"
+                 DefaultIcon="@DefaultIcon"
+                 AltText="@GetTooltip()" />
+</span>
+
+@code {
+    [Parameter] public TodoTask? Task { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public TaskIconCategory? Category { get; set; }
+    [Parameter] public TodoTaskStatus? Status { get; set; }
+    [Parameter] public IconDisplay.IconSize Size { get; set; } = IconDisplay.IconSize.Small;
+
+    private string? ResolvedIcon
+    {
+        get
+        {
+            // Priority 1: Explicit icon parameter or task's manual icon
+            if (!string.IsNullOrEmpty(Icon))
+                return Icon;
+
+            if (Task != null && !string.IsNullOrEmpty(Task.Icon) && !Task.IsIconAutoDetected)
+                return Task.Icon;
+
+            // Priority 2: Task's auto-detected icon
+            if (Task != null && !string.IsNullOrEmpty(Task.Icon))
+                return Task.Icon;
+
+            // Priority 3: Category parameter
+            if (Category.HasValue)
+                return IconIntelligence.GetIconForCategory(Category.Value);
+
+            // Priority 4: Task's detected category
+            if (Task?.DetectedCategory.HasValue == true)
+                return IconIntelligence.GetIconForCategory(Task.DetectedCategory.Value);
+
+            // Priority 5: Status-based icon
+            var status = Status ?? Task?.Status;
+            if (status.HasValue)
+                return GetStatusIcon(status.Value);
+
+            return null;
+        }
+    }
+
+    private IconDisplay.IconSize DisplaySize => Size;
+
+    private string SizeClass => Size switch
+    {
+        IconDisplay.IconSize.Small => "task-icon-sm",
+        IconDisplay.IconSize.Large => "task-icon-lg",
+        _ => "task-icon-md"
+    };
+
+    private string DefaultIcon => "📌"; // Pin emoji as default task icon
+
+    private static string GetStatusIcon(TodoTaskStatus status) => status switch
+    {
+        TodoTaskStatus.Inbox => "📥",
+        TodoTaskStatus.NextAction => "⚡",
+        TodoTaskStatus.WaitingFor => "⏳",
+        TodoTaskStatus.Scheduled => "📅",
+        TodoTaskStatus.SomedayMaybe => "💭",
+        TodoTaskStatus.Completed => "✅",
+        TodoTaskStatus.Reference => "📎",
+        TodoTaskStatus.Deleted => "🗑️",
+        _ => "📌"
+    };
+
+    private string GetTooltip()
+    {
+        if (Task?.DetectedCategory.HasValue == true)
+        {
+            return $"{Task.DetectedCategory.Value} task";
+        }
+
+        var status = Status ?? Task?.Status;
+        if (status.HasValue)
+        {
+            return status.Value.ToString();
+        }
+
+        return "Task";
+    }
+}

@@ -57,11 +57,13 @@ public class GoalService : IGoalService
 
     public async Task<Goal> CreateAsync(Goal goal)
     {
+        ArgumentNullException.ThrowIfNull(goal);
         return await _repository.AddAsync(goal);
     }
 
     public async Task<Goal> UpdateAsync(Goal goal)
     {
+        ArgumentNullException.ThrowIfNull(goal);
         return await _repository.UpdateAsync(goal);
     }
 

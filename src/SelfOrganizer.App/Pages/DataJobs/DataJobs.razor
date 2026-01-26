@@ -7,6 +7,7 @@
 @inject IExportService ExportService
 @inject IImportService ImportService
 @inject IJSRuntime JSRuntime
+@inject IToastService ToastService
 
 <h3 class="mb-4">
     <span class="oi oi-cloud-download me-2"></span>Data Jobs
@@ -595,8 +596,9 @@
 
     private void ConnectMicrosoftGraph()
     {
-        // TODO: Implement OAuth flow for Microsoft Graph
-        // This will redirect to Microsoft login and then back to the app
+        // Microsoft Graph OAuth integration is not yet available
+        // When implemented, this will redirect to Microsoft login for OAuth authorization
+        ToastService.ShowInfo("Microsoft Graph integration is coming soon. This feature will allow you to sync calendar events from Outlook.");
     }
 
     private async Task SyncMicrosoftGraph()
@@ -606,8 +608,10 @@
 
         try
         {
-            // TODO: Implement actual Microsoft Graph sync
-            await Task.Delay(1000); // Placeholder
+            // Microsoft Graph sync is not yet implemented
+            // When implemented, this will pull calendar events from the user's Outlook account
+            await Task.Delay(500); // Brief delay for UX
+            ToastService.ShowInfo("Microsoft Graph sync is not yet available. Once connected, this will automatically sync your Outlook calendar events.");
             await LoadData();
         }
         finally
@@ -618,7 +622,9 @@
 
     private void ConfigureMicrosoftGraph()
     {
-        // TODO: Open configuration modal
+        // Microsoft Graph configuration modal is not yet implemented
+        // When implemented, this will allow users to configure sync frequency, date range, and other settings
+        ToastService.ShowInfo("Microsoft Graph configuration is coming soon. You'll be able to customize sync frequency, date ranges, and which calendars to include.");
     }
 
     private async Task ExportTasks()

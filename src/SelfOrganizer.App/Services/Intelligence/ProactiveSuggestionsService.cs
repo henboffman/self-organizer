@@ -205,6 +205,7 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
 
         if (dueToday.Count > 0)
         {
+            var firstDueTask = dueToday[0];
             suggestions.Add(new ProactiveSuggestion
             {
                 Id = Guid.NewGuid(),
@@ -212,7 +213,7 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
                 Category = "Tasks",
                 Title = "Due Today",
                 Message = dueToday.Count == 1
-                    ? $"\"{dueToday.First().Title}\" is due today"
+                    ? $"\"{firstDueTask.Title}\" is due today"
                     : $"{dueToday.Count} tasks are due today",
                 ActionLabel = "View",
                 ActionUrl = "/tasks?filter=today",

@@ -332,11 +332,22 @@ else
 
     private async void HandleDataChanged()
     {
-        await InvokeAsync(async () =>
+        try
         {
-            await LoadTasks();
-            StateHasChanged();
-        });
+            await InvokeAsync(async () =>
+            {
+                await LoadTasks();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
     }
 
     private async Task LoadTasks()
@@ -726,15 +737,26 @@ else
 
     private async void HandleKeyboardToggle()
     {
-        if (_keyboardFocusIndex >= 0)
+        try
         {
-            _cachedDisplayTasks = GetDisplayTasks().ToList();
-            if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+            if (_keyboardFocusIndex >= 0)
             {
-                var task = _cachedDisplayTasks[_keyboardFocusIndex];
-                await ToggleComplete(task);
-                await InvokeAsync(StateHasChanged);
+                _cachedDisplayTasks = GetDisplayTasks().ToList();
+                if (_keyboardFocusIndex < _cachedDisplayTasks.Count)
+                {
+                    var task = _cachedDisplayTasks[_keyboardFocusIndex];
+                    await ToggleComplete(task);
+                    await InvokeAsync(StateHasChanged);
+                }
             }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling keyboard toggle
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash
         }
     }
 

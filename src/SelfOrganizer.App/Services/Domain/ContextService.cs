@@ -101,6 +101,7 @@ public class ContextService : IContextService
 
     public async Task<Context> CreateAsync(string name, string? icon = null, string? color = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         // Check if context already exists
         var existing = await GetByNameAsync(name);
         if (existing != null)

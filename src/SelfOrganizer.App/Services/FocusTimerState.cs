@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using Microsoft.JSInterop.Infrastructure;
 using SelfOrganizer.Core.Models;
 
 namespace SelfOrganizer.App.Services;
@@ -169,7 +170,7 @@ public interface IFocusTimerState
     /// <summary>
     /// Sync state from external source (e.g., another window via BroadcastChannel)
     /// </summary>
-    void SyncState(FocusTimerStateData state);
+    Task SyncStateAsync(FocusTimerStateData state);
 }
 
 /// <summary>
@@ -178,6 +179,7 @@ public interface IFocusTimerState
 public class FocusTimerState : IFocusTimerState, IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
+    private readonly SemaphoreSlim _stateLock = new(1, 1);
     private DotNetObjectReference<FocusTimerState>? _dotNetRef;
     private System.Threading.Timer? _timer;
     private bool _initialized;
@@ -241,29 +243,45 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
 
     public async Task PlayAsync()
     {
-        if (State.IsRunning) return;
+        await _stateLock.WaitAsync();
+        try
+        {
+            if (State.IsRunning) return;
 
-        State.IsRunning = true;
-        State.LastUpdated = DateTime.UtcNow;
+            State.IsRunning = true;
+            State.LastUpdated = DateTime.UtcNow;
 
-        _timer?.Dispose();
-        _timer = new System.Threading.Timer(TimerTick, null, 1000, 1000);
+            _timer?.Dispose();
+            _timer = new System.Threading.Timer(TimerTick, null, 1000, 1000);
 
-        await BroadcastStateAsync();
+            await BroadcastStateAsync();
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
         NotifyStateChanged();
     }
 
     public async Task PauseAsync()
     {
-        if (!State.IsRunning) return;
+        await _stateLock.WaitAsync();
+        try
+        {
+            if (!State.IsRunning) return;
 
-        State.IsRunning = false;
-        State.LastUpdated = DateTime.UtcNow;
+            State.IsRunning = false;
+            State.LastUpdated = DateTime.UtcNow;
 
-        _timer?.Dispose();
-        _timer = null;
+            _timer?.Dispose();
+            _timer = null;
 
-        await BroadcastStateAsync();
+            await BroadcastStateAsync();
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
         NotifyStateChanged();
     }
 
@@ -459,9 +477,9 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
     /// Called from JavaScript when receiving state from another window
     /// </summary>
     [JSInvokable]
-    public void OnStateReceived(FocusTimerStateData newState)
+    public async Task OnStateReceived(FocusTimerStateData newState)
     {
-        SyncState(newState);
+        await SyncStateAsync(newState);
     }
 
     /// <summary>
@@ -474,92 +492,122 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
         NotifyStateChanged();
     }
 
-    public void SyncState(FocusTimerStateData newState)
+    public async Task SyncStateAsync(FocusTimerStateData newState)
     {
-        // Only sync if incoming state is newer
-        if (newState.LastUpdated.HasValue &&
-            (!State.LastUpdated.HasValue || newState.LastUpdated > State.LastUpdated))
+        // Use async lock acquisition for Blazor WebAssembly compatibility
+        await _stateLock.WaitAsync();
+        try
         {
-            var wasRunning = State.IsRunning;
-
-            State.TaskId = newState.TaskId;
-            State.TaskTitle = newState.TaskTitle;
-            State.IsRunning = newState.IsRunning;
-            State.IsBreak = newState.IsBreak;
-            State.RemainingSeconds = newState.RemainingSeconds;
-            State.TotalSeconds = newState.TotalSeconds;
-            State.FocusMinutes = newState.FocusMinutes;
-            State.BreakMinutes = newState.BreakMinutes;
-            State.SessionsCompleted = newState.SessionsCompleted;
-            State.OriginalEstimatedMinutes = newState.OriginalEstimatedMinutes;
-            State.ElapsedSeconds = newState.ElapsedSeconds;
-            State.ExtensionCount = newState.ExtensionCount;
-            State.TotalExtensionMinutes = newState.TotalExtensionMinutes;
-            State.TaskQueue = newState.TaskQueue ?? new List<QueuedTask>();
-            State.LastUpdated = newState.LastUpdated;
-
-            // Handle timer state changes
-            if (newState.IsRunning && !wasRunning)
+            // Only sync if incoming state is newer
+            if (newState.LastUpdated.HasValue &&
+                (!State.LastUpdated.HasValue || newState.LastUpdated > State.LastUpdated))
             {
-                _timer?.Dispose();
-                _timer = new System.Threading.Timer(TimerTick, null, 1000, 1000);
+                var wasRunning = State.IsRunning;
+
+                State.TaskId = newState.TaskId;
+                State.TaskTitle = newState.TaskTitle;
+                State.IsRunning = newState.IsRunning;
+                State.IsBreak = newState.IsBreak;
+                State.RemainingSeconds = newState.RemainingSeconds;
+                State.TotalSeconds = newState.TotalSeconds;
+                State.FocusMinutes = newState.FocusMinutes;
+                State.BreakMinutes = newState.BreakMinutes;
+                State.SessionsCompleted = newState.SessionsCompleted;
+                State.OriginalEstimatedMinutes = newState.OriginalEstimatedMinutes;
+                State.ElapsedSeconds = newState.ElapsedSeconds;
+                State.ExtensionCount = newState.ExtensionCount;
+                State.TotalExtensionMinutes = newState.TotalExtensionMinutes;
+                State.TaskQueue = newState.TaskQueue ?? new List<QueuedTask>();
+                State.LastUpdated = newState.LastUpdated;
+
+                // Handle timer state changes
+                if (newState.IsRunning && !wasRunning)
+                {
+                    _timer?.Dispose();
+                    _timer = new System.Threading.Timer(TimerTick, null, 1000, 1000);
+                }
+                else if (!newState.IsRunning && wasRunning)
+                {
+                    _timer?.Dispose();
+                    _timer = null;
+                }
             }
-            else if (!newState.IsRunning && wasRunning)
+        }
+        finally
+        {
+            _stateLock.Release();
+        }
+
+        NotifyStateChanged();
+    }
+
+    private void TimerTick(object? state)
+    {
+        // Fire-and-forget with proper error handling
+        _ = TimerTickAsync();
+    }
+
+    private async Task TimerTickAsync()
+    {
+        await _stateLock.WaitAsync();
+        try
+        {
+            State.RemainingSeconds--;
+            if (!State.IsBreak)
+            {
+                State.ElapsedSeconds++;
+            }
+            State.LastUpdated = DateTime.UtcNow;
+
+            if (State.RemainingSeconds <= 0)
             {
                 _timer?.Dispose();
                 _timer = null;
-            }
+                State.IsRunning = false;
 
-            NotifyStateChanged();
-        }
-    }
-
-    private async void TimerTick(object? state)
-    {
-        State.RemainingSeconds--;
-        if (!State.IsBreak)
-        {
-            State.ElapsedSeconds++;
-        }
-        State.LastUpdated = DateTime.UtcNow;
-
-        if (State.RemainingSeconds <= 0)
-        {
-            _timer?.Dispose();
-            _timer = null;
-            State.IsRunning = false;
-
-            if (!State.IsBreak)
-            {
-                // Focus session complete
-                State.SessionsCompleted++;
-                State.IsBreak = true;
-                State.RemainingSeconds = State.BreakMinutes * 60;
-                State.TotalSeconds = State.RemainingSeconds;
-
-                // Play notification sound
-                try
+                if (!State.IsBreak)
                 {
-                    await _jsRuntime.InvokeVoidAsync("focusTimerInterop.playNotification", "Focus session complete! Time for a break.");
-                }
-                catch { }
-            }
-            else
-            {
-                // Break complete
-                State.IsBreak = false;
-                State.RemainingSeconds = State.FocusMinutes * 60;
-                State.TotalSeconds = State.RemainingSeconds;
+                    // Focus session complete
+                    State.SessionsCompleted++;
+                    State.IsBreak = true;
+                    State.RemainingSeconds = State.BreakMinutes * 60;
+                    State.TotalSeconds = State.RemainingSeconds;
 
-                try
-                {
-                    await _jsRuntime.InvokeVoidAsync("focusTimerInterop.playNotification", "Break over! Ready for another session?");
+                    // Play notification sound
+                    try
+                    {
+                        await _jsRuntime.InvokeVoidAsync("focusTimerInterop.playNotification", "Focus session complete! Time for a break.");
+                    }
+                    catch (JSException)
+                    {
+                        // JS interop not available (e.g., during prerendering)
+                    }
                 }
-                catch { }
+                else
+                {
+                    // Break complete
+                    State.IsBreak = false;
+                    State.RemainingSeconds = State.FocusMinutes * 60;
+                    State.TotalSeconds = State.RemainingSeconds;
+
+                    try
+                    {
+                        await _jsRuntime.InvokeVoidAsync("focusTimerInterop.playNotification", "Break over! Ready for another session?");
+                    }
+                    catch (JSException)
+                    {
+                        // JS interop not available
+                    }
+                }
             }
+
+            await BroadcastStateAsync();
+        }
+        finally
+        {
+            _stateLock.Release();
         }
 
-        await BroadcastStateAsync();
         NotifyStateChanged();
     }
 
@@ -584,14 +632,19 @@ public class FocusTimerState : IFocusTimerState, IAsyncDisposable
     {
         _timer?.Dispose();
         _dotNetRef?.Dispose();
+        _stateLock.Dispose();
 
         try
         {
             await _jsRuntime.InvokeVoidAsync("focusTimerInterop.dispose");
         }
-        catch
+        catch (JSException)
         {
-            // Ignore disposal errors
+            // JS interop not available during disposal
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already disposed
         }
     }
 }

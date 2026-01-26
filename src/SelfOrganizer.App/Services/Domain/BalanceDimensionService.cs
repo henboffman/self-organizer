@@ -304,6 +304,7 @@ public class BalanceDimensionService : IBalanceDimensionService
 
     public async Task<List<string>> SuggestDimensionsForGoalAsync(Goal goal)
     {
+        ArgumentNullException.ThrowIfNull(goal);
         var suggestions = new List<string>();
         var mode = await GetCurrentModeAsync();
         var dimensions = await GetDimensionsForModeAsync(mode);
@@ -408,6 +409,7 @@ public class BalanceDimensionService : IBalanceDimensionService
 
     public async Task SaveBalanceRatingsAsync(Dictionary<string, int> ratings)
     {
+        ArgumentNullException.ThrowIfNull(ratings);
         var prefs = await GetOrCreatePreferencesAsync();
         prefs.LifeAreaRatings = ratings;
         prefs.LifeAreaAssessmentDate = DateTime.UtcNow;

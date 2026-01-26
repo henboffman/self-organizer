@@ -323,14 +323,25 @@
 
     private async void HandleDataChanged()
     {
-        // Mark cache as invalid but don't reload immediately
-        _cacheInvalidated = true;
-
-        // Only reload if this page is currently visible
-        await InvokeAsync(() =>
+        try
         {
-            StateHasChanged();
-        });
+            // Mark cache as invalid but don't reload immediately
+            _cacheInvalidated = true;
+
+            // Only reload if this page is currently visible
+            await InvokeAsync(() =>
+            {
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
     }
 
     private async Task LoadTags()

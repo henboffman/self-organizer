@@ -1,0 +1,75 @@
+@using SelfOrganizer.Core.Models
+
+@* Goal icon display with fallback to category-based default *@
+<span class="goal-icon @SizeClass" data-testid="goal-icon">
+    @if (!string.IsNullOrEmpty(Goal?.IconImageUrl))
+    {
+        <img src="@Goal.IconImageUrl"
+             alt="@(Goal?.Title ?? "Goal")"
+             class="goal-icon-image"
+             style="@ImageStyle" />
+    }
+    else if (!string.IsNullOrEmpty(Goal?.Icon))
+    {
+        <IconDisplay Icon="@Goal.Icon" Size="@DisplaySize" AltText="@Goal?.Title" />
+    }
+    else if (!string.IsNullOrEmpty(Icon))
+    {
+        <IconDisplay Icon="@Icon" Size="@DisplaySize" AltText="@Goal?.Title" />
+    }
+    else if (!string.IsNullOrEmpty(IconImageUrl))
+    {
+        <img src="@IconImageUrl"
+             alt="@(Goal?.Title ?? "Goal")"
+             class="goal-icon-image"
+             style="@ImageStyle" />
+    }
+    else
+    {
+        @* Fallback: Category-based default icon *@
+        <IconDisplay Icon="@GetCategoryIcon()" Size="@DisplaySize" DefaultIcon="oi-target" />
+    }
+</span>
+
+@code {
+    [Parameter] public Goal? Goal { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? IconImageUrl { get; set; }
+    [Parameter] public GoalCategory? Category { get; set; }
+    [Parameter] public IconDisplay.IconSize Size { get; set; } = IconDisplay.IconSize.Medium;
+
+    private IconDisplay.IconSize DisplaySize => Size;
+
+    private string SizeClass => Size switch
+    {
+        IconDisplay.IconSize.Small => "goal-icon-sm",
+        IconDisplay.IconSize.Large => "goal-icon-lg",
+        _ => "goal-icon-md"
+    };
+
+    private string SizePixels => Size switch
+    {
+        IconDisplay.IconSize.Small => "24px",
+        IconDisplay.IconSize.Large => "48px",
+        _ => "32px"
+    };
+
+    private string ImageStyle => $"width: {SizePixels}; height: {SizePixels}; object-fit: cover; border-radius: 4px;";
+
+    private string GetCategoryIcon()
+    {
+        var category = Goal?.Category ?? Category ?? GoalCategory.Personal;
+        return category switch
+        {
+            GoalCategory.Career => "🎯",
+            GoalCategory.Financial => "💰",
+            GoalCategory.Health => "💪",
+            GoalCategory.Learning => "📚",
+            GoalCategory.Personal => "⭐",
+            GoalCategory.Relationships => "❤️",
+            GoalCategory.Creative => "🎨",
+            GoalCategory.Other => "🎯",
+            _ => "🎯"
+        };
+    }
+}

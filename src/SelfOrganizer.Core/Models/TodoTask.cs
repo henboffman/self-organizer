@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace SelfOrganizer.Core.Models;
 
 /// <summary>
@@ -5,6 +7,9 @@ namespace SelfOrganizer.Core.Models;
 /// </summary>
 public class TodoTask : BaseEntity
 {
+    [Required(ErrorMessage = "Task title is required")]
+    [MinLength(1, ErrorMessage = "Task title cannot be empty")]
+    [MaxLength(500, ErrorMessage = "Task title cannot exceed 500 characters")]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Guid? ProjectId { get; set; }
@@ -21,6 +26,7 @@ public class TodoTask : BaseEntity
     public Guid? WaitingForContactId { get; set; }
     public string? WaitingForNote { get; set; }
     public DateTime? WaitingForSince { get; set; }
+    [Range(1, 3, ErrorMessage = "Priority must be between 1 (High) and 3 (Low)")]
     public int Priority { get; set; } = 2; // 1=High, 2=Normal, 3=Low
     public List<Guid> LinkedTaskIds { get; set; } = new();
     public List<Guid> LinkedMeetingIds { get; set; } = new();
@@ -99,4 +105,20 @@ public class TodoTask : BaseEntity
     /// Returns true if this is a subtask of another task
     /// </summary>
     public bool IsSubtask => ParentTaskId.HasValue;
+
+    // Icon support
+    /// <summary>
+    /// Icon identifier (emoji or icon class) - can be manually set or auto-detected
+    /// </summary>
+    public string? Icon { get; set; }
+
+    /// <summary>
+    /// Whether the icon was auto-detected (true) or manually set (false)
+    /// </summary>
+    public bool IsIconAutoDetected { get; set; } = true;
+
+    /// <summary>
+    /// The detected category of this task for intelligent icon assignment
+    /// </summary>
+    public TaskIconCategory? DetectedCategory { get; set; }
 }

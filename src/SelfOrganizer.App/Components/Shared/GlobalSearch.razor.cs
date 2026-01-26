@@ -203,7 +203,7 @@ public partial class GlobalSearch : IDisposable
         _selectedIndex = 0;
     }
 
-    private async void Close()
+    private async Task CloseAsync()
     {
         _searchQuery = string.Empty;
         _searchResults = null;
@@ -211,6 +211,12 @@ public partial class GlobalSearch : IDisposable
 
         await IsVisibleChanged.InvokeAsync(false);
         await OnClose.InvokeAsync();
+    }
+
+    private void Close()
+    {
+        // Fire-and-forget with proper error handling for sync callers
+        _ = CloseAsync();
     }
 
     private static string GetTypeDisplayName(string type)

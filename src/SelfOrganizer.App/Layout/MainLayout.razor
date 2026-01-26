@@ -4,12 +4,13 @@
 @using SelfOrganizer.Core.Interfaces
 @inject IRepository<UserPreferences> PreferencesRepository
 
+<a href="#main-content" class="skip-to-main visually-hidden-focusable">Skip to main content</a>
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
 
-    <main>
+    <main id="main-content">
         <div class="top-row px-4">
             <div class="me-auto">
                 <SelfOrganizer.App.Components.FocusTimer.FocusTimerIndicator />

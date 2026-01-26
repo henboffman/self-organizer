@@ -45,11 +45,13 @@ public class CalendarService : ICalendarService
 
     public async Task<CalendarEvent> CreateAsync(CalendarEvent calendarEvent)
     {
+        ArgumentNullException.ThrowIfNull(calendarEvent);
         return await _repository.AddAsync(calendarEvent);
     }
 
     public async Task<CalendarEvent> UpdateAsync(CalendarEvent calendarEvent)
     {
+        ArgumentNullException.ThrowIfNull(calendarEvent);
         return await _repository.UpdateAsync(calendarEvent);
     }
 

@@ -227,14 +227,44 @@ The response must be parseable JSON that matches this structure: {typeof(T).Name
             return string.Empty;
 
         var codeBlockMatch = Regex.Match(response, @"```(?:json)?\s*([\s\S]*?)```", RegexOptions.IgnoreCase);
+        string json;
         if (codeBlockMatch.Success)
-            return codeBlockMatch.Groups[1].Value.Trim();
+        {
+            json = codeBlockMatch.Groups[1].Value.Trim();
+        }
+        else
+        {
+            var jsonMatch = Regex.Match(response, @"(\{[\s\S]*\}|\[[\s\S]*\])");
+            json = jsonMatch.Success ? jsonMatch.Groups[1].Value.Trim() : response.Trim();
+        }
 
-        var jsonMatch = Regex.Match(response, @"(\{[\s\S]*\}|\[[\s\S]*\])");
-        if (jsonMatch.Success)
-            return jsonMatch.Groups[1].Value.Trim();
+        // Sanitize invalid escape sequences that LLMs sometimes generate
+        return SanitizeJsonString(json);
+    }
 
-        return response.Trim();
+    /// <summary>
+    /// Sanitizes JSON strings by fixing common LLM-generated escape sequence errors.
+    /// LLMs sometimes generate invalid escape sequences like \& or \' which are not valid JSON.
+    /// </summary>
+    private static string SanitizeJsonString(string json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return json;
+
+        // Fix invalid escape sequences: \& \' \` \# \@ \! \? \( \) \[ \] \{ \} \< \> \= \+ \* \% \$ \^
+        // These are NOT valid JSON escape sequences but LLMs sometimes generate them
+        // Valid JSON escapes are: \" \\ \/ \b \f \n \r \t \uXXXX
+        var result = Regex.Replace(json, @"\\([^""\\\/bfnrtu])", match =>
+        {
+            var escapedChar = match.Groups[1].Value;
+            // If it's a unicode escape like \u0000, keep it
+            if (escapedChar.Length > 0 && char.IsDigit(escapedChar[0]))
+                return match.Value;
+            // Otherwise, just return the character without the backslash
+            return escapedChar;
+        });
+
+        return result;
     }
 }
 

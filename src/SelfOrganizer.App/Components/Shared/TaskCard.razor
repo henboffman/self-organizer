@@ -16,9 +16,53 @@
     {
         if (!string.IsNullOrWhiteSpace(newTitle) && Task.Title != newTitle)
         {
-            Task.Title = newTitle;
-            Task.ModifiedAt = DateTime.UtcNow;
-            await OnEdit.InvokeAsync(Task);
+            // Create a copy of the task with the updated title instead of mutating the parameter
+            // This ensures the UI shows old data if the parent's save operation fails
+            var updatedTask = new TodoTask
+            {
+                Id = Task.Id,
+                Title = newTitle,
+                Description = Task.Description,
+                Status = Task.Status,
+                Priority = Task.Priority,
+                EstimatedMinutes = Task.EstimatedMinutes,
+                ActualMinutes = Task.ActualMinutes,
+                DueDate = Task.DueDate,
+                ScheduledDate = Task.ScheduledDate,
+                ScheduledStartTime = Task.ScheduledStartTime,
+                Contexts = Task.Contexts.ToList(),
+                Tags = Task.Tags.ToList(),
+                Category = Task.Category,
+                EnergyLevel = Task.EnergyLevel,
+                RequiresDeepWork = Task.RequiresDeepWork,
+                ProjectId = Task.ProjectId,
+                GoalIds = Task.GoalIds.ToList(),
+                ParentTaskId = Task.ParentTaskId,
+                SubtaskIds = Task.SubtaskIds.ToList(),
+                BlockedByTaskIds = Task.BlockedByTaskIds.ToList(),
+                LinkedTaskIds = Task.LinkedTaskIds.ToList(),
+                LinkedMeetingIds = Task.LinkedMeetingIds.ToList(),
+                IsRecurring = Task.IsRecurring,
+                RecurrencePattern = Task.RecurrencePattern,
+                RecurrenceIntervalDays = Task.RecurrenceIntervalDays,
+                LastRecurrenceDate = Task.LastRecurrenceDate,
+                Links = Task.Links.ToList(),
+                WhoFor = Task.WhoFor,
+                WaitingForContactId = Task.WaitingForContactId,
+                WaitingForNote = Task.WaitingForNote,
+                WaitingForSince = Task.WaitingForSince,
+                Icon = Task.Icon,
+                IsIconAutoDetected = Task.IsIconAutoDetected,
+                DetectedCategory = Task.DetectedCategory,
+                Notes = Task.Notes,
+                CreatedAt = Task.CreatedAt,
+                ModifiedAt = DateTime.UtcNow,
+                CompletedAt = Task.CompletedAt
+            };
+
+            // Let the parent handle the update; if it succeeds, the parent will refresh the task list
+            // If it fails, the original Task parameter remains unchanged
+            await OnEdit.InvokeAsync(updatedTask);
         }
     }
 }
@@ -26,12 +70,13 @@
 <div class="card task-card mb-2">
     <div class="card-body py-2 px-3">
         <div class="d-flex align-items-center">
-            <button class="btn btn-sm btn-outline-success me-2" @onclick="() => OnComplete.InvokeAsync(Task)" title="Complete">
-                <span class="oi oi-check"></span>
+            <button class="btn btn-sm btn-outline-success me-2" @onclick="() => OnComplete.InvokeAsync(Task)" title="Complete" aria-label="Complete task">
+                <span class="oi oi-check" aria-hidden="true"></span>
             </button>
             <div class="flex-grow-1">
                 <div class="d-flex align-items-center">
-                    <PriorityIndicator Priority="@Task.Priority" />
+                    <TaskIcon Task="@Task" Size="IconDisplay.IconSize.Small" />
+                    <PriorityIndicator Priority="@Task.Priority" CssClass="ms-1" />
                     @if (EnableInlineEdit)
                     {
                         <div class="task-title-wrapper ms-2">
@@ -83,21 +128,21 @@
             <div class="task-actions">
                 @if (ShowFocus && OnFocus.HasDelegate)
                 {
-                    <button class="btn btn-sm btn-link text-primary" @onclick="() => OnFocus.InvokeAsync(Task)" title="Focus on this task">
-                        <span class="oi oi-target"></span>
+                    <button class="btn btn-sm btn-link text-primary" @onclick="() => OnFocus.InvokeAsync(Task)" title="Focus on this task" aria-label="Focus on this task">
+                        <span class="oi oi-target" aria-hidden="true"></span>
                     </button>
                 }
                 @if (ShowDeactivate)
                 {
-                    <button class="btn btn-sm btn-link text-warning" @onclick="() => OnDeactivate.InvokeAsync(Task)" title="Move back to Inbox">
-                        <span class="oi oi-action-undo"></span>
+                    <button class="btn btn-sm btn-link text-warning" @onclick="() => OnDeactivate.InvokeAsync(Task)" title="Move back to Inbox" aria-label="Move back to Inbox">
+                        <span class="oi oi-action-undo" aria-hidden="true"></span>
                     </button>
                 }
-                <button class="btn btn-sm btn-link text-secondary" @onclick="() => OnEdit.InvokeAsync(Task)" title="Edit">
-                    <span class="oi oi-pencil"></span>
+                <button class="btn btn-sm btn-link text-secondary" @onclick="() => OnEdit.InvokeAsync(Task)" title="Edit" aria-label="Edit task">
+                    <span class="oi oi-pencil" aria-hidden="true"></span>
                 </button>
-                <button class="btn btn-sm btn-link text-danger" @onclick="() => OnDelete.InvokeAsync(Task)" title="Delete">
-                    <span class="oi oi-trash"></span>
+                <button class="btn btn-sm btn-link text-danger" @onclick="() => OnDelete.InvokeAsync(Task)" title="Delete" aria-label="Delete task">
+                    <span class="oi oi-trash" aria-hidden="true"></span>
                 </button>
             </div>
         </div>

@@ -1,0 +1,223 @@
+@inject IJSRuntime JS
+
+<div class="image-uploader @StateClass" data-testid="image-uploader">
+    @if (State == UploaderState.Empty || State == UploaderState.DragOver)
+    {
+        <div class="upload-area @(State == UploaderState.DragOver ? "drag-over" : "")"
+             @ondragover="HandleDragOver"
+             @ondragover:preventDefault="true"
+             @ondragleave="HandleDragLeave"
+             @ondrop="HandleDrop"
+             @ondrop:preventDefault="true"
+             data-testid="upload-area">
+            <label class="upload-label" for="@_inputId">
+                <span class="oi oi-cloud-upload upload-icon"></span>
+                <span class="upload-text">
+                    @if (State == UploaderState.DragOver)
+                    {
+                        <span>Drop image here</span>
+                    }
+                    else
+                    {
+                        <span>Click to upload or drag & drop</span>
+                        <small class="text-muted d-block">PNG, JPG, GIF up to 1MB</small>
+                    }
+                </span>
+            </label>
+            <InputFile id="@_inputId"
+                       class="visually-hidden"
+                       OnChange="HandleFileSelected"
+                       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                       @ref="_inputFile" />
+        </div>
+    }
+    else if (State == UploaderState.Preview)
+    {
+        <div class="preview-area" data-testid="preview-area">
+            <img src="@_previewUrl" alt="Preview" class="preview-image" />
+            <div class="preview-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelUpload" data-testid="cancel-upload">
+                    <span class="oi oi-x"></span> Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" @onclick="ConfirmUpload" data-testid="confirm-upload">
+                    <span class="oi oi-check"></span> Use Image
+                </button>
+            </div>
+        </div>
+    }
+    else if (State == UploaderState.Processing)
+    {
+        <div class="processing-area" data-testid="processing-area">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Processing...</span>
+            </div>
+            <span class="ms-2">Processing image...</span>
+        </div>
+    }
+    else if (State == UploaderState.Complete)
+    {
+        <div class="complete-area" data-testid="complete-area">
+            <img src="@ImageDataUrl" alt="Uploaded" class="uploaded-image" />
+            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveImage" data-testid="remove-image">
+                <span class="oi oi-trash"></span>
+            </button>
+        </div>
+    }
+    else if (State == UploaderState.Error)
+    {
+        <div class="error-area" data-testid="error-area">
+            <span class="oi oi-warning text-danger"></span>
+            <span class="text-danger ms-2">@_errorMessage</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="Reset">Try Again</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? ImageDataUrl { get; set; }
+    [Parameter] public EventCallback<string?> ImageDataUrlChanged { get; set; }
+    [Parameter] public int MaxWidth { get; set; } = 64;
+    [Parameter] public int MaxHeight { get; set; } = 64;
+
+    private InputFile? _inputFile;
+    private string _inputId = Guid.NewGuid().ToString("N");
+    private string? _previewUrl;
+    private string? _errorMessage;
+    private UploaderState State = UploaderState.Empty;
+
+    public enum UploaderState
+    {
+        Empty,
+        DragOver,
+        Preview,
+        Processing,
+        Complete,
+        Error
+    }
+
+    private string StateClass => $"uploader-{State.ToString().ToLower()}";
+
+    protected override void OnParametersSet()
+    {
+        // If we already have an image, show complete state
+        if (!string.IsNullOrEmpty(ImageDataUrl) && State == UploaderState.Empty)
+        {
+            State = UploaderState.Complete;
+        }
+    }
+
+    private void HandleDragOver()
+    {
+        if (State == UploaderState.Empty)
+        {
+            State = UploaderState.DragOver;
+        }
+    }
+
+    private void HandleDragLeave()
+    {
+        if (State == UploaderState.DragOver)
+        {
+            State = UploaderState.Empty;
+        }
+    }
+
+    private async Task HandleDrop()
+    {
+        State = UploaderState.Empty;
+        // The file will be handled by the InputFile component
+        await Task.CompletedTask;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e.File == null) return;
+
+        State = UploaderState.Processing;
+        StateHasChanged();
+
+        try
+        {
+            // Read file and create preview
+            using var stream = e.File.OpenReadStream(maxAllowedSize: 1024 * 1024); // 1MB
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            var base64 = Convert.ToBase64String(bytes);
+            _previewUrl = $"data:{e.File.ContentType};base64,{base64}";
+
+            State = UploaderState.Preview;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            State = UploaderState.Error;
+        }
+    }
+
+    private async Task ConfirmUpload()
+    {
+        if (string.IsNullOrEmpty(_previewUrl)) return;
+
+        State = UploaderState.Processing;
+        StateHasChanged();
+
+        try
+        {
+            // Resize image using JavaScript
+            // For now, we'll use the preview URL directly since InputFile doesn't expose the element
+            // In a real implementation, you'd use JS interop with the actual input element
+            var resizedUrl = await ResizeImageAsync(_previewUrl, MaxWidth, MaxHeight);
+
+            await ImageDataUrlChanged.InvokeAsync(resizedUrl);
+            State = UploaderState.Complete;
+            RevokePreviewUrl();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            State = UploaderState.Error;
+        }
+    }
+
+    private async Task<string> ResizeImageAsync(string dataUrl, int maxWidth, int maxHeight)
+    {
+        // Use JavaScript to resize the image
+        var result = await JS.InvokeAsync<ResizeResult>("resizeImageFromDataUrl", dataUrl, maxWidth, maxHeight);
+        if (!result.Success)
+        {
+            throw new Exception(result.Error ?? "Failed to resize image");
+        }
+        return result.DataUrl!;
+    }
+
+    private void CancelUpload()
+    {
+        RevokePreviewUrl();
+        State = UploaderState.Empty;
+    }
+
+    private async Task RemoveImage()
+    {
+        await ImageDataUrlChanged.InvokeAsync(null);
+        State = UploaderState.Empty;
+    }
+
+    private void Reset()
+    {
+        RevokePreviewUrl();
+        _errorMessage = null;
+        State = UploaderState.Empty;
+    }
+
+    private void RevokePreviewUrl()
+    {
+        if (!string.IsNullOrEmpty(_previewUrl) && _previewUrl.StartsWith("blob:"))
+        {
+            // In a real implementation, use JS interop to revoke
+            _previewUrl = null;
+        }
+    }
+
+    private record ResizeResult(bool Success, string? DataUrl, string? Error);
+}

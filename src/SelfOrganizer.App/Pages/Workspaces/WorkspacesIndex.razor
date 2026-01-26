@@ -352,11 +352,22 @@ else
 
     private async void HandleDataChanged()
     {
-        await InvokeAsync(async () =>
+        try
         {
-            await LoadData();
-            StateHasChanged();
-        });
+            await InvokeAsync(async () =>
+            {
+                await LoadData();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
     }
 
     private async Task LoadData()

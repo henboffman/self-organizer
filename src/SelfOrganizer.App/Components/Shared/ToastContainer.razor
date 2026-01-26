@@ -45,25 +45,36 @@
 
     private async void HandleToastRequested(ToastMessage toast)
     {
-        var item = new ToastItem
+        try
         {
-            Id = toast.Id,
-            Type = toast.Type,
-            Title = toast.Title,
-            Message = toast.Message,
-            DurationMs = toast.DurationMs
-        };
+            var item = new ToastItem
+            {
+                Id = toast.Id,
+                Type = toast.Type,
+                Title = toast.Title,
+                Message = toast.Message,
+                DurationMs = toast.DurationMs
+            };
 
-        await InvokeAsync(() =>
-        {
-            _toasts.Add(item);
-            StateHasChanged();
-        });
+            await InvokeAsync(() =>
+            {
+                _toasts.Add(item);
+                StateHasChanged();
+            });
 
-        // Auto-dismiss after duration
-        if (toast.DurationMs > 0)
+            // Auto-dismiss after duration
+            if (toast.DurationMs > 0)
+            {
+                _ = AutoDismiss(toast.Id, toast.DurationMs);
+            }
+        }
+        catch (ObjectDisposedException)
         {
-            _ = AutoDismiss(toast.Id, toast.DurationMs);
+            // Component was disposed while handling toast request
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash
         }
     }
 

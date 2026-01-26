@@ -138,13 +138,24 @@
 
     private async void ShowFeedback(bool success, string message)
     {
-        _feedbackSuccess = success;
-        _feedbackMessage = message;
-        _showFeedback = true;
-        StateHasChanged();
+        try
+        {
+            _feedbackSuccess = success;
+            _feedbackMessage = message;
+            _showFeedback = true;
+            await InvokeAsync(StateHasChanged);
 
-        await Task.Delay(4000);
-        _showFeedback = false;
-        StateHasChanged();
+            await Task.Delay(4000);
+            _showFeedback = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while showing feedback
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash
+        }
     }
 }

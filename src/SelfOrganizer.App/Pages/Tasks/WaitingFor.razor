@@ -5,6 +5,8 @@
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
 @inject IExportService ExportService
 @inject IDataChangeNotificationService DataChangeNotification
+@inject IToastService ToastService
+@inject NavigationManager NavigationManager
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>
@@ -121,9 +123,27 @@ else
         await LoadTasks();
     }
 
-    private void FollowUp(TodoTask task)
+    private async Task FollowUp(TodoTask task)
     {
-        // TODO: Implement follow-up functionality (create a new task or send email)
+        // Create a follow-up task to send a reminder
+        var followUpTask = new TodoTask
+        {
+            Id = Guid.NewGuid(),
+            Title = $"Follow up: {task.Title}",
+            Description = $"Send a follow-up reminder about: {task.Title}\n\nWaiting for: {task.WaitingForNote ?? "Someone"}\nWaiting since: {(task.WaitingForSince ?? task.CreatedAt):MMM d, yyyy}",
+            Status = TodoTaskStatus.NextAction,
+            Priority = task.Priority,
+            Contexts = new List<string> { "@email", "@communication" },
+            Tags = new List<string> { "follow-up" },
+            LinkedTaskIds = new List<Guid> { task.Id }
+        };
+
+        await TaskService.CreateAsync(followUpTask);
+        DataChangeNotification.NotifyDataChanged();
+        ToastService.ShowSuccess($"Follow-up task created for '{task.Title}'");
+
+        // Navigate to the new task
+        NavigationManager.NavigateTo($"/tasks/{followUpTask.Id}");
     }
 
     private async Task CompleteTask(TodoTask task)

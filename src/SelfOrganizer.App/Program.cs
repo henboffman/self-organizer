@@ -93,6 +93,10 @@ builder.Services.AddScoped<IProactiveSuggestionsService, ProactiveSuggestionsSer
 builder.Services.AddScoped<IEntityLinkingService, EntityLinkingService>();
 builder.Services.AddScoped<ICalendarIntelligenceService, CalendarIntelligenceService>();
 
+// Icon Services
+builder.Services.AddSingleton<IIconLibraryService, IconLibraryService>();
+builder.Services.AddScoped<ITaskIconIntelligenceService, TaskIconIntelligenceService>();
+
 // UI Services
 builder.Services.AddScoped<IThemeService, ThemeService>();
 builder.Services.AddScoped<IPlatformService, PlatformService>();

@@ -7,11 +7,16 @@ public class TaskService : ITaskService
 {
     private readonly IRepository<TodoTask> _repository;
     private readonly IUserPreferencesProvider _preferencesProvider;
+    private readonly ITaskIconIntelligenceService? _iconIntelligenceService;
 
-    public TaskService(IRepository<TodoTask> repository, IUserPreferencesProvider preferencesProvider)
+    public TaskService(
+        IRepository<TodoTask> repository,
+        IUserPreferencesProvider preferencesProvider,
+        ITaskIconIntelligenceService? iconIntelligenceService = null)
     {
         _repository = repository;
         _preferencesProvider = preferencesProvider;
+        _iconIntelligenceService = iconIntelligenceService;
     }
 
     /// <summary>
@@ -91,6 +96,8 @@ public class TaskService : ITaskService
 
     public async Task<IEnumerable<TodoTask>> SearchAsync(string query)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+
         var lowerQuery = query.ToLowerInvariant();
         var tasks = await _repository.QueryAsync(t =>
             t.Title.ToLower().Contains(lowerQuery) ||
@@ -101,11 +108,30 @@ public class TaskService : ITaskService
 
     public async Task<TodoTask> CreateAsync(TodoTask task)
     {
+        ArgumentNullException.ThrowIfNull(task);
+        // Auto-detect icon if enabled and no manual icon set
+        if (task.IsIconAutoDetected && string.IsNullOrEmpty(task.Icon) && _iconIntelligenceService != null)
+        {
+            var result = _iconIntelligenceService.AnalyzeTask(task.Title, task.Description, task.Contexts);
+            task.Icon = result.Icon;
+            task.DetectedCategory = result.Category;
+        }
+
         return await _repository.AddAsync(task);
     }
 
     public async Task<TodoTask> UpdateAsync(TodoTask task)
     {
+        ArgumentNullException.ThrowIfNull(task);
+
+        // Re-detect icon if auto-detection is enabled and title/description might have changed
+        if (task.IsIconAutoDetected && _iconIntelligenceService != null)
+        {
+            var result = _iconIntelligenceService.AnalyzeTask(task.Title, task.Description, task.Contexts);
+            task.Icon = result.Icon;
+            task.DetectedCategory = result.Category;
+        }
+
         return await _repository.UpdateAsync(task);
     }
 
@@ -186,6 +212,8 @@ public class TaskService : ITaskService
 
     public async Task<TodoTask> CreateSubtaskAsync(Guid parentTaskId, TodoTask subtask)
     {
+        ArgumentNullException.ThrowIfNull(subtask);
+
         var parentTask = await _repository.GetByIdAsync(parentTaskId);
         if (parentTask == null)
             throw new InvalidOperationException($"Parent task {parentTaskId} not found");
@@ -419,6 +447,8 @@ public class TaskService : ITaskService
     // Batch operations
     public async Task BatchDeleteAsync(IEnumerable<Guid> taskIds)
     {
+        ArgumentNullException.ThrowIfNull(taskIds);
+
         foreach (var id in taskIds)
         {
             var task = await _repository.GetByIdAsync(id);
@@ -432,6 +462,8 @@ public class TaskService : ITaskService
 
     public async Task BatchCompleteAsync(IEnumerable<Guid> taskIds)
     {
+        ArgumentNullException.ThrowIfNull(taskIds);
+
         var now = DateTime.UtcNow;
         foreach (var id in taskIds)
         {
@@ -455,6 +487,8 @@ public class TaskService : ITaskService
 
     public async Task BatchChangeStatusAsync(IEnumerable<Guid> taskIds, TodoTaskStatus newStatus)
     {
+        ArgumentNullException.ThrowIfNull(taskIds);
+
         foreach (var id in taskIds)
         {
             var task = await _repository.GetByIdAsync(id);
@@ -490,6 +524,10 @@ public class TaskService : ITaskService
 
     public async Task BatchChangePriorityAsync(IEnumerable<Guid> taskIds, int priority)
     {
+        ArgumentNullException.ThrowIfNull(taskIds);
+        if (priority < 1 || priority > 3)
+            throw new ArgumentOutOfRangeException(nameof(priority), "Priority must be between 1 and 3");
+
         foreach (var id in taskIds)
         {
             var task = await _repository.GetByIdAsync(id);

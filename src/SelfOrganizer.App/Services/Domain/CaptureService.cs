@@ -15,6 +15,7 @@ public class CaptureService : ICaptureService
 
     public async Task<CaptureItem> CaptureAsync(string rawText)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawText);
         // Parse tags from the raw text
         var (cleanedText, tags) = TagParsingService.ParseTextAndTags(rawText);
 

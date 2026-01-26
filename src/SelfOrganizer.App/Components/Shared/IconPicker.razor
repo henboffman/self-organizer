@@ -1,0 +1,218 @@
+@using SelfOrganizer.Core.Interfaces
+@inject IIconLibraryService IconLibrary
+
+<div class="icon-picker @(IsOpen ? "open" : "")" data-testid="icon-picker">
+    <button type="button"
+            class="btn btn-outline-secondary icon-picker-trigger"
+            @onclick="ToggleOpen"
+            aria-expanded="@IsOpen"
+            aria-haspopup="true"
+            data-testid="icon-picker-trigger">
+        @if (!string.IsNullOrEmpty(SelectedImageUrl))
+        {
+            <img src="@SelectedImageUrl" alt="Selected icon" class="selected-icon-image" />
+        }
+        else if (!string.IsNullOrEmpty(SelectedIcon))
+        {
+            <IconDisplay Icon="@SelectedIcon" Size="IconDisplay.IconSize.Small" />
+        }
+        else
+        {
+            <span class="oi oi-image text-muted"></span>
+        }
+        <span class="oi oi-chevron-bottom ms-1" style="font-size: 0.6rem;"></span>
+    </button>
+
+    @if (IsOpen)
+    {
+        <div class="icon-picker-dropdown" @onclick:stopPropagation="true" data-testid="icon-picker-dropdown">
+            <div class="icon-picker-header">
+                <ul class="nav nav-tabs nav-fill">
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(_activeTab == "icons" ? "active" : "")"
+                                @onclick="SetTabIcons">
+                            Icons
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button"
+                                class="nav-link @(_activeTab == "emoji" ? "active" : "")"
+                                @onclick="SetTabEmoji">
+                            Emoji
+                        </button>
+                    </li>
+                    @if (AllowCustomImage)
+                    {
+                        <li class="nav-item">
+                            <button type="button"
+                                    class="nav-link @(_activeTab == "upload" ? "active" : "")"
+                                    @onclick="SetTabUpload">
+                                Upload
+                            </button>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <div class="icon-picker-search">
+                <input type="text"
+                       class="form-control form-control-sm"
+                       placeholder="Search icons..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       data-testid="icon-search" />
+            </div>
+
+            <div class="icon-picker-content">
+                @if (_activeTab == "icons")
+                {
+                    <div class="icon-grid" data-testid="icon-grid">
+                        @foreach (var icon in FilteredIcons.Where(i => !i.IsEmoji))
+                        {
+                            <button type="button"
+                                    class="icon-option @(SelectedIcon == icon.Id ? "selected" : "")"
+                                    title="@icon.Name"
+                                    @onclick="() => SelectIcon(icon.Id)"
+                                    data-testid="icon-option">
+                                <span class="oi @icon.Id"></span>
+                            </button>
+                        }
+                    </div>
+                }
+                else if (_activeTab == "emoji")
+                {
+                    <div class="icon-grid emoji-grid" data-testid="emoji-grid">
+                        @foreach (var icon in FilteredIcons.Where(i => i.IsEmoji))
+                        {
+                            <button type="button"
+                                    class="icon-option emoji-option @(SelectedIcon == icon.Id ? "selected" : "")"
+                                    title="@icon.Name"
+                                    @onclick="() => SelectIcon(icon.Id)"
+                                    data-testid="emoji-option">
+                                @icon.Id
+                            </button>
+                        }
+                    </div>
+                }
+                else if (_activeTab == "upload")
+                {
+                    <div class="upload-tab" data-testid="upload-tab">
+                        <ImageUploader @bind-ImageDataUrl="@_uploadedImageUrl"
+                                      MaxWidth="64"
+                                      MaxHeight="64" />
+                        @if (!string.IsNullOrEmpty(_uploadedImageUrl))
+                        {
+                            <button type="button"
+                                    class="btn btn-primary btn-sm mt-2 w-100"
+                                    @onclick="UseUploadedImage">
+                                Use This Image
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="icon-picker-footer">
+                @if (!string.IsNullOrEmpty(SelectedIcon) || !string.IsNullOrEmpty(SelectedImageUrl))
+                {
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            @onclick="ClearSelection"
+                            data-testid="clear-icon">
+                        <span class="oi oi-x"></span> Clear
+                    </button>
+                }
+                <button type="button"
+                        class="btn btn-sm btn-secondary ms-auto"
+                        @onclick="Close"
+                        data-testid="close-picker">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        <div class="icon-picker-backdrop" @onclick="Close"></div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? SelectedIcon { get; set; }
+    [Parameter] public EventCallback<string?> SelectedIconChanged { get; set; }
+    [Parameter] public string? SelectedImageUrl { get; set; }
+    [Parameter] public EventCallback<string?> SelectedImageUrlChanged { get; set; }
+    [Parameter] public bool AllowCustomImage { get; set; } = true;
+    [Parameter] public IconPickerMode Mode { get; set; } = IconPickerMode.All;
+
+    public enum IconPickerMode
+    {
+        All,
+        ProjectsOnly,
+        GoalsOnly
+    }
+
+    private bool IsOpen = false;
+    private string _activeTab = "icons";
+    private string _searchQuery = string.Empty;
+    private string? _uploadedImageUrl;
+
+    private IEnumerable<IconDefinition> FilteredIcons
+    {
+        get
+        {
+            var icons = Mode switch
+            {
+                IconPickerMode.ProjectsOnly => IconLibrary.GetProjectIcons(),
+                IconPickerMode.GoalsOnly => IconLibrary.GetGoalIcons(),
+                _ => IconLibrary.GetIconsByCategory().SelectMany(g => g.Value)
+            };
+
+            if (string.IsNullOrWhiteSpace(_searchQuery))
+                return icons;
+
+            return IconLibrary.SearchIcons(_searchQuery);
+        }
+    }
+
+    private void ToggleOpen()
+    {
+        IsOpen = !IsOpen;
+        if (IsOpen)
+        {
+            _searchQuery = string.Empty;
+        }
+    }
+
+    private void Close()
+    {
+        IsOpen = false;
+    }
+
+    private void SetTabIcons() => _activeTab = "icons";
+    private void SetTabEmoji() => _activeTab = "emoji";
+    private void SetTabUpload() => _activeTab = "upload";
+
+    private async Task SelectIcon(string iconId)
+    {
+        await SelectedIconChanged.InvokeAsync(iconId);
+        await SelectedImageUrlChanged.InvokeAsync(null); // Clear image when selecting icon
+        Close();
+    }
+
+    private async Task UseUploadedImage()
+    {
+        if (!string.IsNullOrEmpty(_uploadedImageUrl))
+        {
+            await SelectedImageUrlChanged.InvokeAsync(_uploadedImageUrl);
+            await SelectedIconChanged.InvokeAsync(null); // Clear icon when using image
+            _uploadedImageUrl = null;
+            Close();
+        }
+    }
+
+    private async Task ClearSelection()
+    {
+        await SelectedIconChanged.InvokeAsync(null);
+        await SelectedImageUrlChanged.InvokeAsync(null);
+    }
+}

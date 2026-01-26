@@ -3,6 +3,7 @@
 <div class="goal-card card h-100 @GetStatusClass()" @onclick="HandleClick">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-2">
+            <SelfOrganizer.App.Components.Shared.GoalIcon Goal="@Goal" Size="SelfOrganizer.App.Components.Shared.IconDisplay.IconSize.Small" />
             <span class="category-badge @GetCategoryClass()">@Goal.Category</span>
             @if (Goal.Priority == 1)
             {

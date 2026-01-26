@@ -77,6 +77,13 @@ ehthumbs.db
 # Application-specific
 wwwroot/lib/
 
+# Node.js / Testing
+node_modules/
+package-lock.json
+playwright-report/
+playwright/.cache/
+test-results/
+
 # Secrets - never commit these!
 appsettings.Development.json
 appsettings.Local.json

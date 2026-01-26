@@ -40,11 +40,22 @@ public partial class Goals : IDisposable
 
     private async void HandleDataChanged()
     {
-        await InvokeAsync(async () =>
+        try
         {
-            await LoadGoals();
-            StateHasChanged();
-        });
+            await InvokeAsync(async () =>
+            {
+                await LoadGoals();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
     }
 
     private async Task LoadGoals()

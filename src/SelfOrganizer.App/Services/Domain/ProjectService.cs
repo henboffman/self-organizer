@@ -110,11 +110,13 @@ public class ProjectService : IProjectService
 
     public async Task<Project> CreateAsync(Project project)
     {
+        ArgumentNullException.ThrowIfNull(project);
         return await _repository.AddAsync(project);
     }
 
     public async Task<Project> UpdateAsync(Project project)
     {
+        ArgumentNullException.ThrowIfNull(project);
         return await _repository.UpdateAsync(project);
     }
 

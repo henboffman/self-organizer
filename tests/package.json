@@ -1,0 +1,27 @@
+{
+  "name": "self-organizer-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for Self-Organizer GTD application using Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "test:capture": "playwright test capture.spec.ts",
+    "test:inbox": "playwright test inbox.spec.ts",
+    "test:focus": "playwright test focus-timer.spec.ts",
+    "test:dashboard": "playwright test dashboard.spec.ts",
+    "test:tasks": "playwright test tasks.spec.ts",
+    "test:accessibility": "playwright test accessibility.spec.ts"
+  },
+  "keywords": ["testing", "e2e", "playwright", "blazor"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^25.0.10",
+    "typescript": "^5.9.3"
+  }
+}

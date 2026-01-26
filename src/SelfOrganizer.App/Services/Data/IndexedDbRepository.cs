@@ -33,6 +33,8 @@ public class IndexedDbRepository<T> : IRepository<T> where T : BaseEntity
 
     public async Task<T> AddAsync(T entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         entity.CreatedAt = DateTime.UtcNow;
         entity.ModifiedAt = DateTime.UtcNow;
         return await _dbService.AddAsync(_storeName, entity);
@@ -40,6 +42,8 @@ public class IndexedDbRepository<T> : IRepository<T> where T : BaseEntity
 
     public async Task<T> UpdateAsync(T entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         entity.ModifiedAt = DateTime.UtcNow;
         return await _dbService.PutAsync(_storeName, entity);
     }

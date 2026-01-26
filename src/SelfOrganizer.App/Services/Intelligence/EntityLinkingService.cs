@@ -402,6 +402,10 @@ public class EntityLinkingService : IEntityLinkingService
 
     private static double CalculateStringMatchConfidence(string pattern, string text, StringComparison comparison)
     {
+        // Guard against empty text to avoid division by zero
+        if (text.Length == 0)
+            return 0;
+
         // Exact match gets full confidence
         if (text.Equals(pattern, comparison))
             return 1.0;
@@ -430,6 +434,10 @@ public class EntityLinkingService : IEntityLinkingService
     {
         try
         {
+            // Guard against empty text to avoid division by zero
+            if (text.Length == 0)
+                return 0;
+
             var options = caseSensitive ? RegexOptions.None : RegexOptions.IgnoreCase;
             var regex = new Regex(pattern, options, TimeSpan.FromMilliseconds(100));
             var matches = regex.Matches(text);

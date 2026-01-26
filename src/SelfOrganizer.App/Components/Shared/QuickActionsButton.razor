@@ -92,8 +92,22 @@
 
     private async void OnDataChangedHandler()
     {
-        await LoadInboxCount();
-        await InvokeAsync(StateHasChanged);
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadInboxCount();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
     }
 
     private string GetCurrentPath()

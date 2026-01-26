@@ -454,7 +454,8 @@
                 Description = suggested.Description,
                 EstimatedMinutes = suggested.EstimatedMinutes,
                 Priority = suggested.Priority,
-                Contexts = suggested.SuggestedContexts,
+                // Strip @ prefix from AI-generated contexts (ContextBadge adds it for display)
+                Contexts = suggested.SuggestedContexts?.Select(c => c.TrimStart('@')).ToList() ?? new List<string>(),
                 Status = TodoTaskStatus.NextAction,
                 Tags = new List<string> { "ai-suggested", $"balance:{suggested.DimensionId}" },
                 CreatedAt = DateTime.UtcNow,
