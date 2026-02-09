@@ -141,26 +141,26 @@
         var actions = new List<ActionItem>();
 
         // Context-specific actions based on current page
-        if (_currentPath.Contains("/tasks"))
+        if (_currentPath.Contains("tasks"))
         {
-            actions.Add(new("Review Day", "oi-check", "/review/daily", null, false));
+            actions.Add(new("Review Day", "oi-check", "review/daily", null, false));
         }
-        else if (_currentPath.Contains("/calendar"))
+        else if (_currentPath.Contains("calendar"))
         {
-            actions.Add(new("Today", "oi-home", "/calendar?view=day&date=" + DateTime.Today.ToString("yyyy-MM-dd"), "t", false));
+            actions.Add(new("Today", "oi-home", "calendar?view=day&date=" + DateTime.Today.ToString("yyyy-MM-dd"), "t", false));
         }
-        else if (_currentPath.Contains("/goals"))
+        else if (_currentPath.Contains("goals"))
         {
-            actions.Add(new("New Goal", "oi-target", "/goals?new=true", null, false));
+            actions.Add(new("New Goal", "oi-target", "goals?new=true", null, false));
         }
 
         // Standard actions (in reverse order for proper stacking)
-        actions.Add(new("Focus Timer", "oi-clock", "/focus", "f", false));
-        actions.Add(new("Daily Review", "oi-check", "/review/daily", null, false));
-        actions.Add(new("New Goal", "oi-target", "/goals?new=true", null, false));
-        actions.Add(new("New Project", "oi-folder", "/projects?new=true", null, false));
-        actions.Add(new("New Idea", "oi-lightbulb", "/ideas?new=true", null, false));
-        actions.Add(new("Quick Capture", "oi-bolt", "/capture", "c", true));
+        actions.Add(new("Focus Timer", "oi-clock", "focus", "f", false));
+        actions.Add(new("Daily Review", "oi-check", "review/daily", null, false));
+        actions.Add(new("New Goal", "oi-target", "goals?new=true", null, false));
+        actions.Add(new("New Project", "oi-folder", "projects?new=true", null, false));
+        actions.Add(new("New Idea", "oi-lightbulb", "ideas?new=true", null, false));
+        actions.Add(new("Quick Capture", "oi-bolt", "capture", "c", true));
 
         // Remove duplicates and take max 6
         return actions.DistinctBy(a => a.NavigateTo).Take(6).ToList();

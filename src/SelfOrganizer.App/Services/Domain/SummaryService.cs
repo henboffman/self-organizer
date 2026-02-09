@@ -14,6 +14,8 @@ public class SummaryService : ISummaryService
     private readonly IRepository<Habit> _habitRepository;
     private readonly IRepository<HabitLog> _habitLogRepository;
     private readonly IRepository<CalendarEvent> _calendarRepository;
+    private readonly ISkillService _skillService;
+    private readonly ICareerPlanService _careerPlanService;
 
     public SummaryService(
         ITaskService taskService,
@@ -23,7 +25,9 @@ public class SummaryService : ISummaryService
         IRepository<FocusSessionLog> focusSessionRepository,
         IRepository<Habit> habitRepository,
         IRepository<HabitLog> habitLogRepository,
-        IRepository<CalendarEvent> calendarRepository)
+        IRepository<CalendarEvent> calendarRepository,
+        ISkillService skillService,
+        ICareerPlanService careerPlanService)
     {
         _taskService = taskService;
         _projectService = projectService;
@@ -33,6 +37,8 @@ public class SummaryService : ISummaryService
         _habitRepository = habitRepository;
         _habitLogRepository = habitLogRepository;
         _calendarRepository = calendarRepository;
+        _skillService = skillService;
+        _careerPlanService = careerPlanService;
     }
 
     public async Task<SummaryReport> GenerateSummaryAsync(DateTime startDate, DateTime endDate)
@@ -389,6 +395,81 @@ public class SummaryService : ISummaryService
             .GroupBy(e => e.EffectiveCategory.ToString())
             .ToDictionary(g => g.Key, g => g.Count());
 
+        // Skills (current-state snapshot, not time-bounded)
+        var allSkills = await _skillService.GetAllAsync();
+        var activeSkills = allSkills.Where(s => s.IsActive).ToList();
+        report.Skills = activeSkills
+            .Select(s => new SkillSnapshotSummary
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Category = s.Category,
+                Type = s.Type,
+                CurrentProficiency = s.CurrentProficiency,
+                TargetProficiency = s.TargetProficiency,
+                ProgressPercent = s.ProgressPercent,
+                IsActive = s.IsActive,
+                IsAiSuggested = s.IsAiSuggested,
+                Icon = s.Icon,
+                Color = s.Color,
+                LinkedGoalTitles = s.LinkedGoalIds
+                    .Where(id => goalTitles.ContainsKey(id))
+                    .Select(id => goalTitles[id])
+                    .ToList()
+            })
+            .OrderBy(s => s.Category)
+            .ThenByDescending(s => s.CurrentProficiency)
+            .ToList();
+
+        // Build skill names lookup for career plan linking
+        var skillNames = allSkills.ToDictionary(s => s.Id, s => s.Name);
+
+        // Career Plans
+        var allCareerPlans = await _careerPlanService.GetAllAsync();
+        report.CareerPlans = allCareerPlans
+            .Where(cp => cp.Status != CareerPlanStatus.Archived)
+            .Select(cp => new CareerPlanSnapshotSummary
+            {
+                Id = cp.Id,
+                Title = cp.Title,
+                CurrentRole = cp.CurrentRole,
+                TargetRole = cp.TargetRole,
+                Status = cp.Status,
+                ProgressPercent = cp.ProgressPercent,
+                TotalMilestones = cp.Milestones.Count,
+                CompletedMilestones = cp.Milestones.Count(m => m.Status == MilestoneStatus.Completed),
+                MilestonesCompletedInPeriod = cp.Milestones.Count(m =>
+                    m.Status == MilestoneStatus.Completed &&
+                    m.CompletedDate.HasValue &&
+                    m.CompletedDate.Value >= startDate &&
+                    m.CompletedDate.Value <= endDate),
+                StartDate = cp.StartDate,
+                TargetDate = cp.TargetDate,
+                Milestones = cp.Milestones
+                    .OrderBy(m => m.SortOrder)
+                    .Select(m => new MilestoneSnapshotSummary
+                    {
+                        Title = m.Title,
+                        Description = m.Description,
+                        Category = m.Category,
+                        Status = m.Status,
+                        TargetDate = m.TargetDate,
+                        CompletedDate = m.CompletedDate
+                    })
+                    .ToList(),
+                LinkedGoalTitles = cp.LinkedGoalIds
+                    .Where(id => goalTitles.ContainsKey(id))
+                    .Select(id => goalTitles[id])
+                    .ToList(),
+                LinkedSkillNames = cp.LinkedSkillIds
+                    .Where(id => skillNames.ContainsKey(id))
+                    .Select(id => skillNames[id])
+                    .ToList()
+            })
+            .OrderByDescending(cp => cp.Status == CareerPlanStatus.Active)
+            .ThenByDescending(cp => cp.ProgressPercent)
+            .ToList();
+
         return report;
     }
 
@@ -577,6 +658,120 @@ public class SummaryService : ISummaryService
                 sb.AppendLine($"| {icon}{EscapeMarkdown(habit.Name)}{aiTag} | {habit.CompletionsInPeriod} | {habit.CompletionRate:F0}% | {streak} | {linkedGoals} |");
             }
             sb.AppendLine();
+        }
+
+        // Skills
+        if (report.Skills.Any())
+        {
+            sb.AppendLine("## Skills");
+            sb.AppendLine();
+
+            var haveSkills = report.Skills.Where(s => s.Type == SkillType.Have).ToList();
+            var wantSkills = report.Skills.Where(s => s.Type == SkillType.Want).ToList();
+
+            if (haveSkills.Any() && wantSkills.Any())
+            {
+                sb.AppendLine("### Current Skills");
+                sb.AppendLine();
+            }
+
+            if (haveSkills.Any())
+            {
+                sb.AppendLine("| Skill | Category | Level | Target | Progress | Linked Goals |");
+                sb.AppendLine("|-------|----------|-------|--------|----------|--------------|");
+                foreach (var skill in haveSkills)
+                {
+                    var linkedGoals = skill.LinkedGoalTitles.Any()
+                        ? string.Join(", ", skill.LinkedGoalTitles.Take(2).Select(g => TruncateForMarkdown(g, 20)))
+                        : "-";
+                    sb.AppendLine($"| {EscapeMarkdown(skill.Name)} | {skill.Category} | {Skill.GetProficiencyName(skill.CurrentProficiency)} | {Skill.GetProficiencyName(skill.TargetProficiency)} | {skill.ProgressPercent}% | {linkedGoals} |");
+                }
+                sb.AppendLine();
+            }
+
+            if (wantSkills.Any())
+            {
+                if (haveSkills.Any())
+                {
+                    sb.AppendLine("### Skills to Develop");
+                    sb.AppendLine();
+                }
+                sb.AppendLine("| Skill | Category | Level | Target | Progress | Linked Goals |");
+                sb.AppendLine("|-------|----------|-------|--------|----------|--------------|");
+                foreach (var skill in wantSkills)
+                {
+                    var linkedGoals = skill.LinkedGoalTitles.Any()
+                        ? string.Join(", ", skill.LinkedGoalTitles.Take(2).Select(g => TruncateForMarkdown(g, 20)))
+                        : "-";
+                    sb.AppendLine($"| {EscapeMarkdown(skill.Name)} | {skill.Category} | {Skill.GetProficiencyName(skill.CurrentProficiency)} | {Skill.GetProficiencyName(skill.TargetProficiency)} | {skill.ProgressPercent}% | {linkedGoals} |");
+                }
+                sb.AppendLine();
+            }
+        }
+
+        // Career Development
+        if (report.CareerPlans.Any())
+        {
+            sb.AppendLine("## Career Development");
+            sb.AppendLine();
+            foreach (var plan in report.CareerPlans)
+            {
+                sb.AppendLine($"### {plan.Title}");
+                sb.AppendLine();
+                if (!string.IsNullOrEmpty(plan.CurrentRole) || !string.IsNullOrEmpty(plan.TargetRole))
+                {
+                    sb.AppendLine($"**{plan.CurrentRole ?? "Current"} → {plan.TargetRole ?? "Target"}**");
+                    sb.AppendLine();
+                }
+                sb.AppendLine($"- **Status:** {plan.Status}");
+
+                // Progress bar representation
+                var filled = plan.ProgressPercent / 10;
+                var empty = 10 - filled;
+                var progressBar = $"[{new string('#', filled)}{new string('.', empty)}] {plan.ProgressPercent}%";
+                sb.AppendLine($"- **Progress:** {progressBar}");
+
+                if (plan.TotalMilestones > 0)
+                {
+                    sb.AppendLine($"- **Milestones:** {plan.CompletedMilestones}/{plan.TotalMilestones} completed");
+                }
+                if (plan.MilestonesCompletedInPeriod > 0)
+                {
+                    sb.AppendLine($"- **Completed This Period:** {plan.MilestonesCompletedInPeriod} milestones");
+                }
+                if (plan.TargetDate.HasValue)
+                {
+                    sb.AppendLine($"- **Target Date:** {plan.TargetDate.Value:MMMM d, yyyy}");
+                }
+                if (plan.LinkedGoalTitles.Any())
+                {
+                    sb.AppendLine($"- **Linked Goals:** {string.Join(", ", plan.LinkedGoalTitles)}");
+                }
+                if (plan.LinkedSkillNames.Any())
+                {
+                    sb.AppendLine($"- **Linked Skills:** {string.Join(", ", plan.LinkedSkillNames)}");
+                }
+                sb.AppendLine();
+
+                if (plan.Milestones.Any())
+                {
+                    sb.AppendLine("| Milestone | Category | Status | Target |");
+                    sb.AppendLine("|-----------|----------|--------|--------|");
+                    foreach (var ms in plan.Milestones)
+                    {
+                        var statusIcon = ms.Status switch
+                        {
+                            MilestoneStatus.Completed => "[DONE]",
+                            MilestoneStatus.InProgress => "[IN PROGRESS]",
+                            MilestoneStatus.Skipped => "[SKIPPED]",
+                            _ => "[ ]"
+                        };
+                        var target = ms.TargetDate.HasValue ? ms.TargetDate.Value.ToString("MMM yyyy") : "-";
+                        sb.AppendLine($"| {EscapeMarkdown(ms.Title)} | {ms.Category} | {statusIcon} | {target} |");
+                    }
+                    sb.AppendLine();
+                }
+            }
         }
 
         // Meetings
@@ -876,7 +1071,7 @@ public class SummaryService : ISummaryService
                 if (habit.CurrentStreak > 0)
                     sb.AppendLine($"                        <span class=\"streak-badge\">🔥 {habit.CurrentStreak}</span>");
                 sb.AppendLine($"                    </div>");
-                sb.AppendLine($"                    <div class=\"progress-bar-container\" style=\"height: 8px;\">");
+                sb.AppendLine($"                    <div class=\"progress-bar-container small\">");
                 sb.AppendLine($"                        <div class=\"progress-bar\" style=\"width: {habit.CompletionRate}%; background-color: {habit.Color ?? progressColor};\"></div>");
                 sb.AppendLine($"                    </div>");
                 sb.AppendLine($"                    <div class=\"habit-stats\">");
@@ -898,6 +1093,148 @@ public class SummaryService : ISummaryService
                 sb.AppendLine($"                </div>");
             }
             sb.AppendLine("            </div>");
+            sb.AppendLine("        </section>");
+        }
+
+        // Skills Section
+        if (report.Skills.Any())
+        {
+            sb.AppendLine("        <section class=\"skills-section\">");
+            sb.AppendLine($"            <h2>Skills <span class=\"completion-badge\">{report.Skills.Count} active</span></h2>");
+            sb.AppendLine("            <div class=\"skills-grid\">");
+            foreach (var skill in report.Skills)
+            {
+                var typeClass = skill.Type == SkillType.Have ? "have" : "want";
+                var categoryColor = skill.Color ?? "#667eea";
+                sb.AppendLine($"                <div class=\"skill-card\" style=\"border-left: 4px solid {categoryColor}\">");
+                sb.AppendLine($"                    <div class=\"skill-header\">");
+                if (!string.IsNullOrEmpty(skill.Icon))
+                    sb.AppendLine($"                        <span class=\"skill-icon\">{skill.Icon}</span>");
+                sb.AppendLine($"                        <span class=\"skill-name\">{HtmlEncode(skill.Name)}</span>");
+                sb.AppendLine($"                        <span class=\"category-badge\">{skill.Category}</span>");
+                sb.AppendLine($"                        <span class=\"type-badge {typeClass}\">{skill.Type}</span>");
+                if (skill.IsAiSuggested)
+                    sb.AppendLine($"                        <span class=\"ai-badge\">AI</span>");
+                sb.AppendLine($"                    </div>");
+                sb.AppendLine($"                    <div class=\"proficiency-bar\">");
+                sb.AppendLine($"                        <div class=\"proficiency-labels\">");
+                sb.AppendLine($"                            <span>{Skill.GetProficiencyName(skill.CurrentProficiency)}</span>");
+                sb.AppendLine($"                            <span>Target: {Skill.GetProficiencyName(skill.TargetProficiency)}</span>");
+                sb.AppendLine($"                        </div>");
+                sb.AppendLine($"                        <div class=\"proficiency-track\">");
+                for (int i = 1; i <= 5; i++)
+                {
+                    var starClass = i <= skill.CurrentProficiency ? "filled" : (i <= skill.TargetProficiency ? "target" : "empty");
+                    sb.AppendLine($"                            <span class=\"proficiency-star {starClass}\">★</span>");
+                }
+                sb.AppendLine($"                        </div>");
+                sb.AppendLine($"                    </div>");
+                if (skill.LinkedGoalTitles.Any())
+                {
+                    sb.AppendLine($"                    <div class=\"skill-goals\">");
+                    sb.AppendLine($"                        <span class=\"goals-label\">Goals:</span>");
+                    foreach (var goalTitle in skill.LinkedGoalTitles.Take(2))
+                    {
+                        sb.AppendLine($"                        <span class=\"goal-tag\">{HtmlEncode(goalTitle)}</span>");
+                    }
+                    if (skill.LinkedGoalTitles.Count > 2)
+                        sb.AppendLine($"                        <span class=\"more\">+{skill.LinkedGoalTitles.Count - 2}</span>");
+                    sb.AppendLine($"                    </div>");
+                }
+                sb.AppendLine($"                </div>");
+            }
+            sb.AppendLine("            </div>");
+            sb.AppendLine("        </section>");
+        }
+
+        // Career Development Section
+        if (report.CareerPlans.Any())
+        {
+            sb.AppendLine("        <section class=\"career-section\">");
+            sb.AppendLine("            <h2>Career Development</h2>");
+            foreach (var plan in report.CareerPlans)
+            {
+                sb.AppendLine($"            <div class=\"career-plan\">");
+                sb.AppendLine($"                <div class=\"career-plan-header\">");
+                sb.AppendLine($"                    <h3>{HtmlEncode(plan.Title)}</h3>");
+                sb.AppendLine($"                    <span class=\"status-badge\">{plan.Status}</span>");
+                sb.AppendLine($"                </div>");
+                if (!string.IsNullOrEmpty(plan.CurrentRole) || !string.IsNullOrEmpty(plan.TargetRole))
+                {
+                    sb.AppendLine($"                <div class=\"role-arrow\">");
+                    sb.AppendLine($"                    <span class=\"current-role\">{HtmlEncode(plan.CurrentRole ?? "Current")}</span>");
+                    sb.AppendLine($"                    <span class=\"arrow\">→</span>");
+                    sb.AppendLine($"                    <span class=\"target-role\">{HtmlEncode(plan.TargetRole ?? "Target")}</span>");
+                    sb.AppendLine($"                </div>");
+                }
+                sb.AppendLine($"                <div class=\"progress-bar-container\">");
+                sb.AppendLine($"                    <div class=\"progress-bar\" style=\"width: {plan.ProgressPercent}%\"></div>");
+                sb.AppendLine($"                    <span class=\"progress-text\">{plan.ProgressPercent}%</span>");
+                sb.AppendLine($"                </div>");
+                sb.AppendLine($"                <div class=\"career-meta\">");
+                if (plan.TotalMilestones > 0)
+                    sb.AppendLine($"                    <span>{plan.CompletedMilestones}/{plan.TotalMilestones} milestones</span>");
+                if (plan.MilestonesCompletedInPeriod > 0)
+                    sb.AppendLine($"                    <span class=\"badge completed\">{plan.MilestonesCompletedInPeriod} completed this period</span>");
+                if (plan.TargetDate.HasValue)
+                    sb.AppendLine($"                    <span>Target: {plan.TargetDate.Value:MMM d, yyyy}</span>");
+                sb.AppendLine($"                </div>");
+
+                if (plan.Milestones.Any())
+                {
+                    sb.AppendLine($"                <div class=\"milestone-list\">");
+                    foreach (var ms in plan.Milestones)
+                    {
+                        var msStatusClass = ms.Status switch
+                        {
+                            MilestoneStatus.Completed => "completed",
+                            MilestoneStatus.InProgress => "in-progress",
+                            MilestoneStatus.Skipped => "skipped",
+                            _ => ""
+                        };
+                        sb.AppendLine($"                    <div class=\"milestone-item {msStatusClass}\">");
+                        sb.AppendLine($"                        <div class=\"milestone-status-icon\">");
+                        var icon = ms.Status switch
+                        {
+                            MilestoneStatus.Completed => "&#10003;",
+                            MilestoneStatus.InProgress => "&#9654;",
+                            MilestoneStatus.Skipped => "&#8212;",
+                            _ => "&#9675;"
+                        };
+                        sb.AppendLine($"                            <span>{icon}</span>");
+                        sb.AppendLine($"                        </div>");
+                        sb.AppendLine($"                        <div class=\"milestone-content\">");
+                        sb.AppendLine($"                            <span class=\"milestone-title\">{HtmlEncode(ms.Title)}</span>");
+                        sb.AppendLine($"                            <span class=\"category-badge\">{ms.Category}</span>");
+                        if (ms.TargetDate.HasValue)
+                            sb.AppendLine($"                            <span class=\"milestone-date\">{ms.TargetDate.Value:MMM yyyy}</span>");
+                        if (ms.CompletedDate.HasValue)
+                            sb.AppendLine($"                            <span class=\"milestone-date completed\">Completed {ms.CompletedDate.Value:MMM d, yyyy}</span>");
+                        sb.AppendLine($"                        </div>");
+                        sb.AppendLine($"                    </div>");
+                    }
+                    sb.AppendLine($"                </div>");
+                }
+
+                if (plan.LinkedGoalTitles.Any() || plan.LinkedSkillNames.Any())
+                {
+                    sb.AppendLine($"                <div class=\"career-links\">");
+                    if (plan.LinkedGoalTitles.Any())
+                    {
+                        sb.AppendLine($"                    <span class=\"goals-label\">Goals:</span>");
+                        foreach (var title in plan.LinkedGoalTitles)
+                            sb.AppendLine($"                    <span class=\"goal-tag\">{HtmlEncode(title)}</span>");
+                    }
+                    if (plan.LinkedSkillNames.Any())
+                    {
+                        sb.AppendLine($"                    <span class=\"goals-label\">Skills:</span>");
+                        foreach (var name in plan.LinkedSkillNames)
+                            sb.AppendLine($"                    <span class=\"goal-tag\">{HtmlEncode(name)}</span>");
+                    }
+                    sb.AppendLine($"                </div>");
+                }
+                sb.AppendLine($"            </div>");
+            }
             sb.AppendLine("        </section>");
         }
 
@@ -1235,6 +1572,9 @@ public class SummaryService : ISummaryService
             height: 24px;
             margin-bottom: 12px;
             overflow: hidden;
+        }
+        .progress-bar-container.small {
+            height: 8px;
         }
         .progress-bar {
             height: 100%;
@@ -1581,6 +1921,194 @@ public class SummaryService : ISummaryService
         .habit-goals .more {
             font-size: 0.75rem;
             color: #666;
+        }
+        /* Skills Styles */
+        .skills-section h2 .completion-badge {
+            font-size: 0.9rem;
+            font-weight: normal;
+            padding: 4px 10px;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border-radius: 20px;
+            margin-left: 12px;
+        }
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .skill-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .skill-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .skill-icon {
+            font-size: 1.25rem;
+        }
+        .skill-name {
+            font-weight: 500;
+            flex: 1;
+            min-width: 80px;
+        }
+        .category-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #e9ecef;
+            color: #495057;
+        }
+        .type-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .type-badge.have {
+            background: #d4edda;
+            color: #155724;
+        }
+        .type-badge.want {
+            background: #cce5ff;
+            color: #004085;
+        }
+        .proficiency-bar {
+            margin-bottom: 8px;
+        }
+        .proficiency-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .proficiency-track {
+            display: flex;
+            gap: 4px;
+        }
+        .proficiency-star {
+            font-size: 1.2rem;
+        }
+        .proficiency-star.filled {
+            color: #ffc107;
+        }
+        .proficiency-star.target {
+            color: #dee2e6;
+        }
+        .proficiency-star.empty {
+            color: #f0f0f0;
+        }
+        .skill-goals {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }
+        /* Career Development Styles */
+        .career-section .career-plan {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .career-plan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .role-arrow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+        .role-arrow .current-role {
+            color: #666;
+        }
+        .role-arrow .arrow {
+            color: #667eea;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .role-arrow .target-role {
+            color: #333;
+            font-weight: 600;
+        }
+        .career-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .milestone-list {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .milestone-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: white;
+            border-radius: 8px;
+            border-left: 3px solid #dee2e6;
+        }
+        .milestone-item.completed {
+            border-left-color: #28a745;
+        }
+        .milestone-item.in-progress {
+            border-left-color: #667eea;
+        }
+        .milestone-item.skipped {
+            border-left-color: #adb5bd;
+            opacity: 0.7;
+        }
+        .milestone-status-icon {
+            font-size: 1rem;
+            width: 24px;
+            text-align: center;
+        }
+        .milestone-item.completed .milestone-status-icon {
+            color: #28a745;
+        }
+        .milestone-item.in-progress .milestone-status-icon {
+            color: #667eea;
+        }
+        .milestone-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            flex-wrap: wrap;
+        }
+        .milestone-title {
+            font-weight: 500;
+        }
+        .milestone-date {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .milestone-date.completed {
+            color: #28a745;
+        }
+        .career-links {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         .report-footer {
             text-align: center;

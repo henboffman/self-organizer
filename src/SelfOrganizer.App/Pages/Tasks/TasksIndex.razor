@@ -204,15 +204,16 @@ else
                                     <span class="oi oi-location me-1"></span>@@@task.Category
                                 </span>
                             }
-                            @if (task.Tags.Any())
+                            @{var taskTags = task.Tags ?? new List<string>();}
+                            @if (taskTags.Any())
                             {
-                                @foreach (var tag in task.Tags.Take(3))
+                                @foreach (var tag in taskTags.Take(3))
                                 {
                                     <a href="tags/@tag" class="badge bg-primary text-decoration-none" @onclick:stopPropagation="true">#@tag</a>
                                 }
-                                @if (task.Tags.Count > 3)
+                                @if (taskTags.Count > 3)
                                 {
-                                    <span class="text-muted">+@(task.Tags.Count - 3)</span>
+                                    <span class="text-muted">+@(taskTags.Count - 3)</span>
                                 }
                             }
                         </div>

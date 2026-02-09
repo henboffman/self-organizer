@@ -1,0 +1,27 @@
+@if (IsVisible)
+{
+    <div class="alert alert-success d-flex flex-column gap-2 mb-4">
+        <div class="d-flex align-items-center gap-2">
+            <span class="oi oi-circle-check fs-4"></span>
+            <strong>All tasks complete! Ready to wrap up?</strong>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-success btn-sm" @onclick="OnReflectAndComplete">
+                <span class="oi oi-pencil me-1"></span> Reflect & Complete
+            </button>
+            <button class="btn btn-outline-success btn-sm" @onclick="OnCompleteWithoutNotes">
+                <span class="oi oi-check me-1"></span> Complete Without Notes
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="OnAddMoreTasks">
+                <span class="oi oi-plus me-1"></span> Add More Tasks
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnReflectAndComplete { get; set; }
+    [Parameter] public EventCallback OnCompleteWithoutNotes { get; set; }
+    [Parameter] public EventCallback OnAddMoreTasks { get; set; }
+}

@@ -1,0 +1,115 @@
+@using SelfOrganizer.Core.Models
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">@(IsEdit ? "Edit Milestone" : "Add Milestone")</h6>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Cancel">
+            <span class="oi oi-x"></span>
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" @bind="_milestone.Title" placeholder="Milestone title" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold">Description</label>
+            <textarea class="form-control" @bind="_milestone.Description" rows="2" placeholder="Optional details..."></textarea>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Category</label>
+                <select class="form-select" @bind="_milestone.Category">
+                    @foreach (var cat in Enum.GetValues<MilestoneCategory>())
+                    {
+                        <option value="@cat">@cat</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Status</label>
+                <select class="form-select" @bind="_milestone.Status">
+                    @foreach (var status in Enum.GetValues<MilestoneStatus>())
+                    {
+                        <option value="@status">@FormatStatus(status)</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Target Date</label>
+                <input type="date" class="form-control" @bind="_milestone.TargetDate" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Completed Date</label>
+                <input type="date" class="form-control" @bind="_milestone.CompletedDate" />
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary" @onclick="Save" disabled="@(!CanSave)">
+                <span class="oi oi-check me-1"></span>
+                @(IsEdit ? "Update" : "Add")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CareerMilestone? Milestone { get; set; }
+    [Parameter] public EventCallback<CareerMilestone> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private CareerMilestone _milestone = new();
+    private bool IsEdit => Milestone != null;
+    private bool CanSave => !string.IsNullOrWhiteSpace(_milestone.Title);
+
+    protected override void OnParametersSet()
+    {
+        if (Milestone != null)
+        {
+            _milestone = new CareerMilestone
+            {
+                Id = Milestone.Id,
+                Title = Milestone.Title,
+                Description = Milestone.Description,
+                Category = Milestone.Category,
+                Status = Milestone.Status,
+                TargetDate = Milestone.TargetDate,
+                CompletedDate = Milestone.CompletedDate,
+                SortOrder = Milestone.SortOrder,
+                Icon = Milestone.Icon,
+                Color = Milestone.Color,
+                LinkedGoalIds = new List<Guid>(Milestone.LinkedGoalIds),
+                LinkedSkillIds = new List<Guid>(Milestone.LinkedSkillIds)
+            };
+        }
+        else
+        {
+            _milestone = new CareerMilestone();
+        }
+    }
+
+    private async Task Save()
+    {
+        if (!CanSave) return;
+        await OnSave.InvokeAsync(_milestone);
+    }
+
+    private async Task Cancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private string FormatStatus(MilestoneStatus status) => status switch
+    {
+        MilestoneStatus.NotStarted => "Not Started",
+        MilestoneStatus.InProgress => "In Progress",
+        _ => status.ToString()
+    };
+}

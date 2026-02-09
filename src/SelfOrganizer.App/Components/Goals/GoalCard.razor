@@ -84,16 +84,17 @@
         </div>
 
         @* Tags *@
-        @if (Goal.Tags.Any())
+        @{var goalCardTags = Goal.Tags ?? new List<string>();}
+        @if (goalCardTags.Any())
         {
             <div class="tags mt-2">
-                @foreach (var tag in Goal.Tags.Take(3))
+                @foreach (var tag in goalCardTags.Take(3))
                 {
                     <span class="badge bg-primary me-1">#@tag</span>
                 }
-                @if (Goal.Tags.Count > 3)
+                @if (goalCardTags.Count > 3)
                 {
-                    <span class="badge bg-secondary">+@(Goal.Tags.Count - 3)</span>
+                    <span class="badge bg-secondary">+@(goalCardTags.Count - 3)</span>
                 }
             </div>
         }

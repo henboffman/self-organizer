@@ -106,7 +106,8 @@ window.focusTimerInterop = {
             return;
         }
 
-        this.miniWindow = window.open('/focus-timer-mini', 'FocusTimerMini', features);
+        const baseHref = document.querySelector('base')?.getAttribute('href') || '/';
+        this.miniWindow = window.open(baseHref + 'focus-timer-mini', 'FocusTimerMini', features);
 
         // Check if popup was blocked
         if (!this.miniWindow) {
@@ -191,7 +192,7 @@ window.focusTimerInterop = {
         if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('Focus Timer', {
                 body: message,
-                icon: '/favicon.png',
+                icon: (document.querySelector('base')?.getAttribute('href') || '/') + 'favicon.png',
                 tag: 'focus-timer'
             });
         } else if ('Notification' in window && Notification.permission !== 'denied') {

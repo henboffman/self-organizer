@@ -1,0 +1,472 @@
+@using SelfOrganizer.Core.Models
+@inject IJSRuntime JS
+
+<div class="career-timeline-wrapper">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="mb-0"><span class="oi oi-graph me-2"></span>Timeline</h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn @(_zoomLevel == "1yr" ? "btn-primary" : "")" @onclick='() => SetZoom("1yr")'>1yr</button>
+            <button class="btn @(_zoomLevel == "3yr" ? "btn-primary" : "")" @onclick='() => SetZoom("3yr")'>3yr</button>
+            <button class="btn @(_zoomLevel == "5yr" ? "btn-primary" : "")" @onclick='() => SetZoom("5yr")'>5yr</button>
+            <button class="btn @(_zoomLevel == "all" ? "btn-primary" : "")" @onclick='() => SetZoom("all")'>All</button>
+        </div>
+    </div>
+
+    <div class="timeline-scroll-container" id="@_containerId">
+        <div class="timeline-track" style="width: @(_totalWidth)px; min-height: @(_trackHeight)px;">
+            @* Time axis markers *@
+            @foreach (var marker in _timeMarkers)
+            {
+                <div class="timeline-axis-marker" style="left: @(marker.X)px;">
+                    <div class="timeline-axis-line"></div>
+                    <div class="timeline-axis-label">@marker.Label</div>
+                </div>
+            }
+
+            @* Today indicator *@
+            @if (_todayX >= 0 && _todayX <= _totalWidth)
+            {
+                <div class="timeline-today" style="left: @(_todayX)px;">
+                    <div class="timeline-today-line"></div>
+                    <div class="timeline-today-label">Today</div>
+                </div>
+            }
+
+            @* Skill bars *@
+            @foreach (var bar in _skillBars)
+            {
+                <div class="timeline-bar timeline-clickable" title="@bar.Name"
+                     style="left: @(bar.X)px; width: @(bar.Width)px; top: @(bar.Y)px; background-color: @(bar.Color);"
+                     @onclick="() => SelectSkill(bar)" @onclick:stopPropagation="true">
+                    <span class="timeline-bar-label">@bar.Name</span>
+                </div>
+            }
+
+            @* Milestone items *@
+            @foreach (var item in _milestoneItems)
+            {
+                <div class="timeline-item timeline-clickable @GetMilestoneItemClass(item.Status) @(item == _selectedMilestone ? "timeline-item-selected" : "")" title="@item.Title"
+                     style="left: @(item.X)px; top: @(item.Y)px;"
+                     @onclick="() => SelectMilestone(item)" @onclick:stopPropagation="true">
+                    <div class="timeline-item-dot"></div>
+                    <div class="timeline-item-content">
+                        <div class="timeline-item-title">@item.Title</div>
+                        <div class="timeline-item-date">@item.DateLabel</div>
+                    </div>
+                </div>
+            }
+
+            @* Snapshot markers *@
+            @foreach (var marker in _snapshotMarkers)
+            {
+                <div class="timeline-snapshot-marker timeline-clickable" title="Snapshot: @marker.DateLabel"
+                     style="left: @(marker.X)px;"
+                     @onclick="() => SelectSnapshot(marker)" @onclick:stopPropagation="true">
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Detail panel for selected item *@
+    @if (_selectedMilestone != null)
+    {
+        <div class="timeline-detail-panel mt-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="@GetMilestoneStatusIcon(_selectedMilestone.Status)"></span>
+                        <strong>@_selectedMilestone.Title</strong>
+                        <span class="badge @GetMilestoneStatusBadgeClass(_selectedMilestone.Status)">@_selectedMilestone.Status</span>
+                        <span class="badge bg-light text-dark">@_selectedMilestone.Milestone.Category</span>
+                    </div>
+                    <div class="text-muted small mb-1">
+                        Part of <a href="career/@_selectedMilestone.PlanId/edit" class="text-decoration-none fw-bold">@_selectedMilestone.PlanTitle</a>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_selectedMilestone.Milestone.Description))
+                    {
+                        <p class="mb-1 small">@_selectedMilestone.Milestone.Description</p>
+                    }
+                    <div class="d-flex gap-3 small text-muted">
+                        @if (_selectedMilestone.Milestone.TargetDate.HasValue)
+                        {
+                            <span><span class="oi oi-calendar me-1"></span>Target: @_selectedMilestone.Milestone.TargetDate.Value.ToString("MMM d, yyyy")</span>
+                        }
+                        @if (_selectedMilestone.Milestone.CompletedDate.HasValue)
+                        {
+                            <span class="text-success"><span class="oi oi-check me-1"></span>Completed: @_selectedMilestone.Milestone.CompletedDate.Value.ToString("MMM d, yyyy")</span>
+                        }
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelection" title="Close">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+        </div>
+    }
+    else if (_selectedSkill != null)
+    {
+        <div class="timeline-detail-panel mt-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="oi oi-star"></span>
+                        <strong>@_selectedSkill.Skill.Name</strong>
+                        <span class="badge bg-light text-dark">@_selectedSkill.Skill.Category</span>
+                        @if (_selectedSkill.Skill.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(_selectedSkill.Skill.Description))
+                    {
+                        <p class="mb-1 small">@_selectedSkill.Skill.Description</p>
+                    }
+                    <div class="d-flex gap-3 small text-muted flex-wrap">
+                        @if (_selectedSkill.Skill.CurrentProficiency > 0 || _selectedSkill.Skill.TargetProficiency > 0)
+                        {
+                            <span>Proficiency: @_selectedSkill.Skill.CurrentProficiency / @_selectedSkill.Skill.TargetProficiency</span>
+                        }
+                        @if (_selectedSkill.Skill.StartDate.HasValue)
+                        {
+                            <span><span class="oi oi-calendar me-1"></span>Started: @_selectedSkill.Skill.StartDate.Value.ToString("MMM yyyy")</span>
+                        }
+                        @if (_selectedSkill.Skill.TargetDate.HasValue)
+                        {
+                            <span><span class="oi oi-target me-1"></span>Target: @_selectedSkill.Skill.TargetDate.Value.ToString("MMM yyyy")</span>
+                        }
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelection" title="Close">
+                    <span class="oi oi-x"></span>
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (_milestoneItems.Count == 0 && _skillBars.Count == 0)
+    {
+        <div class="text-center py-4">
+            <span class="oi oi-graph fs-1 d-block mb-2 opacity-50"></span>
+            <p>No timeline data to display. Create a career plan with milestones to see them here.</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CareerPlan> Plans { get; set; } = new();
+    [Parameter] public List<Skill> Skills { get; set; } = new();
+    [Parameter] public List<GrowthSnapshot> Snapshots { get; set; } = new();
+    [Parameter] public EventCallback<GrowthSnapshot> OnSnapshotSelected { get; set; }
+
+    private string _containerId = $"timeline-{Guid.NewGuid():N}";
+    private string _zoomLevel = "3yr";
+    private DateTime _viewStartDate;
+    private DateTime _viewEndDate;
+    private double _pixelsPerMonth;
+    private double _totalWidth;
+    private double _trackHeight = 300;
+    private double _todayX;
+
+    private List<TimeMarker> _timeMarkers = new();
+    private List<SkillBar> _skillBars = new();
+    private List<MilestoneItem> _milestoneItems = new();
+    private List<SnapshotMarker> _snapshotMarkers = new();
+
+    private MilestoneItem? _selectedMilestone;
+    private SkillBar? _selectedSkill;
+
+    private bool _jsInitialized;
+
+    protected override void OnParametersSet()
+    {
+        CalculateLayout();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || !_jsInitialized)
+        {
+            _jsInitialized = true;
+            try
+            {
+                await JS.InvokeVoidAsync("careerTimeline.enableDragScroll", _containerId);
+                await JS.InvokeVoidAsync("careerTimeline.scrollToDate", _containerId, _todayX);
+            }
+            catch
+            {
+                // JS interop may fail during prerendering
+            }
+        }
+    }
+
+    private async Task SetZoom(string level)
+    {
+        _zoomLevel = level;
+        CalculateLayout();
+        StateHasChanged();
+
+        try
+        {
+            await JS.InvokeVoidAsync("careerTimeline.scrollToDate", _containerId, _todayX);
+        }
+        catch { }
+    }
+
+    private void CalculateLayout()
+    {
+        var now = DateTime.UtcNow;
+
+        switch (_zoomLevel)
+        {
+            case "1yr":
+                _viewStartDate = now.AddMonths(-3);
+                _viewEndDate = now.AddMonths(9);
+                _pixelsPerMonth = 120;
+                break;
+            case "3yr":
+                _viewStartDate = now.AddMonths(-6);
+                _viewEndDate = now.AddMonths(30);
+                _pixelsPerMonth = 60;
+                break;
+            case "5yr":
+                _viewStartDate = now.AddMonths(-12);
+                _viewEndDate = now.AddMonths(48);
+                _pixelsPerMonth = 40;
+                break;
+            case "all":
+                CalculateAllDates(now);
+                _pixelsPerMonth = 40;
+                break;
+        }
+
+        var totalMonths = ((_viewEndDate.Year - _viewStartDate.Year) * 12) + _viewEndDate.Month - _viewStartDate.Month;
+        _totalWidth = Math.Max(800, totalMonths * _pixelsPerMonth + 200);
+        _todayX = DateToPixel(now);
+
+        BuildTimeMarkers();
+        BuildSkillBars();
+        BuildMilestoneItems();
+        BuildSnapshotMarkers();
+
+        // Adjust track height based on content
+        var maxY = 80.0; // baseline
+        if (_skillBars.Count > 0)
+            maxY = Math.Max(maxY, _skillBars.Max(b => b.Y) + 40);
+        if (_milestoneItems.Count > 0)
+            maxY = Math.Max(maxY, _milestoneItems.Max(m => m.Y) + 60);
+        _trackHeight = maxY + 40;
+    }
+
+    private void CalculateAllDates(DateTime now)
+    {
+        var earliest = now.AddYears(-1);
+        var latest = now.AddYears(2);
+
+        foreach (var plan in Plans)
+        {
+            if (plan.StartDate.HasValue && plan.StartDate.Value < earliest)
+                earliest = plan.StartDate.Value;
+            if (plan.TargetDate.HasValue && plan.TargetDate.Value > latest)
+                latest = plan.TargetDate.Value;
+
+            foreach (var m in plan.Milestones)
+            {
+                if (m.TargetDate.HasValue && m.TargetDate.Value < earliest)
+                    earliest = m.TargetDate.Value;
+                if (m.TargetDate.HasValue && m.TargetDate.Value > latest)
+                    latest = m.TargetDate.Value;
+            }
+        }
+
+        foreach (var skill in Skills)
+        {
+            if (skill.StartDate.HasValue && skill.StartDate.Value < earliest)
+                earliest = skill.StartDate.Value;
+            if (skill.TargetDate.HasValue && skill.TargetDate.Value > latest)
+                latest = skill.TargetDate.Value;
+        }
+
+        _viewStartDate = earliest.AddMonths(-2);
+        _viewEndDate = latest.AddMonths(2);
+    }
+
+    private double DateToPixel(DateTime date)
+    {
+        var months = ((date.Year - _viewStartDate.Year) * 12) + date.Month - _viewStartDate.Month
+            + (date.Day - 1.0) / DateTime.DaysInMonth(date.Year, date.Month);
+        return 100 + (months * _pixelsPerMonth);
+    }
+
+    private void BuildTimeMarkers()
+    {
+        _timeMarkers.Clear();
+        var current = new DateTime(_viewStartDate.Year, _viewStartDate.Month, 1);
+        var stepMonths = _zoomLevel switch
+        {
+            "1yr" => 1,
+            "3yr" => 3,
+            "5yr" => 6,
+            "all" => 6,
+            _ => 3
+        };
+
+        while (current <= _viewEndDate)
+        {
+            _timeMarkers.Add(new TimeMarker
+            {
+                X = DateToPixel(current),
+                Label = stepMonths <= 1 ? current.ToString("MMM yy") : current.ToString("MMM yyyy")
+            });
+            current = current.AddMonths(stepMonths);
+        }
+    }
+
+    private void BuildSkillBars()
+    {
+        _skillBars.Clear();
+        var row = 0;
+        var colors = new[] { "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899" };
+
+        foreach (var skill in Skills.Where(s => s.StartDate.HasValue || s.TargetDate.HasValue))
+        {
+            var startDate = skill.StartDate ?? DateTime.UtcNow;
+            var endDate = skill.TargetDate ?? DateTime.UtcNow.AddYears(1);
+            if (endDate <= startDate) endDate = startDate.AddMonths(6);
+
+            var x = DateToPixel(startDate);
+            var endX = DateToPixel(endDate);
+            var width = Math.Max(30, endX - x);
+
+            _skillBars.Add(new SkillBar
+            {
+                Name = skill.Name,
+                X = x,
+                Width = width,
+                Y = 50 + (row * 28),
+                Color = skill.Color ?? colors[row % colors.Length],
+                Skill = skill
+            });
+            row++;
+        }
+    }
+
+    private void BuildMilestoneItems()
+    {
+        _milestoneItems.Clear();
+        var rows = new List<double>(); // track rightmost X per row to avoid overlap
+        var baseY = 50 + (_skillBars.Count * 28) + (_skillBars.Count > 0 ? 20 : 0);
+
+        var allMilestones = Plans
+            .SelectMany(p => p.Milestones.Select(m => (Plan: p, Milestone: m)))
+            .Where(x => x.Milestone.TargetDate.HasValue)
+            .OrderBy(x => x.Milestone.TargetDate)
+            .ToList();
+
+        foreach (var (plan, milestone) in allMilestones)
+        {
+            var x = DateToPixel(milestone.TargetDate!.Value);
+
+            // Find first row where this item won't overlap
+            var rowIndex = 0;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (x > rows[i] + 20)
+                {
+                    rowIndex = i;
+                    break;
+                }
+                rowIndex = i + 1;
+            }
+
+            while (rows.Count <= rowIndex)
+                rows.Add(0);
+
+            rows[rowIndex] = x + 120; // reserve space for label
+
+            _milestoneItems.Add(new MilestoneItem
+            {
+                Title = milestone.Title,
+                DateLabel = milestone.TargetDate!.Value.ToString("MMM yyyy"),
+                X = x,
+                Y = baseY + (rowIndex * 50),
+                Status = milestone.Status,
+                Milestone = milestone,
+                PlanId = plan.Id,
+                PlanTitle = plan.Title
+            });
+        }
+    }
+
+    private string GetMilestoneItemClass(MilestoneStatus status) => status switch
+    {
+        MilestoneStatus.Completed => "milestone-completed",
+        MilestoneStatus.InProgress => "milestone-active",
+        MilestoneStatus.Skipped => "milestone-skipped",
+        _ => "milestone-pending"
+    };
+
+    private void SelectMilestone(MilestoneItem item)
+    {
+        _selectedSkill = null;
+        _selectedMilestone = _selectedMilestone == item ? null : item;
+    }
+
+    private void SelectSkill(SkillBar bar)
+    {
+        _selectedMilestone = null;
+        _selectedSkill = _selectedSkill == bar ? null : bar;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedMilestone = null;
+        _selectedSkill = null;
+    }
+
+    private string GetMilestoneStatusIcon(MilestoneStatus status) => status switch
+    {
+        MilestoneStatus.Completed => "oi oi-circle-check text-success",
+        MilestoneStatus.InProgress => "oi oi-media-record text-primary",
+        MilestoneStatus.Skipped => "oi oi-circle-x text-muted",
+        _ => "oi oi-record text-secondary"
+    };
+
+    private string GetMilestoneStatusBadgeClass(MilestoneStatus status) => status switch
+    {
+        MilestoneStatus.Completed => "bg-success",
+        MilestoneStatus.InProgress => "bg-primary",
+        MilestoneStatus.Skipped => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+
+    private void BuildSnapshotMarkers()
+    {
+        _snapshotMarkers.Clear();
+        foreach (var snapshot in Snapshots)
+        {
+            var date = snapshot.SnapshotDate.ToDateTime(TimeOnly.MinValue);
+            var x = DateToPixel(date);
+            if (x >= 0 && x <= _totalWidth)
+            {
+                _snapshotMarkers.Add(new SnapshotMarker
+                {
+                    X = x,
+                    DateLabel = snapshot.SnapshotDate.ToString("MMM d, yyyy"),
+                    Snapshot = snapshot
+                });
+            }
+        }
+    }
+
+    private async Task SelectSnapshot(SnapshotMarker marker)
+    {
+        _selectedMilestone = null;
+        _selectedSkill = null;
+        await OnSnapshotSelected.InvokeAsync(marker.Snapshot);
+    }
+
+    private class TimeMarker { public double X; public string Label = ""; }
+    private class SkillBar { public string Name = ""; public double X; public double Width; public double Y; public string Color = "#3b82f6"; public Skill Skill = default!; }
+    private class MilestoneItem { public string Title = ""; public string DateLabel = ""; public double X; public double Y; public MilestoneStatus Status; public CareerMilestone Milestone = default!; public Guid PlanId; public string PlanTitle = ""; }
+    private class SnapshotMarker { public double X; public string DateLabel = ""; public GrowthSnapshot Snapshot = default!; }
+}

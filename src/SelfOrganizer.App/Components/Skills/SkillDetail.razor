@@ -1,0 +1,465 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services.Intelligence
+@inject ISkillService SkillService
+@inject IGoalService GoalService
+@inject IProjectService ProjectService
+@inject ISkillAiService SkillAiService
+
+<div class="skill-detail">
+    @* Header Section *@
+    <div class="detail-header d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge @GetCategoryBadgeClass()">@GetCategoryLabel()</span>
+                <span class="badge @GetTypeBadgeClass()">@(Skill.Type == SkillType.Have ? "Have" : "Want")</span>
+                @if (!Skill.IsActive)
+                {
+                    <span class="badge bg-secondary">Inactive</span>
+                }
+            </div>
+            <h4 class="skill-title mb-0">
+                @if (!string.IsNullOrEmpty(Skill.Icon))
+                {
+                    <span class="me-2">@Skill.Icon</span>
+                }
+                @Skill.Name
+            </h4>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" @onclick="HandleEdit">
+                <span class="oi oi-pencil me-1"></span> Edit
+            </button>
+        </div>
+    </div>
+
+    @* Proficiency Section *@
+    <div class="proficiency-section card mb-4">
+        <div class="card-header">
+            <span class="oi oi-graph me-1"></span> Proficiency
+        </div>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>
+                    Current: <strong>@Skill.GetProficiencyName(Skill.CurrentProficiency)</strong> (@Skill.CurrentProficiency/5)
+                </span>
+                <span>
+                    Target: <strong>@Skill.GetProficiencyName(Skill.TargetProficiency)</strong> (@Skill.TargetProficiency/5)
+                </span>
+            </div>
+            <div class="progress mb-3" style="height: 20px;">
+                <div class="progress-bar @GetProgressBarClass()"
+                     role="progressbar"
+                     style="width: @Skill.ProgressPercent%"
+                     aria-valuenow="@Skill.ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                    @Skill.ProgressPercent%
+                </div>
+            </div>
+            @if (Skill.Type == SkillType.Want && Skill.CurrentProficiency < Skill.TargetProficiency)
+            {
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" @onclick="LevelUp">
+                        <span class="oi oi-chevron-top me-1"></span> Level Up
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Description & Notes *@
+    @if (!string.IsNullOrEmpty(Skill.Description) || !string.IsNullOrEmpty(Skill.Notes))
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Skill.Description))
+                {
+                    <h6>Description</h6>
+                    <p class="text-muted">@Skill.Description</p>
+                }
+                @if (!string.IsNullOrEmpty(Skill.Notes))
+                {
+                    <h6>Notes</h6>
+                    <p class="text-muted" style="white-space: pre-wrap;">@Skill.Notes</p>
+                }
+            </div>
+        </div>
+    }
+
+    @* AI Actions Section *@
+    <div class="ai-actions-section card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><span class="oi oi-lightbulb me-1"></span> AI Assistant</span>
+            @if (_isAiAvailable.HasValue)
+            {
+                <span class="badge @(_isAiAvailable.Value ? "bg-success" : "bg-secondary")">
+                    @(_isAiAvailable.Value ? "Connected" : "Offline")
+                </span>
+            }
+        </div>
+        <div class="card-body">
+            @if (_isCheckingAi)
+            {
+                <div class="text-center py-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Checking AI...</span>
+                    </div>
+                    <span class="ms-2 text-muted">Checking AI availability...</span>
+                </div>
+            }
+            else if (_isAiAvailable == true)
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary" @onclick="SuggestGoals" disabled="@_isProcessing">
+                        @if (_isSuggestingGoals)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Finding...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-target me-1"></span>
+                            <span>Suggest Goals</span>
+                        }
+                    </button>
+                    <button class="btn btn-outline-success" @onclick="SuggestHabits" disabled="@_isProcessing">
+                        @if (_isSuggestingHabits)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            <span>Finding...</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-loop-circular me-1"></span>
+                            <span>Suggest Habits</span>
+                        }
+                    </button>
+                </div>
+                <p class="text-muted small mt-2 mb-0">
+                    Use AI to find goals that help develop this skill or habits for practice.
+                </p>
+            }
+            else
+            {
+                <div class="text-muted">
+                    <span class="oi oi-warning me-1"></span>
+                    AI features require Ollama to be running locally.
+                    <a href="settings" class="text-primary">Configure in Settings</a>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Linked Goals *@
+    <div class="linked-section card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><span class="oi oi-target me-1"></span> Linked Goals (@_linkedGoals.Count)</span>
+        </div>
+        <div class="card-body">
+            @if (_linkedGoals.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var goal in _linkedGoals)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold">@goal.Title</span>
+                                <small class="text-muted ms-2">@goal.Category</small>
+                            </div>
+                            <span class="badge @GetGoalStatusBadge(goal.Status)">@goal.Status</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No linked goals. Link goals that help develop this skill.</p>
+            }
+        </div>
+    </div>
+
+    @* Linked Projects *@
+    <div class="linked-section card mb-4">
+        <div class="card-header">
+            <span class="oi oi-folder me-1"></span> Linked Projects (@_linkedProjects.Count)
+        </div>
+        <div class="card-body">
+            @if (_linkedProjects.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var project in _linkedProjects)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold">@project.Name</span>
+                                @if (!string.IsNullOrEmpty(project.Category))
+                                {
+                                    <small class="text-muted ms-2">@project.Category</small>
+                                }
+                            </div>
+                            <span class="badge @GetProjectStatusBadge(project.Status)">@project.Status</span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No linked projects. Link projects that use this skill.</p>
+            }
+        </div>
+    </div>
+
+    @* Linked Tasks *@
+    <div class="linked-section card mb-4">
+        <div class="card-header">
+            <span class="oi oi-task me-1"></span> Completed Tasks (@_completedTaskCount)
+        </div>
+        <div class="card-body">
+            @if (_linkedTasks.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var task in _linkedTasks.Take(10))
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="@(task.Status == TodoTaskStatus.Completed ? "text-muted text-decoration-line-through" : "")">
+                                    @task.Title
+                                </span>
+                            </div>
+                            @if (task.Status == TodoTaskStatus.Completed)
+                            {
+                                <span class="oi oi-check text-success"></span>
+                            }
+                        </div>
+                    }
+                    @if (_linkedTasks.Count > 10)
+                    {
+                        <div class="list-group-item text-muted">
+                            +@(_linkedTasks.Count - 10) more tasks
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No tasks linked yet. Tasks that exercise this skill will appear here.</p>
+            }
+        </div>
+    </div>
+
+    @* Linked Habits *@
+    <div class="linked-section card mb-4">
+        <div class="card-header">
+            <span class="oi oi-loop-circular me-1"></span> Linked Habits (@_linkedHabits.Count)
+        </div>
+        <div class="card-body">
+            @if (_linkedHabits.Any())
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var habit in _linkedHabits)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold">@habit.Name</span>
+                                <small class="text-muted ms-2">@habit.Frequency</small>
+                            </div>
+                            <span class="badge @(habit.IsActive ? "bg-success" : "bg-secondary")">
+                                @(habit.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">No linked habits. Link habits that help develop this skill.</p>
+            }
+        </div>
+    </div>
+
+    @* Metadata *@
+    <div class="card">
+        <div class="card-body">
+            <div class="row text-muted small">
+                <div class="col-md-4">
+                    <span class="oi oi-calendar me-1"></span>
+                    Created: @Skill.CreatedAt.ToString("MMM d, yyyy")
+                </div>
+                <div class="col-md-4">
+                    <span class="oi oi-clock me-1"></span>
+                    Modified: @Skill.ModifiedAt.ToString("MMM d, yyyy")
+                </div>
+                @if (Skill.TargetDate.HasValue)
+                {
+                    <div class="col-md-4">
+                        <span class="oi oi-flag me-1"></span>
+                        Target: @Skill.TargetDate.Value.ToString("MMM d, yyyy")
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Skill Skill { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback OnSkillUpdated { get; set; }
+
+    private List<Goal> _linkedGoals = new();
+    private List<Project> _linkedProjects = new();
+    private List<TodoTask> _linkedTasks = new();
+    private List<Habit> _linkedHabits = new();
+    private int _completedTaskCount;
+
+    private bool? _isAiAvailable;
+    private bool _isCheckingAi;
+    private bool _isSuggestingGoals;
+    private bool _isSuggestingHabits;
+    private bool _isProcessing => _isSuggestingGoals || _isSuggestingHabits;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadLinkedData();
+        _ = CheckAiAvailability();
+    }
+
+    private async Task LoadLinkedData()
+    {
+        _linkedGoals = (await SkillService.GetLinkedGoalsAsync(Skill.Id)).ToList();
+        _linkedProjects = (await SkillService.GetLinkedProjectsAsync(Skill.Id)).ToList();
+        _linkedTasks = (await SkillService.GetLinkedTasksAsync(Skill.Id)).ToList();
+        _linkedHabits = (await SkillService.GetLinkedHabitsAsync(Skill.Id)).ToList();
+        _completedTaskCount = _linkedTasks.Count(t => t.Status == TodoTaskStatus.Completed);
+    }
+
+    private async Task CheckAiAvailability()
+    {
+        _isCheckingAi = true;
+        StateHasChanged();
+
+        try
+        {
+            _isAiAvailable = await SkillAiService.IsAvailableAsync();
+        }
+        catch
+        {
+            _isAiAvailable = false;
+        }
+
+        _isCheckingAi = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleEdit()
+    {
+        await OnEdit.InvokeAsync();
+    }
+
+    private async Task LevelUp()
+    {
+        if (Skill.CurrentProficiency < Skill.TargetProficiency)
+        {
+            await SkillService.UpdateProficiencyAsync(Skill.Id, Skill.CurrentProficiency + 1);
+            Skill.CurrentProficiency++;
+            await OnSkillUpdated.InvokeAsync();
+        }
+    }
+
+    private async Task SuggestGoals()
+    {
+        _isSuggestingGoals = true;
+        StateHasChanged();
+
+        try
+        {
+            var existingGoals = (await GoalService.GetAllAsync()).ToList();
+            var result = await SkillAiService.SuggestGoalsForSkillAsync(Skill, existingGoals);
+            // TODO: Show suggestions in a modal or panel
+        }
+        finally
+        {
+            _isSuggestingGoals = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SuggestHabits()
+    {
+        _isSuggestingHabits = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await SkillAiService.SuggestHabitsForSkillAsync(Skill);
+            // TODO: Show suggestions in a modal or panel
+        }
+        finally
+        {
+            _isSuggestingHabits = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryBadgeClass() => Skill.Category switch
+    {
+        SkillCategory.Technical => "bg-primary",
+        SkillCategory.SoftSkills => "bg-info",
+        SkillCategory.Creative => "bg-warning text-dark",
+        SkillCategory.DomainKnowledge => "bg-success",
+        SkillCategory.ToolsSoftware => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetTypeBadgeClass() => Skill.Type switch
+    {
+        SkillType.Have => "bg-success",
+        SkillType.Want => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetCategoryLabel() => Skill.Category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain Knowledge",
+        SkillCategory.ToolsSoftware => "Tools & Software",
+        _ => Skill.Category.ToString()
+    };
+
+    private string GetProgressBarClass()
+    {
+        var progress = Skill.ProgressPercent;
+        if (progress >= 100) return "bg-success";
+        if (progress >= 75) return "bg-info";
+        if (progress >= 50) return "bg-primary";
+        if (progress >= 25) return "bg-warning";
+        return "bg-secondary";
+    }
+
+    private static string GetGoalStatusBadge(GoalStatus status) => status switch
+    {
+        GoalStatus.Active => "bg-success",
+        GoalStatus.OnHold => "bg-warning text-dark",
+        GoalStatus.Completed => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private static string GetProjectStatusBadge(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Active => "bg-success",
+        ProjectStatus.OnHold => "bg-warning text-dark",
+        ProjectStatus.Completed => "bg-info",
+        _ => "bg-secondary"
+    };
+}

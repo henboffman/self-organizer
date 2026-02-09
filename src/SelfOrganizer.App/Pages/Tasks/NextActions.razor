@@ -101,14 +101,14 @@ else
     else if (_groupBy == "context")
     {
         var filteredList = FilteredTasks.ToList();
-        var contextsUsed = filteredList.SelectMany(t => t.Contexts).Distinct().OrderBy(c => c).ToList();
-        if (!contextsUsed.Any() && filteredList.Any(t => !t.Contexts.Any())) contextsUsed.Add("No Context");
+        var contextsUsed = filteredList.SelectMany(t => t.Contexts ?? new List<string>()).Distinct().OrderBy(c => c).ToList();
+        if (!contextsUsed.Any() && filteredList.Any(t => !(t.Contexts ?? new List<string>()).Any())) contextsUsed.Add("No Context");
 
         @foreach (var context in contextsUsed)
         {
             var contextTasks = context == "No Context"
-                ? filteredList.Where(t => !t.Contexts.Any()).ToList()
-                : filteredList.Where(t => t.Contexts.Contains(context)).ToList();
+                ? filteredList.Where(t => !(t.Contexts ?? new List<string>()).Any()).ToList()
+                : filteredList.Where(t => (t.Contexts ?? new List<string>()).Contains(context)).ToList();
 
             if (contextTasks.Any())
             {
@@ -290,8 +290,16 @@ else
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-        <button class="btn btn-primary" @onclick="SaveTask" disabled="@string.IsNullOrWhiteSpace(_taskTitle)">
-            @(_editingTask == null ? "Create" : "Save")
+        <button class="btn btn-primary" @onclick="SaveTask" disabled="@(string.IsNullOrWhiteSpace(_taskTitle) || _isSaving)">
+            @if (_isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Saving...</span>
+            }
+            else
+            {
+                @(_editingTask == null ? "Create" : "Save")
+            }
         </button>
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
@@ -308,6 +316,7 @@ else
 @code {
     private List<TodoTask> _tasks = new();
     private bool _isLoading = true;
+    private bool _isSaving = false;
     private string _groupBy = "none";
     private int? _energyFilter = null;
     private bool _showModal = false;
@@ -440,8 +449,10 @@ else
         _taskEnergyLevel = task.EnergyLevel;
         _taskCategory = task.Category ?? string.Empty;
         _taskWhoFor = task.WhoFor ?? string.Empty;
-        _taskTagsInput = task.Tags.Any() ? string.Join(", ", task.Tags) : string.Empty;
-        _taskLinksInput = task.Links.Any() ? string.Join("\n", task.Links) : string.Empty;
+        var editTaskTags = task.Tags ?? new List<string>();
+        var editTaskLinks = task.Links ?? new List<string>();
+        _taskTagsInput = editTaskTags.Any() ? string.Join(", ", editTaskTags) : string.Empty;
+        _taskLinksInput = editTaskLinks.Any() ? string.Join("\n", editTaskLinks) : string.Empty;
         _taskRequiresDeepWork = task.RequiresDeepWork;
         _taskIsRecurring = task.IsRecurring;
         _taskRecurrencePattern = task.RecurrencePattern ?? RecurrencePattern.Daily;
@@ -451,8 +462,8 @@ else
         _showAdvancedOptions = _taskEnergyLevel.HasValue ||
                                !string.IsNullOrEmpty(_taskCategory) ||
                                !string.IsNullOrEmpty(_taskWhoFor) ||
-                               task.Tags.Any() ||
-                               task.Links.Any() ||
+                               editTaskTags.Any() ||
+                               editTaskLinks.Any() ||
                                _taskRequiresDeepWork ||
                                _taskIsRecurring;
 
@@ -475,79 +486,87 @@ else
 
     private async Task SaveTask()
     {
-        if (string.IsNullOrWhiteSpace(_taskTitle)) return;
+        if (string.IsNullOrWhiteSpace(_taskTitle) || _isSaving) return;
 
-        // Parse tags and links from input strings
-        var tags = string.IsNullOrWhiteSpace(_taskTagsInput)
-            ? new List<string>()
-            : _taskTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-        var links = string.IsNullOrWhiteSpace(_taskLinksInput)
-            ? new List<string>()
-            : _taskLinksInput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-        // Determine status based on scheduled date
-        var status = _taskScheduledDate.HasValue ? TodoTaskStatus.Scheduled : TodoTaskStatus.NextAction;
-
-        if (_editingTask == null)
+        _isSaving = true;
+        try
         {
-            var task = new TodoTask
+            // Parse tags and links from input strings
+            var tags = string.IsNullOrWhiteSpace(_taskTagsInput)
+                ? new List<string>()
+                : _taskTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            var links = string.IsNullOrWhiteSpace(_taskLinksInput)
+                ? new List<string>()
+                : _taskLinksInput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+            // Determine status based on scheduled date
+            var status = _taskScheduledDate.HasValue ? TodoTaskStatus.Scheduled : TodoTaskStatus.NextAction;
+
+            if (_editingTask == null)
             {
-                Title = _taskTitle,
-                Description = _taskDescription,
-                Status = status,
-                EstimatedMinutes = _taskEstimatedMinutes,
-                Priority = _taskPriority,
-                DueDate = _taskDueDate,
-                ScheduledDate = _taskScheduledDate,
-                Contexts = _selectedContexts.ToList(),
+                var task = new TodoTask
+                {
+                    Title = _taskTitle,
+                    Description = _taskDescription,
+                    Status = status,
+                    EstimatedMinutes = _taskEstimatedMinutes,
+                    Priority = _taskPriority,
+                    DueDate = _taskDueDate,
+                    ScheduledDate = _taskScheduledDate,
+                    Contexts = _selectedContexts.ToList(),
+                    // Advanced options
+                    EnergyLevel = _taskEnergyLevel,
+                    Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory,
+                    WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor,
+                    Tags = tags,
+                    Links = links,
+                    RequiresDeepWork = _taskRequiresDeepWork,
+                    IsRecurring = _taskIsRecurring,
+                    RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null,
+                    RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null
+                };
+                await TaskService.CreateAsync(task);
+            }
+            else
+            {
+                _editingTask.Title = _taskTitle;
+                _editingTask.Description = _taskDescription;
+                _editingTask.EstimatedMinutes = _taskEstimatedMinutes;
+                _editingTask.Priority = _taskPriority;
+                _editingTask.DueDate = _taskDueDate;
+                _editingTask.ScheduledDate = _taskScheduledDate;
+                _editingTask.Contexts = _selectedContexts.ToList();
+                // Update status based on scheduled date
+                if (_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.NextAction)
+                {
+                    _editingTask.Status = TodoTaskStatus.Scheduled;
+                }
+                else if (!_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.Scheduled)
+                {
+                    _editingTask.Status = TodoTaskStatus.NextAction;
+                }
                 // Advanced options
-                EnergyLevel = _taskEnergyLevel,
-                Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory,
-                WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor,
-                Tags = tags,
-                Links = links,
-                RequiresDeepWork = _taskRequiresDeepWork,
-                IsRecurring = _taskIsRecurring,
-                RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null,
-                RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null
-            };
-            await TaskService.CreateAsync(task);
-        }
-        else
-        {
-            _editingTask.Title = _taskTitle;
-            _editingTask.Description = _taskDescription;
-            _editingTask.EstimatedMinutes = _taskEstimatedMinutes;
-            _editingTask.Priority = _taskPriority;
-            _editingTask.DueDate = _taskDueDate;
-            _editingTask.ScheduledDate = _taskScheduledDate;
-            _editingTask.Contexts = _selectedContexts.ToList();
-            // Update status based on scheduled date
-            if (_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.NextAction)
-            {
-                _editingTask.Status = TodoTaskStatus.Scheduled;
+                _editingTask.EnergyLevel = _taskEnergyLevel;
+                _editingTask.Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory;
+                _editingTask.WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor;
+                _editingTask.Tags = tags;
+                _editingTask.Links = links;
+                _editingTask.RequiresDeepWork = _taskRequiresDeepWork;
+                _editingTask.IsRecurring = _taskIsRecurring;
+                _editingTask.RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null;
+                _editingTask.RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null;
+                await TaskService.UpdateAsync(_editingTask);
             }
-            else if (!_taskScheduledDate.HasValue && _editingTask.Status == TodoTaskStatus.Scheduled)
-            {
-                _editingTask.Status = TodoTaskStatus.NextAction;
-            }
-            // Advanced options
-            _editingTask.EnergyLevel = _taskEnergyLevel;
-            _editingTask.Category = string.IsNullOrWhiteSpace(_taskCategory) ? null : _taskCategory;
-            _editingTask.WhoFor = string.IsNullOrWhiteSpace(_taskWhoFor) ? null : _taskWhoFor;
-            _editingTask.Tags = tags;
-            _editingTask.Links = links;
-            _editingTask.RequiresDeepWork = _taskRequiresDeepWork;
-            _editingTask.IsRecurring = _taskIsRecurring;
-            _editingTask.RecurrencePattern = _taskIsRecurring ? _taskRecurrencePattern : null;
-            _editingTask.RecurrenceIntervalDays = _taskIsRecurring && _taskRecurrencePattern == RecurrencePattern.Custom ? _taskRecurrenceIntervalDays : null;
-            await TaskService.UpdateAsync(_editingTask);
-        }
 
-        CloseModal();
-        DataChangeNotification.NotifyDataChanged();
-        await LoadTasks();
+            CloseModal();
+            DataChangeNotification.NotifyDataChanged();
+            await LoadTasks();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private async Task CompleteTask(TodoTask task)

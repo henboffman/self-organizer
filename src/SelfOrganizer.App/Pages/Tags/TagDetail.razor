@@ -274,7 +274,7 @@ else
 
             foreach (var task in _taggedTasks)
             {
-                foreach (var tag in task.Tags.Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
+                foreach (var tag in (task.Tags ?? new List<string>()).Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
                 {
                     var lowerTag = tag.ToLowerInvariant();
                     relatedTagCounts[lowerTag] = relatedTagCounts.GetValueOrDefault(lowerTag) + 1;
@@ -283,7 +283,7 @@ else
 
             foreach (var evt in _taggedEvents)
             {
-                foreach (var tag in evt.Tags.Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
+                foreach (var tag in (evt.Tags ?? new List<string>()).Where(t => !TagParsingService.TagsMatch(t, normalizedTag)))
                 {
                     var lowerTag = tag.ToLowerInvariant();
                     relatedTagCounts[lowerTag] = relatedTagCounts.GetValueOrDefault(lowerTag) + 1;

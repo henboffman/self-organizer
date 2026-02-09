@@ -139,9 +139,10 @@
     protected override void OnParametersSet()
     {
         // Initialize tags input from Goal.Tags
-        if (Goal.Tags.Any())
+        var goalFormTags = Goal.Tags ?? new List<string>();
+        if (goalFormTags.Any())
         {
-            _tagsInput = string.Join(" ", Goal.Tags.Select(t => $"#{t}"));
+            _tagsInput = string.Join(" ", goalFormTags.Select(t => $"#{t}"));
         }
         else
         {

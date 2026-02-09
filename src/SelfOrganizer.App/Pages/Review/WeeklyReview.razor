@@ -9,6 +9,7 @@
 @inject SelfOrganizer.Core.Interfaces.IRepository<Habit> HabitRepository
 @inject SelfOrganizer.Core.Interfaces.IRepository<HabitLog> HabitLogRepository
 @inject IDataChangeNotificationService DataChangeNotification
+@inject SelfOrganizer.Core.Interfaces.IGrowthContextService GrowthContextService
 @inject NavigationManager NavigationManager
 
 <div class="weekly-review">
@@ -612,6 +613,9 @@
         {
             await WeeklySnapshotRepository.UpdateAsync(_snapshot);
         }
+
+        // Auto-capture growth snapshot on weekly review completion
+        await GrowthContextService.AutoSnapshotIfDueAsync();
 
         DataChangeNotification.NotifyDataChanged();
         _alreadyCompleted = true;

@@ -20,4 +20,28 @@ public interface IProjectService
     /// More efficient than calling GetProgressAsync for each project individually.
     /// </summary>
     Task<Dictionary<Guid, (int completed, int total)>> GetProgressBatchAsync(IEnumerable<Guid> projectIds);
+
+    /// <summary>
+    /// Sets the designated next action task for a project.
+    /// Demotes any existing NextAction status tasks in the project to Active.
+    /// </summary>
+    /// <param name="projectId">The project ID</param>
+    /// <param name="taskId">The task to designate as next action, or null to clear</param>
+    Task SetNextActionAsync(Guid projectId, Guid? taskId);
+
+    /// <summary>
+    /// Clears the next action if the specified task matches.
+    /// Called when a task is completed or deleted.
+    /// </summary>
+    Task ClearNextActionIfMatchesAsync(Guid projectId, Guid taskId);
+
+    /// <summary>
+    /// Links a skill to this project (bidirectional).
+    /// </summary>
+    Task LinkSkillAsync(Guid projectId, Guid skillId);
+
+    /// <summary>
+    /// Unlinks a skill from this project (bidirectional).
+    /// </summary>
+    Task UnlinkSkillAsync(Guid projectId, Guid skillId);
 }

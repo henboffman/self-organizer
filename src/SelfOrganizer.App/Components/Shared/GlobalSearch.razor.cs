@@ -183,13 +183,13 @@ public partial class GlobalSearch : IDisposable
     {
         var url = action.Id switch
         {
-            "capture" => "/capture",
-            "inbox" => "/inbox",
-            "tasks" => "/tasks",
-            "projects" => "/projects",
-            "calendar" => "/calendar",
-            "review" => "/review/daily",
-            _ => "/"
+            "capture" => "capture",
+            "inbox" => "inbox",
+            "tasks" => "tasks",
+            "projects" => "projects",
+            "calendar" => "calendar",
+            "review" => "review/daily",
+            _ => ""
         };
 
         NavigationManager.NavigateTo(url);

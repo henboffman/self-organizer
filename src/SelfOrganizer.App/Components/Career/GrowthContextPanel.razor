@@ -1,0 +1,195 @@
+@using SelfOrganizer.Core.Models
+
+<div class="growth-context-panel">
+    @* Metrics row *@
+    <div class="context-metrics-row">
+        <div class="context-metric-card">
+            <div class="context-metric-value">@Context.TasksCompleted</div>
+            <div class="context-metric-label">Tasks</div>
+        </div>
+        <div class="context-metric-card">
+            <div class="context-metric-value">@FormatFocusTime(Context.FocusMinutes)</div>
+            <div class="context-metric-label">Focus</div>
+        </div>
+        <div class="context-metric-card">
+            <div class="context-metric-value">@FormatRate(Context.HabitCompletionRate)</div>
+            <div class="context-metric-label">Habits</div>
+        </div>
+        <div class="context-metric-card">
+            <div class="context-metric-value">@FormatEnergy(Context.AverageEnergy)</div>
+            <div class="context-metric-label">Energy</div>
+        </div>
+    </div>
+
+    @if (!Compact)
+    {
+        @* Skills section *@
+        @if (Context.HasSnapshot && Context.Skills.Count > 0)
+        {
+            <div class="context-section">
+                <h6 class="context-section-title">Skills</h6>
+                <div class="context-skills-list">
+                    @foreach (var skill in Context.Skills)
+                    {
+                        <div class="context-skill-row">
+                            <span class="context-skill-name">@skill.Name</span>
+                            <span class="context-skill-stars">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    var idx = i;
+                                    <span class="@(idx <= skill.Proficiency ? "star-filled" : "star-empty")">@(idx <= skill.Proficiency ? "\u2605" : "\u2606")</span>
+                                }
+                            </span>
+                            @if (skill.PreviousProficiency.HasValue)
+                            {
+                                var delta = skill.Proficiency - skill.PreviousProficiency.Value;
+                                @if (delta > 0)
+                                {
+                                    <span class="context-delta delta-up" title="Improved from @skill.PreviousProficiency">\u2191</span>
+                                }
+                                else if (delta < 0)
+                                {
+                                    <span class="context-delta delta-down" title="Decreased from @skill.PreviousProficiency">\u2193</span>
+                                }
+                                else
+                                {
+                                    <span class="context-delta delta-same" title="No change">=</span>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Goals section *@
+        @if (Context.HasSnapshot && Context.Goals.Count > 0)
+        {
+            <div class="context-section">
+                <h6 class="context-section-title">Goals</h6>
+                <div class="context-goals-list">
+                    @foreach (var goal in Context.Goals)
+                    {
+                        <div class="context-goal-row">
+                            <div class="context-goal-header">
+                                <span class="context-goal-title">@goal.Title</span>
+                                @if (goal.PreviousProgressPercent.HasValue)
+                                {
+                                    var delta = goal.ProgressPercent - goal.PreviousProgressPercent.Value;
+                                    @if (delta > 0)
+                                    {
+                                        <span class="context-delta delta-up" title="Up from @(goal.PreviousProgressPercent)%">+@(delta)%</span>
+                                    }
+                                    else if (delta < 0)
+                                    {
+                                        <span class="context-delta delta-down" title="Down from @(goal.PreviousProgressPercent)%">@(delta)%</span>
+                                    }
+                                }
+                            </div>
+                            <div class="context-goal-bar">
+                                <div class="context-goal-bar-fill" style="width: @(goal.ProgressPercent)%"></div>
+                            </div>
+                            <span class="context-goal-pct">@(goal.ProgressPercent)%</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Activity section *@
+        @if (Context.TasksByContext.Count > 0 || Context.ActiveProjectNames.Count > 0 || Context.MilestonesCompletedInPeriod > 0)
+        {
+            <div class="context-section">
+                <h6 class="context-section-title">Activity</h6>
+                @if (Context.TasksByContext.Count > 0)
+                {
+                    <div class="context-detail-row">
+                        <span class="context-detail-label">Top contexts:</span>
+                        <span>@string.Join(", ", Context.TasksByContext.OrderByDescending(kv => kv.Value).Take(3).Select(kv => $"{kv.Key} ({kv.Value})"))</span>
+                    </div>
+                }
+                @if (Context.ActiveProjectNames.Count > 0)
+                {
+                    <div class="context-detail-row">
+                        <span class="context-detail-label">Active projects:</span>
+                        <span>@string.Join(", ", Context.ActiveProjectNames.Take(5))</span>
+                    </div>
+                }
+                @if (Context.MilestonesCompletedInPeriod > 0)
+                {
+                    <div class="context-detail-row">
+                        <span class="context-detail-label">Milestones:</span>
+                        <span>@string.Join(", ", Context.MilestonesCompletedNames)</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @* Wellbeing section *@
+        @if (Context.AverageEnergy.HasValue || Context.AverageMood.HasValue || Context.AverageWorkLifeBalance.HasValue)
+        {
+            <div class="context-section">
+                <h6 class="context-section-title">Wellbeing</h6>
+                <div class="context-wellbeing-row">
+                    @if (Context.AverageEnergy.HasValue)
+                    {
+                        <div class="context-wellbeing-item">
+                            <span class="context-wellbeing-label">Energy</span>
+                            <span class="context-wellbeing-value">@Context.AverageEnergy.Value.ToString("F1")/5</span>
+                        </div>
+                    }
+                    @if (Context.AverageMood.HasValue)
+                    {
+                        <div class="context-wellbeing-item">
+                            <span class="context-wellbeing-label">Mood</span>
+                            <span class="context-wellbeing-value">@Context.AverageMood.Value.ToString("F1")/5</span>
+                        </div>
+                    }
+                    @if (Context.AverageWorkLifeBalance.HasValue)
+                    {
+                        <div class="context-wellbeing-item">
+                            <span class="context-wellbeing-label">Balance</span>
+                            <span class="context-wellbeing-value">@Context.AverageWorkLifeBalance.Value.ToString("F1")/5</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Notes *@
+        @if (!string.IsNullOrWhiteSpace(Context.SnapshotNotes))
+        {
+            <div class="context-section">
+                <h6 class="context-section-title">Notes</h6>
+                <p class="context-notes">@Context.SnapshotNotes</p>
+            </div>
+        }
+
+        @* No snapshot prompt *@
+        @if (!Context.HasSnapshot)
+        {
+            <div class="context-no-snapshot">
+                <span class="oi oi-info me-1"></span>
+                Capture a snapshot to track skill & goal progress over time.
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public GrowthContextSummary Context { get; set; } = new();
+    [Parameter] public bool Compact { get; set; }
+
+    private string FormatFocusTime(int minutes)
+    {
+        if (minutes >= 60)
+            return $"{minutes / 60}h{(minutes % 60 > 0 ? $" {minutes % 60}m" : "")}";
+        return $"{minutes}m";
+    }
+
+    private string FormatRate(double rate) =>
+        $"{(rate * 100):F0}%";
+
+    private string FormatEnergy(double? energy) =>
+        energy.HasValue ? energy.Value.ToString("F1") : "--";
+}

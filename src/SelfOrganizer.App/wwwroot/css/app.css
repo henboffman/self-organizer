@@ -314,11 +314,17 @@ a:focus {
     border-bottom: 1px solid var(--card-border);
     color: var(--text-primary);
     font-weight: 600;
+    /* Match card's border-radius on top corners (subtract 1px for border) */
+    border-top-left-radius: calc(var(--radius-lg) - 1px);
+    border-top-right-radius: calc(var(--radius-lg) - 1px);
 }
 
 .card-footer {
     background-color: var(--bg-tertiary);
     border-top: 1px solid var(--card-border);
+    /* Match card's border-radius on bottom corners */
+    border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+    border-bottom-right-radius: calc(var(--radius-lg) - 1px);
 }
 
 .card-body {
@@ -371,6 +377,12 @@ a:focus {
 .badge {
     font-weight: 500;
     border-radius: var(--radius-sm);
+    /* Fix vertical text centering */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0.35em 0.65em;
 }
 
 .badge.bg-primary,
@@ -1142,6 +1154,7 @@ pre {
     z-index: 1050;
     width: 320px;
     background: var(--bg-primary);
+    color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
@@ -1164,6 +1177,12 @@ pre {
 .icon-picker-header .nav-link {
     font-size: 0.875rem;
     padding: 0.5rem 0.75rem;
+    color: var(--text-secondary);
+}
+
+.icon-picker-header .nav-link.active {
+    color: var(--text-primary);
+    background: var(--bg-primary);
 }
 
 .icon-picker-search {
@@ -1191,6 +1210,7 @@ pre {
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     background: transparent;
+    color: var(--text-primary);
     cursor: pointer;
     transition: all var(--transition-fast);
     font-size: 1rem;
@@ -1333,4 +1353,50 @@ pre {
     align-items: center;
     justify-content: center;
     margin-right: 0.25rem;
+}
+
+/* ----------------------------------------
+   Next Action Star & Pinning
+   ---------------------------------------- */
+.next-action-star {
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    opacity: 0.4;
+    transition: opacity var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.next-action-star:hover:not(:disabled) {
+    opacity: 0.8;
+    color: var(--color-warning);
+    transform: scale(1.1);
+}
+
+.next-action-star.active {
+    opacity: 1;
+    color: var(--color-warning);
+}
+
+.next-action-star:disabled {
+    cursor: not-allowed;
+    opacity: 0.2;
+}
+
+/* Pinned next action row styling */
+.task-row.pinned-next-action,
+.linked-item.pinned-next-action {
+    background-color: rgba(245, 158, 11, 0.08);
+    border-left: 3px solid var(--color-warning);
+    margin-left: -0.5rem;
+    padding-left: calc(0.5rem - 3px) !important;
+    border-radius: var(--radius-sm);
+}
+
+/* Dark mode adjustment for pinned row */
+[data-theme="dark"] .task-row.pinned-next-action,
+[data-theme="dark"] .linked-item.pinned-next-action {
+    background-color: rgba(245, 158, 11, 0.12);
 }

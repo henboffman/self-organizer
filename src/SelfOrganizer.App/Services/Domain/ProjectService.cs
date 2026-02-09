@@ -7,17 +7,20 @@ public class ProjectService : IProjectService
 {
     private readonly IRepository<Project> _repository;
     private readonly IRepository<Goal> _goalRepository;
+    private readonly IRepository<Skill> _skillRepository;
     private readonly ITaskService _taskService;
     private readonly IUserPreferencesProvider _preferencesProvider;
 
     public ProjectService(
         IRepository<Project> repository,
         IRepository<Goal> goalRepository,
+        IRepository<Skill> skillRepository,
         ITaskService taskService,
         IUserPreferencesProvider preferencesProvider)
     {
         _repository = repository;
         _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
         _taskService = taskService;
         _preferencesProvider = preferencesProvider;
     }
@@ -208,5 +211,110 @@ public class ProjectService : IProjectService
         }
 
         return result;
+    }
+
+    public async Task SetNextActionAsync(Guid projectId, Guid? taskId)
+    {
+        var project = await _repository.GetByIdAsync(projectId);
+        if (project == null)
+            throw new InvalidOperationException($"Project {projectId} not found");
+
+        // Validate task if provided
+        if (taskId.HasValue)
+        {
+            var task = await _taskService.GetByIdAsync(taskId.Value);
+            if (task == null)
+                throw new InvalidOperationException($"Task {taskId} not found");
+
+            // Task must belong to this project
+            if (task.ProjectId != projectId)
+                throw new InvalidOperationException("Task does not belong to this project");
+
+            // Task must be incomplete
+            if (task.Status == TodoTaskStatus.Completed || task.Status == TodoTaskStatus.Deleted)
+                throw new InvalidOperationException("Cannot set completed or deleted task as next action");
+        }
+
+        // Demote existing NextAction status tasks in this project to Active
+        var projectTasks = await _taskService.GetByProjectAsync(projectId);
+        foreach (var t in projectTasks.Where(t => t.Status == TodoTaskStatus.NextAction && t.Id != taskId))
+        {
+            t.Status = TodoTaskStatus.Active;
+            t.ModifiedAt = DateTime.UtcNow;
+            await _taskService.UpdateAsync(t);
+        }
+
+        // If setting a task as next action, ensure it has NextAction status
+        if (taskId.HasValue)
+        {
+            var task = await _taskService.GetByIdAsync(taskId.Value);
+            if (task != null && task.Status != TodoTaskStatus.NextAction)
+            {
+                task.Status = TodoTaskStatus.NextAction;
+                task.ModifiedAt = DateTime.UtcNow;
+                await _taskService.UpdateAsync(task);
+            }
+        }
+
+        // Update project with new next action
+        project.NextActionTaskId = taskId;
+        project.ModifiedAt = DateTime.UtcNow;
+        await _repository.UpdateAsync(project);
+    }
+
+    public async Task ClearNextActionIfMatchesAsync(Guid projectId, Guid taskId)
+    {
+        var project = await _repository.GetByIdAsync(projectId);
+        if (project?.NextActionTaskId == taskId)
+        {
+            project.NextActionTaskId = null;
+            project.ModifiedAt = DateTime.UtcNow;
+            await _repository.UpdateAsync(project);
+        }
+    }
+
+    public async Task LinkSkillAsync(Guid projectId, Guid skillId)
+    {
+        var project = await _repository.GetByIdAsync(projectId);
+        if (project == null)
+            throw new InvalidOperationException($"Project {projectId} not found");
+
+        var skill = await _skillRepository.GetByIdAsync(skillId);
+        if (skill == null)
+            throw new InvalidOperationException($"Skill {skillId} not found");
+
+        // Update project side
+        if (!project.LinkedSkillIds.Contains(skillId))
+        {
+            project.LinkedSkillIds.Add(skillId);
+            await _repository.UpdateAsync(project);
+        }
+
+        // Update skill side (bidirectional)
+        if (!skill.LinkedProjectIds.Contains(projectId))
+        {
+            skill.LinkedProjectIds.Add(projectId);
+            await _skillRepository.UpdateAsync(skill);
+        }
+    }
+
+    public async Task UnlinkSkillAsync(Guid projectId, Guid skillId)
+    {
+        var project = await _repository.GetByIdAsync(projectId);
+        if (project == null)
+            throw new InvalidOperationException($"Project {projectId} not found");
+
+        // Update project side
+        if (project.LinkedSkillIds.Remove(skillId))
+        {
+            await _repository.UpdateAsync(project);
+        }
+
+        // Update skill side (bidirectional)
+        var skill = await _skillRepository.GetByIdAsync(skillId);
+        if (skill != null && skill.LinkedProjectIds.Remove(projectId))
+        {
+            await _skillRepository.UpdateAsync(skill);
+        }
     }
 }

@@ -1,0 +1,212 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@inject ISkillService SkillService
+@inject IProjectService ProjectService
+
+<div class="project-skills-panel card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <span class="oi oi-star me-2"></span>Skills Used
+        </h6>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ShowLinkModal" title="Link skills">
+            <span class="oi oi-link-intact"></span>
+        </button>
+    </div>
+    <div class="card-body">
+        @if (_linkedSkills.Any())
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var skill in _linkedSkills)
+                {
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            @if (!string.IsNullOrEmpty(skill.Icon))
+                            {
+                                <span>@skill.Icon</span>
+                            }
+                            <span class="fw-semibold">@skill.Name</span>
+                            <span class="badge @GetTypeBadge(skill.Type)">@(skill.Type == SkillType.Have ? "Have" : "Want")</span>
+                            <span class="badge @GetCategoryBadge(skill.Category)">@GetCategoryLabel(skill.Category)</span>
+                        </div>
+                        <button class="btn btn-sm btn-ghost text-danger" @onclick="() => UnlinkSkill(skill)" title="Unlink skill">
+                            <span class="oi oi-x"></span>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-3">
+                <p class="text-muted small mb-0">
+                    No skills linked yet. Track the skills used or developed in this project.
+                </p>
+            </div>
+        }
+    </div>
+
+    @* Link Skill Modal *@
+    @if (_showLinkModal)
+    {
+        <div class="modal-backdrop fade show" @onclick="CloseLinkModal"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Link Skills to Project</h5>
+                        <button type="button" class="btn-close" @onclick="CloseLinkModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!_availableSkills.Any())
+                        {
+                            <p class="text-muted">No skills available to link. <a href="skills/new">Create a skill</a> first!</p>
+                        }
+                        else
+                        {
+                            <div class="list-group">
+                                @foreach (var skill in _availableSkills)
+                                {
+                                    var isLinked = Project?.LinkedSkillIds.Contains(skill.Id) ?? false;
+                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(isLinked ? "active" : "")"
+                                         @onclick="() => ToggleSkillLink(skill)" style="cursor: pointer;">
+                                        <div>
+                                            @if (!string.IsNullOrEmpty(skill.Icon))
+                                            {
+                                                <span class="me-1">@skill.Icon</span>
+                                            }
+                                            <span>@skill.Name</span>
+                                            <span class="badge @(isLinked ? "bg-light text-dark" : GetCategoryBadge(skill.Category)) ms-2">
+                                                @GetCategoryLabel(skill.Category)
+                                            </span>
+                                        </div>
+                                        @if (isLinked)
+                                        {
+                                            <span class="oi oi-check"></span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseLinkModal">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Project? Project { get; set; }
+
+    [Parameter]
+    public EventCallback<Project> ProjectChanged { get; set; }
+
+    private bool _showLinkModal = false;
+    private List<Skill> _linkedSkills = new();
+    private List<Skill> _availableSkills = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSkills();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadLinkedSkills();
+    }
+
+    private async Task LoadSkills()
+    {
+        _availableSkills = (await SkillService.GetActiveSkillsAsync()).OrderBy(s => s.Name).ToList();
+        await LoadLinkedSkills();
+    }
+
+    private async Task LoadLinkedSkills()
+    {
+        if (Project?.LinkedSkillIds == null || !Project.LinkedSkillIds.Any())
+        {
+            _linkedSkills = new();
+            return;
+        }
+
+        _linkedSkills = new List<Skill>();
+        foreach (var skillId in Project.LinkedSkillIds)
+        {
+            var skill = await SkillService.GetByIdAsync(skillId);
+            if (skill != null)
+            {
+                _linkedSkills.Add(skill);
+            }
+        }
+    }
+
+    private async Task ToggleSkillLink(Skill skill)
+    {
+        if (Project == null) return;
+
+        if (Project.LinkedSkillIds.Contains(skill.Id))
+        {
+            await ProjectService.UnlinkSkillAsync(Project.Id, skill.Id);
+            Project.LinkedSkillIds.Remove(skill.Id);
+        }
+        else
+        {
+            await ProjectService.LinkSkillAsync(Project.Id, skill.Id);
+            Project.LinkedSkillIds.Add(skill.Id);
+        }
+
+        await ProjectChanged.InvokeAsync(Project);
+        await LoadLinkedSkills();
+    }
+
+    private async Task UnlinkSkill(Skill skill)
+    {
+        if (Project == null) return;
+
+        await ProjectService.UnlinkSkillAsync(Project.Id, skill.Id);
+        Project.LinkedSkillIds.Remove(skill.Id);
+
+        await ProjectChanged.InvokeAsync(Project);
+        await LoadLinkedSkills();
+    }
+
+    private void ShowLinkModal()
+    {
+        _showLinkModal = true;
+    }
+
+    private void CloseLinkModal()
+    {
+        _showLinkModal = false;
+    }
+
+    private static string GetTypeBadge(SkillType type) => type switch
+    {
+        SkillType.Have => "bg-success",
+        SkillType.Want => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private static string GetCategoryBadge(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "bg-primary",
+        SkillCategory.SoftSkills => "bg-info",
+        SkillCategory.Creative => "bg-warning text-dark",
+        SkillCategory.DomainKnowledge => "bg-success",
+        SkillCategory.ToolsSoftware => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private static string GetCategoryLabel(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain",
+        SkillCategory.ToolsSoftware => "Tools",
+        _ => category.ToString()
+    };
+}

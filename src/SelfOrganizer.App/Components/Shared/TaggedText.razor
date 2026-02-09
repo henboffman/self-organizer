@@ -55,7 +55,7 @@ else
             // Add the styled tag
             if (Clickable)
             {
-                result.Append($"<a href=\"/tags/{System.Web.HttpUtility.UrlEncode(match.TagName)}\" class=\"tag-link\" onclick=\"event.stopPropagation();\">{System.Web.HttpUtility.HtmlEncode(match.FullMatch)}</a>");
+                result.Append($"<a href=\"tags/{System.Web.HttpUtility.UrlEncode(match.TagName)}\" class=\"tag-link\" onclick=\"event.stopPropagation();\">{System.Web.HttpUtility.HtmlEncode(match.FullMatch)}</a>");
             }
             else
             {

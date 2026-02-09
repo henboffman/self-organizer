@@ -78,7 +78,7 @@ else
                                     {
                                         <SelfOrganizer.App.Components.Shared.TimeDisplay Minutes="@task.EstimatedMinutes" />
                                     }
-                                    @foreach (var ctx in task.Contexts)
+                                    @foreach (var ctx in task.Contexts ?? new List<string>())
                                     {
                                         <SelfOrganizer.App.Components.Shared.ContextBadge Context="@ctx" />
                                     }

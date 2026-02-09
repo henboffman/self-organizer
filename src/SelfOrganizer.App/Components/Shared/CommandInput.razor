@@ -1,0 +1,301 @@
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services
+@inject INaturalLanguageCommandService CommandService
+@inject NavigationManager NavigationManager
+@inject IToastService ToastService
+
+<div class="command-input-wrapper @(_isExpanded ? "expanded" : "") @(_isFocused ? "focused" : "")">
+    @if (!_isExpanded)
+    {
+        <button class="command-trigger" @onclick="Expand" title="Enter a command (Press / or Ctrl+K)">
+            <span class="oi oi-terminal"></span>
+            <span class="trigger-text">Type a command...</span>
+            <span class="trigger-shortcut">/</span>
+        </button>
+    }
+    else
+    {
+        <div class="command-input-container">
+            <span class="oi oi-terminal input-icon"></span>
+            <input type="text"
+                   class="command-input"
+                   placeholder="@GetPlaceholder()"
+                   @bind="_inputValue"
+                   @bind:event="oninput"
+                   @ref="_inputRef"
+                   @onfocus="HandleFocus"
+                   @onblur="HandleBlur"
+                   @onkeydown="HandleKeyDown"
+                   autocomplete="off"
+                   spellcheck="false" />
+            @if (_isProcessing)
+            {
+                <span class="spinner-border spinner-border-sm processing-indicator"></span>
+            }
+            else if (!string.IsNullOrEmpty(_inputValue))
+            {
+                <button class="clear-btn" @onclick="ClearInput" type="button">
+                    <span class="oi oi-x"></span>
+                </button>
+            }
+        </div>
+
+        @if (_showSuggestions && _suggestions.Any())
+        {
+            <div class="suggestions-dropdown">
+                @foreach (var (suggestion, index) in _suggestions.Select((s, i) => (s, i)))
+                {
+                    <div class="suggestion-item @(index == _selectedSuggestionIndex ? "selected" : "")"
+                         @onclick="() => SelectSuggestion(suggestion)"
+                         @onmouseenter="() => _selectedSuggestionIndex = index">
+                        <span class="oi @suggestion.Icon suggestion-icon"></span>
+                        <div class="suggestion-content">
+                            <span class="suggestion-text">@suggestion.DisplayText</span>
+                            @if (!string.IsNullOrEmpty(suggestion.Description))
+                            {
+                                <span class="suggestion-description">@suggestion.Description</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_lastResult != null)
+        {
+            <div class="command-result @(_lastResult.Success ? "success" : "error")">
+                <span class="oi @(_lastResult.Success ? "oi-check" : "oi-warning")"></span>
+                <span class="result-message">@_lastResult.Message</span>
+                @if (!string.IsNullOrEmpty(_lastResult.NavigationUrl))
+                {
+                    <a href="@_lastResult.NavigationUrl" class="result-link">View</a>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public bool Compact { get; set; } = false;
+
+    [Parameter]
+    public EventCallback<CommandExecutionResult> OnCommandExecuted { get; set; }
+
+    private string _inputValue = string.Empty;
+    private bool _isExpanded = false;
+    private bool _isFocused = false;
+    private bool _isProcessing = false;
+    private bool _showSuggestions = false;
+    private int _selectedSuggestionIndex = 0;
+    private List<CommandSuggestion> _suggestions = new();
+    private CommandExecutionResult? _lastResult;
+    private ElementReference _inputRef;
+    private CancellationTokenSource? _suggestionDebounce;
+
+    private static readonly string[] _placeholders = new[]
+    {
+        "create task...",
+        "go to projects...",
+        "show tasks due today...",
+        "complete task...",
+        "focus on..."
+    };
+
+    private int _placeholderIndex = 0;
+
+    protected override void OnInitialized()
+    {
+        _placeholderIndex = Random.Shared.Next(_placeholders.Length);
+    }
+
+    private string GetPlaceholder()
+    {
+        return Compact ? "Command..." : _placeholders[_placeholderIndex];
+    }
+
+    private async Task Expand()
+    {
+        _isExpanded = true;
+        StateHasChanged();
+        await Task.Delay(50); // Allow DOM to update
+        await _inputRef.FocusAsync();
+    }
+
+    private void Collapse()
+    {
+        _isExpanded = false;
+        _inputValue = string.Empty;
+        _showSuggestions = false;
+        _lastResult = null;
+        _selectedSuggestionIndex = 0;
+    }
+
+    private void HandleFocus()
+    {
+        _isFocused = true;
+        _ = UpdateSuggestionsAsync();
+    }
+
+    private async Task HandleBlur()
+    {
+        await Task.Delay(200); // Allow click on suggestions
+        _isFocused = false;
+
+        if (string.IsNullOrEmpty(_inputValue) && _lastResult == null)
+        {
+            Collapse();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+                if (_showSuggestions && _selectedSuggestionIndex >= 0 && _selectedSuggestionIndex < _suggestions.Count)
+                {
+                    await SelectSuggestion(_suggestions[_selectedSuggestionIndex]);
+                }
+                else if (!string.IsNullOrWhiteSpace(_inputValue))
+                {
+                    await ExecuteCommandAsync();
+                }
+                break;
+
+            case "Escape":
+                if (_showSuggestions)
+                {
+                    _showSuggestions = false;
+                }
+                else
+                {
+                    Collapse();
+                }
+                break;
+
+            case "ArrowDown":
+                if (_showSuggestions && _suggestions.Any())
+                {
+                    _selectedSuggestionIndex = (_selectedSuggestionIndex + 1) % _suggestions.Count;
+                }
+                break;
+
+            case "ArrowUp":
+                if (_showSuggestions && _suggestions.Any())
+                {
+                    _selectedSuggestionIndex = _selectedSuggestionIndex <= 0
+                        ? _suggestions.Count - 1
+                        : _selectedSuggestionIndex - 1;
+                }
+                break;
+
+            case "Tab":
+                if (_showSuggestions && _selectedSuggestionIndex >= 0 && _selectedSuggestionIndex < _suggestions.Count)
+                {
+                    _inputValue = _suggestions[_selectedSuggestionIndex].Command;
+                    await UpdateSuggestionsAsync();
+                }
+                break;
+
+            default:
+                // Debounce suggestion updates
+                _suggestionDebounce?.Cancel();
+                _suggestionDebounce = new CancellationTokenSource();
+                try
+                {
+                    await Task.Delay(200, _suggestionDebounce.Token);
+                    await UpdateSuggestionsAsync();
+                }
+                catch (TaskCanceledException) { }
+                break;
+        }
+    }
+
+    private async Task UpdateSuggestionsAsync()
+    {
+        _suggestions = (await CommandService.GetSuggestionsAsync(_inputValue)).ToList();
+        _showSuggestions = _suggestions.Any();
+        _selectedSuggestionIndex = 0;
+        StateHasChanged();
+    }
+
+    private async Task SelectSuggestion(CommandSuggestion suggestion)
+    {
+        _inputValue = suggestion.Command;
+        _showSuggestions = false;
+
+        // If the suggestion ends with a space, wait for more input
+        if (suggestion.Command.EndsWith(" "))
+        {
+            await _inputRef.FocusAsync();
+        }
+        else
+        {
+            await ExecuteCommandAsync();
+        }
+    }
+
+    private async Task ExecuteCommandAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_inputValue)) return;
+
+        _isProcessing = true;
+        _showSuggestions = false;
+        StateHasChanged();
+
+        try
+        {
+            _lastResult = await CommandService.ProcessCommandAsync(_inputValue);
+
+            if (_lastResult.Success)
+            {
+                ToastService.ShowSuccess(_lastResult.Message);
+
+                // Clear input after successful command
+                _inputValue = string.Empty;
+
+                // Auto-collapse after a delay for successful commands
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    await InvokeAsync(() =>
+                    {
+                        if (_lastResult?.Success == true)
+                        {
+                            Collapse();
+                            StateHasChanged();
+                        }
+                    });
+                });
+            }
+            else
+            {
+                ToastService.ShowError(_lastResult.Error ?? "Command failed");
+            }
+
+            await OnCommandExecuted.InvokeAsync(_lastResult);
+        }
+        catch (Exception ex)
+        {
+            _lastResult = new CommandExecutionResult
+            {
+                Success = false,
+                Error = $"Error: {ex.Message}"
+            };
+            ToastService.ShowError(_lastResult.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearInput()
+    {
+        _inputValue = string.Empty;
+        _showSuggestions = false;
+        _lastResult = null;
+    }
+}

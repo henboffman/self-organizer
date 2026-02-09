@@ -1,0 +1,837 @@
+@page "/career/new"
+@page "/career/{PlanId:guid}/edit"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Components.Career
+@using SelfOrganizer.App.Services.Intelligence
+@inject SelfOrganizer.Core.Interfaces.ICareerPlanService CareerPlanService
+@inject SelfOrganizer.Core.Interfaces.IGoalService GoalService
+@inject SelfOrganizer.Core.Interfaces.ISkillService SkillService
+@inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
+@inject SelfOrganizer.App.Services.IDataChangeNotificationService DataChangeNotification
+@inject SelfOrganizer.App.Services.Intelligence.ICareerAiService CareerAiService
+@inject NavigationManager NavigationManager
+
+<div class="career-plan-edit-page">
+    <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary" @onclick="GoBack" title="Back to Career">
+                <span class="oi oi-arrow-left"></span>
+            </button>
+            <h3 class="mb-0">
+                <span class="oi oi-map me-2"></span>
+                @(IsEditMode ? "Edit Career Plan" : "New Career Plan")
+            </h3>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="GoBack">Cancel</button>
+            <button class="btn btn-primary" @onclick="SavePlan" disabled="@(!CanSave)">
+                <span class="oi oi-check me-1"></span>
+                @(IsEditMode ? "Save Changes" : "Create Plan")
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-danger">
+            Career plan not found. <a href="career">Return to Career</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                @* Basic Info *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" @bind="_plan.Title"
+                                   placeholder="e.g., Path to Staff Engineer" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" @bind="_plan.Description" rows="3"
+                                      placeholder="Describe your career growth strategy..."></textarea>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Current Role</label>
+                                <input type="text" class="form-control" @bind="_plan.CurrentRole"
+                                       placeholder="e.g., Senior Engineer" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Target Role</label>
+                                <input type="text" class="form-control" @bind="_plan.TargetRole"
+                                       placeholder="e.g., Staff Engineer" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* Milestones *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><span class="oi oi-flag me-1"></span> Milestones (@_plan.Milestones.Count)</h5>
+                        @if (!_showMilestoneForm)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" @onclick="ShowAddMilestone">
+                                <span class="oi oi-plus me-1"></span> Add
+                            </button>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (_showMilestoneForm)
+                        {
+                            <MilestoneForm Milestone="@_editingMilestone"
+                                           OnSave="OnMilestoneSaved"
+                                           OnCancel="CancelMilestoneForm" />
+                        }
+
+                        @if (_plan.Milestones.Count == 0 && !_showMilestoneForm)
+                        {
+                            <div class="text-center text-muted py-3">
+                                <p class="mb-2">No milestones yet. Add key milestones to track your progress.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var milestone in _plan.Milestones.OrderBy(m => m.SortOrder).ThenBy(m => m.TargetDate))
+                            {
+                                <MilestoneCard Milestone="milestone"
+                                               ShowActions="true"
+                                               OnEdit="EditMilestone"
+                                               OnRemove="RemoveMilestone"
+                                               OnComplete="CompleteMilestone" />
+                            }
+                        }
+                    </div>
+                </div>
+
+                @* AI Coaching Results (main area for visibility) *@
+                @if (_aiError != null)
+                {
+                    <div class="alert alert-warning alert-dismissible mb-4">
+                        <span class="oi oi-warning me-1"></span> @_aiError
+                        <button type="button" class="btn-close" @onclick="() => _aiError = null"></button>
+                    </div>
+                }
+
+                @if (_improvementResult != null)
+                {
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><span class="oi oi-lightbulb me-1"></span> AI Coaching Feedback</h5>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="DismissCoaching">Dismiss</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    @if (_improvementResult.GapAnalysisList.Any())
+                                    {
+                                        <h6 class="fw-bold">Gap Analysis</h6>
+                                        @if (_improvementResult.GapAnalysisList.Count == 1)
+                                        {
+                                            <p>@_improvementResult.GapAnalysisList[0]</p>
+                                        }
+                                        else
+                                        {
+                                            <ul>
+                                                @foreach (var item in _improvementResult.GapAnalysisList)
+                                                {
+                                                    <li>@item</li>
+                                                }
+                                            </ul>
+                                        }
+                                    }
+
+                                    @if (_improvementResult.TimelineAssessmentList.Any())
+                                    {
+                                        <h6 class="fw-bold">Timeline Assessment</h6>
+                                        @if (_improvementResult.TimelineAssessmentList.Count == 1)
+                                        {
+                                            <p>@_improvementResult.TimelineAssessmentList[0]</p>
+                                        }
+                                        else
+                                        {
+                                            <ul>
+                                                @foreach (var item in _improvementResult.TimelineAssessmentList)
+                                                {
+                                                    <li>@item</li>
+                                                }
+                                            </ul>
+                                        }
+                                    }
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    @if (_improvementResult.Strengths.Any())
+                                    {
+                                        <h6 class="fw-bold text-success">Strengths</h6>
+                                        <ul>
+                                            @foreach (var s in _improvementResult.Strengths)
+                                            {
+                                                <li>@s</li>
+                                            }
+                                        </ul>
+                                    }
+
+                                    @if (_improvementResult.Risks.Any())
+                                    {
+                                        <h6 class="fw-bold text-warning">Risks</h6>
+                                        <ul>
+                                            @foreach (var r in _improvementResult.Risks)
+                                            {
+                                                <li>@r</li>
+                                            }
+                                        </ul>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (_improvementResult.CoachingQuestions.Any())
+                            {
+                                <h6 class="fw-bold">Coaching Questions</h6>
+                                <ol class="mb-3">
+                                    @foreach (var q in _improvementResult.CoachingQuestions)
+                                    {
+                                        <li>@q</li>
+                                    }
+                                </ol>
+                            }
+
+                            @if (_improvementResult.SuggestedSkillAreas.Any())
+                            {
+                                <h6 class="fw-bold">Suggested Skill Areas</h6>
+                                <div>
+                                    @foreach (var skill in _improvementResult.SuggestedSkillAreas)
+                                    {
+                                        <span class="badge bg-info me-1 mb-1">@skill</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @* AI Suggested Milestones (main area for visibility) *@
+                @if (_milestoneResult != null && _milestoneResult.SuggestedMilestones.Any())
+                {
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><span class="oi oi-flag me-1"></span> Suggested Milestones</h5>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary" @onclick="AddSelectedMilestones"
+                                        disabled="@(!_selectedSuggestedMilestones.Any())">
+                                    <span class="oi oi-plus me-1"></span> Add Selected (@_selectedSuggestedMilestones.Count)
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="DismissMilestones">Dismiss</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                @for (var i = 0; i < _milestoneResult.SuggestedMilestones.Count; i++)
+                                {
+                                    var index = i;
+                                    var milestone = _milestoneResult.SuggestedMilestones[index];
+                                    var isSelected = _selectedSuggestedMilestones.Contains(index);
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100 @(isSelected ? "border-primary shadow-sm" : "")" style="cursor: pointer;"
+                                             @onclick="@(() => ToggleSuggestedMilestone(index))">
+                                            <div class="card-body p-3">
+                                                <div class="d-flex align-items-start gap-2">
+                                                    <input type="checkbox" class="form-check-input mt-1" checked="@isSelected"
+                                                           @onclick:stopPropagation="true"
+                                                           @onchange="@(() => ToggleSuggestedMilestone(index))" />
+                                                    <div class="flex-grow-1">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <strong>@milestone.Title</strong>
+                                                            <span class="badge bg-secondary">@milestone.Category</span>
+                                                        </div>
+                                                        <p class="text-muted mb-2 small">@milestone.Description</p>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span class="badge bg-info bg-opacity-25 text-info">in @milestone.TargetMonthsFromNow months</span>
+                                                        </div>
+                                                        <small class="text-muted fst-italic d-block mt-1">@milestone.Rationale</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Notes *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control" @bind="_plan.Notes" rows="4"
+                                  placeholder="Additional thoughts, strategies, or context..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                @* Settings *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-select" @bind="_plan.Status">
+                                @foreach (var status in Enum.GetValues<CareerPlanStatus>())
+                                {
+                                    <option value="@status">@FormatStatus(status)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Start Date</label>
+                            <input type="date" class="form-control" @bind="_plan.StartDate" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Target Date</label>
+                            <input type="date" class="form-control" @bind="_plan.TargetDate" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Color</label>
+                            <input type="color" class="form-control form-control-color" @bind="_plan.Color" />
+                        </div>
+                    </div>
+                </div>
+
+                @* Tags *@
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tags</h5>
+                    </div>
+                    <div class="card-body">
+                        <input type="text" class="form-control" @bind="_tagsInput" @bind:event="oninput"
+                               placeholder="#tag1 #tag2 #tag3" />
+                        <small class="text-muted">Use #hashtags separated by spaces</small>
+
+                        @if (_plan.Tags.Any())
+                        {
+                            <div class="mt-2">
+                                @foreach (var tag in _plan.Tags)
+                                {
+                                    <span class="badge bg-primary me-1">#@tag</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* Progress (edit mode only) *@
+                @if (IsEditMode)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Progress</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Milestone Progress</span>
+                                <span class="fw-bold">@_plan.ProgressPercent%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                     style="width: @_plan.ProgressPercent%">
+                                </div>
+                            </div>
+                            <small class="text-muted">Auto-calculated from milestone completion</small>
+                        </div>
+                    </div>
+                }
+
+                @* AI Career Coach *@
+                @if (_isAiAvailable)
+                {
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h5 class="mb-0"><span class="oi oi-lightbulb me-1"></span> AI Career Coach</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-outline-info" @onclick="GetCoaching" disabled="@_isLoadingCoaching">
+                                    @if (_isLoadingCoaching)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Analyzing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="oi oi-comment-square me-1"></span>
+                                        <span>Get AI Coaching</span>
+                                    }
+                                </button>
+                                <button class="btn btn-outline-info" @onclick="GenerateMilestones"
+                                        disabled="@(_isLoadingMilestones || !HasSufficientContext)">
+                                    @if (_isLoadingMilestones)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <span>Generating...</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="oi oi-flag me-1"></span>
+                                        <span>Suggest Milestones</span>
+                                    }
+                                </button>
+                                @if (!HasSufficientContext)
+                                {
+                                    <small class="text-muted">Fill in Current Role and Target Role to generate milestones.</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                }
+
+                @* Linked Goals *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><span class="oi oi-target me-1"></span> Linked Goals</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_availableGoals.Count == 0)
+                        {
+                            <small class="text-muted">No goals available to link.</small>
+                        }
+                        else
+                        {
+                            @foreach (var goal in _availableGoals)
+                            {
+                                var isLinked = _plan.LinkedGoalIds.Contains(goal.Id);
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" checked="@isLinked"
+                                           @onchange="() => ToggleGoalLink(goal.Id)" id="@($"goal-{goal.Id}")">
+                                    <label class="form-check-label small" for="@($"goal-{goal.Id}")">@goal.Title</label>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @* Linked Skills *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><span class="oi oi-star me-1"></span> Linked Skills</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_availableSkills.Count == 0)
+                        {
+                            <small class="text-muted">No skills available to link.</small>
+                        }
+                        else
+                        {
+                            @foreach (var skill in _availableSkills)
+                            {
+                                var isLinked = _plan.LinkedSkillIds.Contains(skill.Id);
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" checked="@isLinked"
+                                           @onchange="() => ToggleSkillLink(skill.Id)" id="@($"skill-{skill.Id}")">
+                                    <label class="form-check-label small" for="@($"skill-{skill.Id}")">@skill.Name</label>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @* Linked Projects *@
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><span class="oi oi-folder me-1"></span> Linked Projects</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (_availableProjects.Count == 0)
+                        {
+                            <small class="text-muted">No projects available to link.</small>
+                        }
+                        else
+                        {
+                            @foreach (var project in _availableProjects)
+                            {
+                                var isLinked = _plan.LinkedProjectIds.Contains(project.Id);
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" checked="@isLinked"
+                                           @onchange="() => ToggleProjectLink(project.Id)" id="@($"proj-{project.Id}")">
+                                    <label class="form-check-label small" for="@($"proj-{project.Id}")">@project.Name</label>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @* Delete *@
+                @if (IsEditMode)
+                {
+                    <div class="card border-danger mb-4">
+                        <div class="card-body">
+                            <button class="btn btn-outline-danger w-100" @onclick="DeletePlan">
+                                <span class="oi oi-trash me-1"></span> Archive Plan
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Mobile save bar *@
+        <div class="d-lg-none fixed-bottom bg-body border-top p-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary flex-fill" @onclick="GoBack">Cancel</button>
+                <button class="btn btn-primary flex-fill" @onclick="SavePlan" disabled="@(!CanSave)">
+                    <span class="oi oi-check me-1"></span>
+                    @(IsEditMode ? "Save" : "Create")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? PlanId { get; set; }
+
+    private CareerPlan _plan = new();
+    private string _tagsInput = "";
+    private bool _isLoading = true;
+    private bool _notFound;
+    private bool _showMilestoneForm;
+    private CareerMilestone? _editingMilestone;
+
+    private List<Goal> _availableGoals = new();
+    private List<Skill> _availableSkills = new();
+    private List<Project> _availableProjects = new();
+
+    // AI Career Coach state
+    private bool _isAiAvailable;
+    private bool _isLoadingCoaching;
+    private bool _isLoadingMilestones;
+    private CareerPlanImprovementResult? _improvementResult;
+    private MilestoneGenerationResult? _milestoneResult;
+    private HashSet<int> _selectedSuggestedMilestones = new();
+    private string? _aiError;
+
+    private bool IsEditMode => PlanId.HasValue;
+    private bool CanSave => !string.IsNullOrWhiteSpace(_plan.Title) && _plan.Title.Length >= 3;
+    private bool HasSufficientContext => !string.IsNullOrWhiteSpace(_plan.CurrentRole) && !string.IsNullOrWhiteSpace(_plan.TargetRole);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load available entities for linking
+        var goalsTask = GoalService.GetAllAsync();
+        var skillsTask = SkillService.GetAllAsync();
+        var projectsTask = ProjectService.GetAllAsync();
+
+        await Task.WhenAll(goalsTask, skillsTask, projectsTask);
+
+        _availableGoals = (await goalsTask).Where(g => g.Status != GoalStatus.Archived).ToList();
+        _availableSkills = (await skillsTask).ToList();
+        _availableProjects = (await projectsTask).Where(p => p.Status != ProjectStatus.Deleted).ToList();
+
+        if (IsEditMode)
+        {
+            var existing = await CareerPlanService.GetByIdAsync(PlanId!.Value);
+            if (existing == null)
+            {
+                _notFound = true;
+            }
+            else
+            {
+                _plan = new CareerPlan
+                {
+                    Id = existing.Id,
+                    Title = existing.Title,
+                    Description = existing.Description,
+                    CurrentRole = existing.CurrentRole,
+                    TargetRole = existing.TargetRole,
+                    Status = existing.Status,
+                    StartDate = existing.StartDate,
+                    TargetDate = existing.TargetDate,
+                    Icon = existing.Icon,
+                    Color = existing.Color,
+                    Milestones = existing.Milestones.Select(m => new CareerMilestone
+                    {
+                        Id = m.Id,
+                        Title = m.Title,
+                        Description = m.Description,
+                        Category = m.Category,
+                        Status = m.Status,
+                        TargetDate = m.TargetDate,
+                        CompletedDate = m.CompletedDate,
+                        SortOrder = m.SortOrder,
+                        Icon = m.Icon,
+                        Color = m.Color,
+                        LinkedGoalIds = new List<Guid>(m.LinkedGoalIds),
+                        LinkedSkillIds = new List<Guid>(m.LinkedSkillIds)
+                    }).ToList(),
+                    LinkedGoalIds = new List<Guid>(existing.LinkedGoalIds),
+                    LinkedSkillIds = new List<Guid>(existing.LinkedSkillIds),
+                    LinkedProjectIds = new List<Guid>(existing.LinkedProjectIds),
+                    LinkedHabitIds = new List<Guid>(existing.LinkedHabitIds),
+                    Tags = new List<string>(existing.Tags),
+                    Notes = existing.Notes,
+                    CreatedAt = existing.CreatedAt,
+                    ModifiedAt = existing.ModifiedAt
+                };
+                _tagsInput = string.Join(" ", _plan.Tags.Select(t => $"#{t}"));
+            }
+        }
+        else
+        {
+            _plan = new CareerPlan
+            {
+                Status = CareerPlanStatus.Draft,
+                StartDate = DateTime.UtcNow
+            };
+        }
+        _isLoading = false;
+
+        // Check AI availability (fire and forget to not block page load)
+        try { _isAiAvailable = await CareerAiService.IsAvailableAsync(); } catch { _isAiAvailable = false; }
+    }
+
+    private void ShowAddMilestone()
+    {
+        _editingMilestone = null;
+        _showMilestoneForm = true;
+    }
+
+    private void EditMilestone(CareerMilestone milestone)
+    {
+        _editingMilestone = milestone;
+        _showMilestoneForm = true;
+    }
+
+    private void CancelMilestoneForm()
+    {
+        _showMilestoneForm = false;
+        _editingMilestone = null;
+    }
+
+    private void OnMilestoneSaved(CareerMilestone milestone)
+    {
+        if (_editingMilestone != null)
+        {
+            var index = _plan.Milestones.FindIndex(m => m.Id == _editingMilestone.Id);
+            if (index >= 0)
+                _plan.Milestones[index] = milestone;
+        }
+        else
+        {
+            milestone.SortOrder = _plan.Milestones.Count;
+            _plan.Milestones.Add(milestone);
+        }
+
+        _showMilestoneForm = false;
+        _editingMilestone = null;
+    }
+
+    private void RemoveMilestone(CareerMilestone milestone)
+    {
+        _plan.Milestones.RemoveAll(m => m.Id == milestone.Id);
+    }
+
+    private void CompleteMilestone(CareerMilestone milestone)
+    {
+        var m = _plan.Milestones.FirstOrDefault(x => x.Id == milestone.Id);
+        if (m != null)
+        {
+            m.Status = MilestoneStatus.Completed;
+            m.CompletedDate = DateTime.UtcNow;
+        }
+    }
+
+    private void ToggleGoalLink(Guid goalId)
+    {
+        if (_plan.LinkedGoalIds.Contains(goalId))
+            _plan.LinkedGoalIds.Remove(goalId);
+        else
+            _plan.LinkedGoalIds.Add(goalId);
+    }
+
+    private void ToggleSkillLink(Guid skillId)
+    {
+        if (_plan.LinkedSkillIds.Contains(skillId))
+            _plan.LinkedSkillIds.Remove(skillId);
+        else
+            _plan.LinkedSkillIds.Add(skillId);
+    }
+
+    private void ToggleProjectLink(Guid projectId)
+    {
+        if (_plan.LinkedProjectIds.Contains(projectId))
+            _plan.LinkedProjectIds.Remove(projectId);
+        else
+            _plan.LinkedProjectIds.Add(projectId);
+    }
+
+    private async Task SavePlan()
+    {
+        if (!CanSave) return;
+
+        _plan.Tags = ParseTags(_tagsInput);
+        _plan.ModifiedAt = DateTime.UtcNow;
+
+        if (IsEditMode)
+        {
+            await CareerPlanService.UpdateAsync(_plan);
+        }
+        else
+        {
+            _plan.CreatedAt = DateTime.UtcNow;
+            await CareerPlanService.CreateAsync(_plan);
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        NavigationManager.NavigateTo("career");
+    }
+
+    private async Task DeletePlan()
+    {
+        if (IsEditMode)
+        {
+            await CareerPlanService.DeleteAsync(PlanId!.Value);
+            DataChangeNotification.NotifyDataChanged();
+        }
+        NavigationManager.NavigateTo("career");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("career");
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string FormatStatus(CareerPlanStatus status) => status switch
+    {
+        CareerPlanStatus.OnHold => "On Hold",
+        _ => status.ToString()
+    };
+
+    // AI Career Coach methods
+
+    private async Task GetCoaching()
+    {
+        _isLoadingCoaching = true;
+        _improvementResult = null;
+        _aiError = null;
+        StateHasChanged();
+
+        try
+        {
+            _improvementResult = await CareerAiService.ImprovePlanAsync(_plan);
+            if (_improvementResult == null)
+                _aiError = "AI coaching returned no results. Try adding more detail to your plan and retry.";
+        }
+        catch (Exception ex)
+        {
+            _aiError = $"AI coaching failed: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingCoaching = false;
+        }
+    }
+
+    private async Task GenerateMilestones()
+    {
+        if (!HasSufficientContext) return;
+
+        _isLoadingMilestones = true;
+        _milestoneResult = null;
+        _selectedSuggestedMilestones.Clear();
+        _aiError = null;
+        StateHasChanged();
+
+        try
+        {
+            _milestoneResult = await CareerAiService.GenerateMilestonesAsync(_plan);
+            if (_milestoneResult == null || !_milestoneResult.SuggestedMilestones.Any())
+                _aiError = "AI returned no milestone suggestions. Try adding more detail to your plan and retry.";
+        }
+        catch (Exception ex)
+        {
+            _aiError = $"Milestone generation failed: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingMilestones = false;
+        }
+    }
+
+    private void ToggleSuggestedMilestone(int index)
+    {
+        if (!_selectedSuggestedMilestones.Remove(index))
+            _selectedSuggestedMilestones.Add(index);
+    }
+
+    private void AddSelectedMilestones()
+    {
+        if (_milestoneResult == null || !_selectedSuggestedMilestones.Any()) return;
+
+        var sortedIndices = _selectedSuggestedMilestones.OrderBy(i => i).ToList();
+        foreach (var (index, offset) in sortedIndices.Select((idx, offset) => (idx, offset)))
+        {
+            var suggested = _milestoneResult.SuggestedMilestones[index];
+            _plan.Milestones.Add(new CareerMilestone
+            {
+                Id = Guid.NewGuid(),
+                Title = suggested.Title,
+                Description = suggested.Description,
+                Category = Enum.TryParse<MilestoneCategory>(suggested.Category, true, out var cat) ? cat : MilestoneCategory.Other,
+                Status = MilestoneStatus.NotStarted,
+                TargetDate = DateTime.UtcNow.AddMonths(suggested.TargetMonthsFromNow),
+                SortOrder = _plan.Milestones.Count + offset
+            });
+        }
+
+        _milestoneResult = null;
+        _selectedSuggestedMilestones.Clear();
+    }
+
+    private void DismissCoaching()
+    {
+        _improvementResult = null;
+    }
+
+    private void DismissMilestones()
+    {
+        _milestoneResult = null;
+        _selectedSuggestedMilestones.Clear();
+    }
+}

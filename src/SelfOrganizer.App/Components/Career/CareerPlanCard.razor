@@ -1,0 +1,172 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Components.Career
+
+<div class="card mb-3 career-plan-card @(Plan.Status == CareerPlanStatus.Active ? "border-primary" : "") @(IsExpanded ? "border-2" : "")" style="overflow: hidden; cursor: pointer;" @onclick="HandleClick">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1 min-width-0">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    @if (!string.IsNullOrEmpty(Plan.Icon))
+                    {
+                        <span class="@Plan.Icon"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-map"></span>
+                    }
+                    <h5 class="mb-0 text-truncate" style="max-width: 100%;">
+                        <a href="career/@Plan.Id/edit" class="text-decoration-none">@Plan.Title</a>
+                    </h5>
+                    <span class="badge @GetStatusBadgeClass()">@Plan.Status</span>
+                    @if (IsDemoData)
+                    {
+                        <span class="badge bg-warning text-dark">Demo</span>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(Plan.CurrentRole) || !string.IsNullOrEmpty(Plan.TargetRole))
+                {
+                    <div class="text-muted small mb-2">
+                        @if (!string.IsNullOrEmpty(Plan.CurrentRole))
+                        {
+                            <span>@Plan.CurrentRole</span>
+                        }
+                        @if (!string.IsNullOrEmpty(Plan.CurrentRole) && !string.IsNullOrEmpty(Plan.TargetRole))
+                        {
+                            <span class="oi oi-arrow-right mx-1" style="font-size: 0.7em;"></span>
+                        }
+                        @if (!string.IsNullOrEmpty(Plan.TargetRole))
+                        {
+                            <strong>@Plan.TargetRole</strong>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Plan.Description))
+                {
+                    <p class="text-muted small mb-2">@TruncateDescription(Plan.Description)</p>
+                }
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+            <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3 small text-muted">
+                @if (Plan.Milestones.Count > 0)
+                {
+                    var completed = Plan.Milestones.Count(m => m.Status == MilestoneStatus.Completed);
+                    <span>
+                        <span class="oi oi-flag me-1"></span>
+                        @completed / @Plan.Milestones.Count milestones
+                    </span>
+                }
+                @if (Plan.TargetDate.HasValue)
+                {
+                    <span>
+                        <span class="oi oi-calendar me-1"></span>
+                        @Plan.TargetDate.Value.ToString("MMM yyyy")
+                    </span>
+                }
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="progress" style="width: 100px; height: 6px;">
+                        <div class="progress-bar @GetProgressBarClass()" role="progressbar"
+                             style="width: @Plan.ProgressPercent%"
+                             aria-valuenow="@Plan.ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    <small class="text-muted fw-bold">@Plan.ProgressPercent%</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (IsExpanded)
+    {
+        <div class="card-footer bg-light" @onclick:stopPropagation="true">
+            @if (!string.IsNullOrEmpty(Plan.Description))
+            {
+                <p class="small mb-2">@Plan.Description</p>
+            }
+
+            @if (!string.IsNullOrEmpty(Plan.CurrentRole) || !string.IsNullOrEmpty(Plan.TargetRole))
+            {
+                <div class="d-flex gap-3 small text-muted mb-2">
+                    @if (!string.IsNullOrEmpty(Plan.CurrentRole))
+                    {
+                        <span>Current: <strong>@Plan.CurrentRole</strong></span>
+                    }
+                    @if (!string.IsNullOrEmpty(Plan.TargetRole))
+                    {
+                        <span>Target: <strong>@Plan.TargetRole</strong></span>
+                    }
+                </div>
+            }
+
+            @if (Plan.Milestones.Any())
+            {
+                <h6 class="small fw-bold mb-2">Milestones (@Plan.Milestones.Count)</h6>
+                <div class="d-flex flex-column gap-1 mb-2">
+                    @foreach (var milestone in Plan.Milestones.OrderBy(m => m.SortOrder))
+                    {
+                        <MilestoneCard Milestone="milestone" />
+                    }
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Plan.Notes))
+            {
+                <div class="mt-2">
+                    <h6 class="small fw-bold mb-1">Notes</h6>
+                    <p class="small text-muted mb-0" style="white-space: pre-wrap;">@Plan.Notes</p>
+                </div>
+            }
+
+            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                <div class="small text-muted">
+                    @if (Plan.StartDate.HasValue)
+                    {
+                        <span class="me-3"><span class="oi oi-calendar me-1"></span>Started @Plan.StartDate.Value.ToString("MMM yyyy")</span>
+                    }
+                    <span>Created @Plan.CreatedAt.ToString("MMM d, yyyy")</span>
+                </div>
+                <a href="career/@Plan.Id/edit" class="btn btn-sm btn-outline-primary" @onclick:stopPropagation="true">
+                    <span class="oi oi-pencil me-1"></span> Edit
+                </a>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CareerPlan Plan { get; set; } = default!;
+    [Parameter] public bool IsDemoData { get; set; }
+    [Parameter] public bool IsExpanded { get; set; }
+    [Parameter] public EventCallback<CareerPlan> OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        await OnClick.InvokeAsync(Plan);
+    }
+
+    private string GetStatusBadgeClass() => Plan.Status switch
+    {
+        CareerPlanStatus.Active => "bg-success",
+        CareerPlanStatus.Draft => "bg-secondary",
+        CareerPlanStatus.OnHold => "bg-warning text-dark",
+        CareerPlanStatus.Completed => "bg-primary",
+        CareerPlanStatus.Archived => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetProgressBarClass() => Plan.ProgressPercent switch
+    {
+        >= 75 => "bg-success",
+        >= 50 => "bg-info",
+        >= 25 => "bg-warning",
+        _ => "bg-secondary"
+    };
+
+    private string TruncateDescription(string text) =>
+        text.Length > 120 ? text[..117] + "..." : text;
+}

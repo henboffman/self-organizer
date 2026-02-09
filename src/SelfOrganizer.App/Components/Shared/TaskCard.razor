@@ -106,9 +106,10 @@
                         <TimeDisplay Minutes="@Task.EstimatedMinutes" />
                         <span class="mx-1">|</span>
                     }
-                    @if (Task.Contexts.Any())
+                    @{var cardContexts = Task.Contexts ?? new List<string>();}
+                    @if (cardContexts.Any())
                     {
-                        @foreach (var context in Task.Contexts)
+                        @foreach (var context in cardContexts)
                         {
                             <ContextBadge Context="@context" />
                         }

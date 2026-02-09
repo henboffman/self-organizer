@@ -16,7 +16,7 @@ export default defineConfig({
     ['list']
   ],
   use: {
-    baseURL: 'http://localhost:5000',
+    baseURL: 'http://localhost:5001',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -29,10 +29,10 @@ export default defineConfig({
     },
   ],
 
-  /* Run the Blazor app before running tests */
+  /* Run the Blazor Server (hosts the WASM app) before running tests */
   webServer: {
-    command: 'cd ../src/SelfOrganizer.App && dotnet run --urls=http://localhost:5000',
-    url: 'http://localhost:5000',
+    command: 'cd ../src/SelfOrganizer.Server && dotnet run --urls=http://localhost:5001',
+    url: 'http://localhost:5001',
     reuseExistingServer: !process.env.CI,
     timeout: 180000, // Blazor WASM can take time to start
     stdout: 'pipe',

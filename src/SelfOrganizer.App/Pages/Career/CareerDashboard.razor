@@ -1,0 +1,107 @@
+@page "/career"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Components.Career
+@inject SelfOrganizer.Core.Interfaces.ICareerPlanService CareerPlanService
+@inject SelfOrganizer.Core.Interfaces.IGoalService GoalService
+@inject SelfOrganizer.Core.Interfaces.ISkillService SkillService
+@inject SelfOrganizer.Core.Interfaces.IGrowthContextService GrowthContextService
+@inject NavigationManager NavigationManager
+@inject SelfOrganizer.App.Services.IExportService ExportService
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h3 class="mb-0"><span class="oi oi-map me-2"></span>Career Planner</h3>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm @(_showDummyData ? "btn-warning" : "btn-outline-primary")"
+                @onclick="ToggleDummyData" title="Toggle demo data for testing">
+            <span class="oi oi-beaker me-1"></span>
+            @(_showDummyData ? "Demo ON" : "Demo Data")
+        </button>
+        <a href="career/new" class="btn btn-primary btn-sm">
+            <span class="oi oi-plus me-1"></span> New Plan
+        </a>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <CareerMetricsBar ActivePlansCount="@_activePlansCount"
+                      SkillsInProgressCount="@_skillsInProgressCount"
+                      ActiveGoalsCount="@_activeGoalsCount"
+                      UpcomingMilestonesCount="@_upcomingMilestonesCount" />
+
+    @* Timeline *@
+    <div class="mb-4">
+        <CareerTimeline Plans="@_timelinePlans" Skills="@_timelineSkills"
+                        Snapshots="@_snapshots" OnSnapshotSelected="HandleSnapshotSelected" />
+    </div>
+
+    @* Growth Journey *@
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span></span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportCareerPlan" disabled="@_isExporting">
+                    @if (_isExporting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-document me-1"></span>
+                    }
+                    Export
+                </button>
+                <button class="btn btn-sm btn-outline-primary" @onclick="CaptureSnapshot" disabled="@_isCapturing">
+                    @if (_isCapturing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-camera-slr me-1"></span>
+                    }
+                    Capture Snapshot
+                </button>
+            </div>
+        </div>
+        <GrowthJourney Periods="@_journeyPeriods" OnPeriodSelected="HandlePeriodSelected" />
+    </div>
+
+    @* Career Plans List *@
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Career Plans</h5>
+        </div>
+
+        @if (_displayPlans.Count == 0)
+        {
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <span class="oi oi-map fs-1 d-block mb-3 text-muted opacity-25"></span>
+                    <h5 class="text-muted">No career plans yet</h5>
+                    <p class="text-muted">Create a career plan to map your professional growth journey.</p>
+                    <a href="career/new" class="btn btn-primary">
+                        <span class="oi oi-plus me-1"></span> Create Your First Plan
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            @foreach (var plan in _displayPlans)
+            {
+                <CareerPlanCard Plan="plan" IsDemoData="@(IsDemoPlan(plan))"
+                                IsExpanded="@(_expandedPlanId == plan.Id)"
+                                OnClick="TogglePlanExpanded" />
+            }
+        }
+    </div>
+}
