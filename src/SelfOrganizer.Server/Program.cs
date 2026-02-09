@@ -53,10 +53,15 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
 
 // Add services
 builder.Services.AddControllers();
-builder.Services.AddHttpClient();
 
-// Register LLM proxy service
-builder.Services.AddScoped<ILlmProxyService, LlmProxyService>();
+// Register LLM proxy service with typed HttpClient.
+// AllowAutoRedirect=false prevents .NET from silently following redirects
+// and stripping custom headers (like Ocp-Apim-Subscription-Key) in the process.
+builder.Services.AddHttpClient<ILlmProxyService, LlmProxyService>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false
+    });
 
 // Note: Google Calendar proxy service removed - using Outlook via Entra
 
