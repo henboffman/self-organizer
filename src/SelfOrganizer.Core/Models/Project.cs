@@ -24,6 +24,12 @@ public class Project : BaseEntity
     public string? Url { get; set; }
 
     /// <summary>
+    /// The single designated "next action" task for this project.
+    /// This task will be pinned to the top of task lists with a star indicator.
+    /// </summary>
+    public Guid? NextActionTaskId { get; set; }
+
+    /// <summary>
     /// Hex color code for visual identification (e.g., "#3b82f6")
     /// </summary>
     public string? Color { get; set; }
@@ -37,4 +43,14 @@ public class Project : BaseEntity
     /// Base64 data URL for custom uploaded image (64x64)
     /// </summary>
     public string? IconImageUrl { get; set; }
+
+    /// <summary>
+    /// Skills used or developed in this project (bidirectional with Skill.LinkedProjectIds)
+    /// </summary>
+    public List<Guid> LinkedSkillIds { get; set; } = new();
+
+    // Completion reflection fields
+    public string? CompletionReflection { get; set; }
+    public string? CompletionLessonsLearned { get; set; }
+    public string? CompletionChallenges { get; set; }
 }

@@ -1,0 +1,338 @@
+@namespace SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.Core.Models
+
+<Modal Title="@Title" IsVisible="@IsVisible" OnClose="OnClose" Size="modal-lg">
+    <ChildContent>
+        <div class="task-linking-modal">
+            @* Search Input *@
+            <div class="search-section mb-3">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <span class="oi oi-magnifying-glass"></span>
+                    </span>
+                    <input type="text"
+                           class="form-control"
+                           @bind="_searchQuery"
+                           @bind:event="oninput"
+                           placeholder="Search tasks by title..."
+                           @ref="_searchInput" />
+                    @if (!string.IsNullOrEmpty(_searchQuery))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                            <span class="oi oi-x"></span>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @* Quick Filter Tabs *@
+            <div class="quick-filters mb-3">
+                <div class="btn-group flex-wrap" role="group">
+                    <button type="button"
+                            class="btn btn-sm @(_activeQuickFilter == QuickFilter.All ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SetQuickFilter(QuickFilter.All)">
+                        All
+                        <span class="badge bg-secondary ms-1">@GetFilteredTaskCount(QuickFilter.All)</span>
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm @(_activeQuickFilter == QuickFilter.NextActions ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SetQuickFilter(QuickFilter.NextActions)">
+                        <span class="oi oi-bolt me-1"></span>Next Actions
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm @(_activeQuickFilter == QuickFilter.HighPriority ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SetQuickFilter(QuickFilter.HighPriority)">
+                        <span class="oi oi-arrow-thick-top me-1 text-danger"></span>High Priority
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm @(_activeQuickFilter == QuickFilter.DueSoon ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SetQuickFilter(QuickFilter.DueSoon)">
+                        <span class="oi oi-calendar me-1"></span>Due Soon
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm @(_activeQuickFilter == QuickFilter.Unassigned ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick="() => SetQuickFilter(QuickFilter.Unassigned)">
+                        <span class="oi oi-inbox me-1"></span>Unassigned
+                    </button>
+                </div>
+            </div>
+
+            @* Advanced Filters Accordion *@
+            <div class="advanced-filters mb-3">
+                <button class="btn btn-link btn-sm p-0 text-decoration-none" type="button" @onclick="ToggleAdvancedFilters">
+                    <span class="oi @(_showAdvancedFilters ? "oi-chevron-bottom" : "oi-chevron-right") me-1"></span>
+                    Advanced Filters
+                    @if (HasActiveAdvancedFilters())
+                    {
+                        <span class="badge bg-primary ms-1">Active</span>
+                    }
+                </button>
+
+                @if (_showAdvancedFilters)
+                {
+                    <div class="filter-panel mt-2 p-3 border rounded">
+                        <div class="row g-2">
+                            @* Status Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Status</label>
+                                <select class="form-select form-select-sm" @bind="_filterStatus">
+                                    <option value="">Any Status</option>
+                                    <option value="NextAction">Next Action</option>
+                                    <option value="Active">Active</option>
+                                    <option value="Inbox">Inbox</option>
+                                    <option value="WaitingFor">Waiting For</option>
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="SomedayMaybe">Someday/Maybe</option>
+                                </select>
+                            </div>
+
+                            @* Priority Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Priority</label>
+                                <select class="form-select form-select-sm" @bind="_filterPriority">
+                                    <option value="">Any Priority</option>
+                                    <option value="1">High (1)</option>
+                                    <option value="2">Normal (2)</option>
+                                    <option value="3">Low (3)</option>
+                                </select>
+                            </div>
+
+                            @* Due Date Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Due Date</label>
+                                <select class="form-select form-select-sm" @bind="_filterDueDate">
+                                    <option value="">Any Due Date</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="none">No Due Date</option>
+                                </select>
+                            </div>
+
+                            @* Tags Filter *@
+                            @if (AvailableTags.Any())
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label small">Tags</label>
+                                    <div class="tag-filter-container">
+                                        @foreach (var tag in AvailableTags.Take(10))
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-sm @(_selectedTags.Contains(tag) ? "btn-primary" : "btn-outline-secondary") me-1 mb-1"
+                                                    @onclick="() => ToggleTag(tag)">
+                                                #@tag
+                                            </button>
+                                        }
+                                        @if (AvailableTags.Count() > 10)
+                                        {
+                                            <span class="text-muted small">+@(AvailableTags.Count() - 10) more</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @* Contexts Filter *@
+                            @if (AvailableContexts.Any())
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label small">Contexts</label>
+                                    <div class="context-filter-container">
+                                        @foreach (var context in AvailableContexts.Take(8))
+                                        {
+                                            <button type="button"
+                                                    class="btn btn-sm @(_selectedContexts.Contains(context) ? "btn-info" : "btn-outline-secondary") me-1 mb-1"
+                                                    @onclick="() => ToggleContext(context)">
+                                                @@@context
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @* Energy Level Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Energy Level</label>
+                                <select class="form-select form-select-sm" @bind="_filterEnergyLevel">
+                                    <option value="">Any Energy</option>
+                                    <option value="1">1 - Minimal</option>
+                                    <option value="2">2 - Low</option>
+                                    <option value="3">3 - Medium</option>
+                                    <option value="4">4 - High</option>
+                                    <option value="5">5 - Maximum</option>
+                                </select>
+                            </div>
+
+                            @* Time Estimate Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Time Estimate</label>
+                                <select class="form-select form-select-sm" @bind="_filterTimeEstimate">
+                                    <option value="">Any Duration</option>
+                                    <option value="quick">Quick (&lt;15 min)</option>
+                                    <option value="short">Short (15-30 min)</option>
+                                    <option value="medium">Medium (30-60 min)</option>
+                                    <option value="long">Long (&gt;60 min)</option>
+                                </select>
+                            </div>
+
+                            @* Deep Work Filter *@
+                            <div class="col-md-4">
+                                <label class="form-label small">Work Type</label>
+                                <select class="form-select form-select-sm" @bind="_filterDeepWork">
+                                    <option value="">Any Type</option>
+                                    <option value="deep">Deep Work Only</option>
+                                    <option value="shallow">Shallow Work Only</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        @* Clear Filters Button *@
+                        @if (HasActiveAdvancedFilters())
+                        {
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="ClearAdvancedFilters">
+                                    <span class="oi oi-x me-1"></span>Clear All Filters
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Sort Options *@
+            <div class="sort-section mb-2 d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    @GetFilteredTasks().Count() task(s) found
+                </small>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label small mb-0">Sort:</label>
+                    <select class="form-select form-select-sm" style="width: auto;" @bind="_sortBy">
+                        <option value="title">Title</option>
+                        <option value="priority">Priority</option>
+                        <option value="dueDate">Due Date</option>
+                        <option value="created">Recently Created</option>
+                        <option value="updated">Recently Updated</option>
+                    </select>
+                </div>
+            </div>
+
+            @* Task List *@
+            <div class="task-list" style="max-height: 350px; overflow-y: auto;">
+                @foreach (var task in GetFilteredTasks().Take(50))
+                {
+                    <div class="task-item p-2 border-bottom" @onclick="() => SelectTask(task)">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="task-main flex-grow-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <PriorityIndicator Priority="@task.Priority" />
+                                    <span class="task-title fw-medium" style="color: var(--text-primary);">@task.Title</span>
+                                </div>
+
+                                @* Task Metadata Row *@
+                                <div class="task-meta mt-1 d-flex flex-wrap gap-2 align-items-center">
+                                    @* Status Badge *@
+                                    <span class="badge @GetStatusBadgeClass(task.Status)">@task.Status</span>
+
+                                    @* Due Date *@
+                                    @if (task.DueDate.HasValue)
+                                    {
+                                        <span class="@GetDueDateClass(task.DueDate.Value)">
+                                            <span class="oi oi-calendar me-1"></span>@FormatDueDate(task.DueDate.Value)
+                                        </span>
+                                    }
+
+                                    @* Time Estimate *@
+                                    @if (task.EstimatedMinutes > 0)
+                                    {
+                                        <span class="text-muted small">
+                                            <span class="oi oi-clock me-1"></span>@FormatMinutes(task.EstimatedMinutes)
+                                        </span>
+                                    }
+
+                                    @* Energy Level *@
+                                    @if (task.EnergyLevel.HasValue)
+                                    {
+                                        <span class="text-muted small" title="Energy Level @task.EnergyLevel">
+                                            @GetEnergyIndicator(task.EnergyLevel.Value)
+                                        </span>
+                                    }
+
+                                    @* Deep Work Indicator *@
+                                    @if (task.RequiresDeepWork)
+                                    {
+                                        <span class="badge bg-info" title="Requires Deep Work">
+                                            <span class="oi oi-target"></span>
+                                        </span>
+                                    }
+                                </div>
+
+                                @* Tags and Contexts *@
+                                @if (task.Tags.Any() || task.Contexts.Any())
+                                {
+                                    <div class="task-tags mt-1 d-flex flex-wrap gap-1">
+                                        @foreach (var tag in task.Tags.Take(3))
+                                        {
+                                            <span class="badge bg-primary small">#@tag</span>
+                                        }
+                                        @if (task.Tags.Count > 3)
+                                        {
+                                            <span class="badge bg-secondary small">+@(task.Tags.Count - 3)</span>
+                                        }
+                                        @foreach (var context in task.Contexts.Take(2))
+                                        {
+                                            <span class="badge bg-info small">@@@context</span>
+                                        }
+                                    </div>
+                                }
+
+                                @* Project Info *@
+                                @if (task.ProjectId.HasValue && ShowProjectInfo)
+                                {
+                                    var projectName = GetProjectName(task.ProjectId.Value);
+                                    @if (!string.IsNullOrEmpty(projectName))
+                                    {
+                                        <div class="task-project mt-1">
+                                            <span class="text-muted small">
+                                                <span class="oi oi-folder me-1"></span>@projectName
+                                            </span>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => SelectTask(task)" @onclick:stopPropagation="true">
+                                <span class="oi oi-link-intact"></span> Link
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (!GetFilteredTasks().Any())
+                {
+                    <div class="text-center py-4 text-muted">
+                        @if (string.IsNullOrWhiteSpace(_searchQuery) && !HasActiveAdvancedFilters() && _activeQuickFilter == QuickFilter.All)
+                        {
+                            <span class="oi oi-inbox d-block mb-2" style="font-size: 2rem;"></span>
+                            <span>No tasks available to link.</span>
+                        }
+                        else
+                        {
+                            <span class="oi oi-magnifying-glass d-block mb-2" style="font-size: 2rem;"></span>
+                            <span>No tasks match your filters.</span>
+                            <button class="btn btn-link btn-sm" @onclick="ClearAllFilters">Clear all filters</button>
+                        }
+                    </div>
+                }
+
+                @if (GetFilteredTasks().Count() > 50)
+                {
+                    <div class="text-center py-2 text-muted small">
+                        Showing first 50 of @GetFilteredTasks().Count() tasks. Use filters to narrow down.
+                    </div>
+                }
+            </div>
+        </div>
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="OnClose">Close</button>
+    </Footer>
+</Modal>

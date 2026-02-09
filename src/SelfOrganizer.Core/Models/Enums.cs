@@ -87,8 +87,40 @@ public enum RecurrencePattern
 }
 
 public enum GoalStatus { Active, OnHold, Completed, Archived }
+
+public enum CareerPlanStatus { Draft, Active, OnHold, Completed, Archived }
+public enum MilestoneStatus { NotStarted, InProgress, Completed, Skipped }
+public enum MilestoneCategory { Role, Certification, Skill, Project, Education, Networking, Leadership, Other }
 public enum GoalCategory { Career, Health, Financial, Personal, Learning, Relationships, Creative, Other }
 public enum GoalTimeframe { Week, Month, Quarter, Year, MultiYear }
+
+/// <summary>
+/// Categories for organizing skills
+/// </summary>
+public enum SkillCategory
+{
+    /// <summary>Programming, engineering, technical knowledge</summary>
+    Technical,
+    /// <summary>Communication, leadership, collaboration</summary>
+    SoftSkills,
+    /// <summary>Design, writing, artistic abilities</summary>
+    Creative,
+    /// <summary>Industry expertise, subject matter knowledge</summary>
+    DomainKnowledge,
+    /// <summary>Specific tools, platforms, software proficiency</summary>
+    ToolsSoftware
+}
+
+/// <summary>
+/// Type of skill relationship
+/// </summary>
+public enum SkillType
+{
+    /// <summary>User currently possesses this skill</summary>
+    Have,
+    /// <summary>User wants to develop this skill</summary>
+    Want
+}
 
 /// <summary>
 /// App mode that determines which contexts and balance dimensions are shown
@@ -127,3 +159,6 @@ public enum FocusSoundType
     /// <summary>Fireplace crackling</summary>
     Fireplace
 }
+
+public enum SnapshotGranularity { Monthly, Quarterly, Manual }
+public enum SnapshotTrigger { Auto, Manual, WeeklyReview, MilestoneCompletion }

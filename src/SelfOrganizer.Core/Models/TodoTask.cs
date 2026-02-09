@@ -78,6 +78,12 @@ public class TodoTask : BaseEntity
     /// </summary>
     public List<string> Links { get; set; } = new();
 
+    /// <summary>
+    /// Primary external URL linking to a tracker, portfolio, or other application
+    /// </summary>
+    public string? Url { get; set; }
+
+
     // Stakeholder
     /// <summary>
     /// Who this task is for (beneficiary/stakeholder)
@@ -89,6 +95,12 @@ public class TodoTask : BaseEntity
     /// Goal IDs this task contributes to
     /// </summary>
     public List<Guid> GoalIds { get; set; } = new();
+
+    // Skill linkage
+    /// <summary>
+    /// Skills this task exercises or develops (bidirectional with Skill.LinkedTaskIds)
+    /// </summary>
+    public List<Guid> SkillIds { get; set; } = new();
 
     // Computed properties for optimizer
     /// <summary>

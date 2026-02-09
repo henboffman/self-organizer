@@ -1,0 +1,405 @@
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Services.Intelligence
+@inject ISkillService SkillService
+@inject IGoalService GoalService
+@inject ISkillAiService SkillAiService
+
+<div class="goal-skills-panel card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <span class="oi oi-star me-2"></span>Skills to Develop
+        </h6>
+        <div class="d-flex gap-2">
+            @if (_aiAvailable)
+            {
+                <button class="btn btn-sm btn-outline-primary" @onclick="SuggestSkills"
+                        disabled="@(_isSuggesting || string.IsNullOrWhiteSpace(Goal?.Title))"
+                        title="Suggest skills with AI">
+                    @if (_isSuggesting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                        <span>Suggesting...</span>
+                    }
+                    else
+                    {
+                        <span class="oi oi-lightbulb me-1"></span>
+                        <span>Suggest Skills</span>
+                    }
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-secondary" @onclick="ShowLinkModal" title="Link existing skill">
+                <span class="oi oi-link-intact"></span>
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (_suggestedSkills.Any())
+        {
+            <div class="suggested-skills mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary">
+                        <span class="oi oi-lightbulb me-1"></span>AI Suggestions
+                    </span>
+                    @if (!string.IsNullOrEmpty(_overallStrategy))
+                    {
+                        <small class="text-muted">@_overallStrategy</small>
+                    }
+                </div>
+
+                <div class="list-group list-group-flush">
+                    @foreach (var skill in _suggestedSkills)
+                    {
+                        var isAccepted = _acceptedSkillNames.Contains(skill.Name);
+                        <div class="list-group-item @(isAccepted ? "bg-success-subtle" : "")">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <strong>@skill.Name</strong>
+                                        <span class="badge bg-secondary">@skill.Category</span>
+                                        <span class="badge @GetImpactBadge(skill.ImpactLevel)">@skill.ImpactLevel</span>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(skill.Description))
+                                    {
+                                        <p class="small text-muted mb-1 mt-1">@skill.Description</p>
+                                    }
+                                    <small class="text-muted">@skill.Rationale</small>
+                                </div>
+                                <div class="ms-2">
+                                    @if (isAccepted)
+                                    {
+                                        <span class="text-success"><span class="oi oi-check"></span> Added</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-primary" @onclick="() => AcceptSkill(skill)">
+                                            <span class="oi oi-plus"></span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => DismissSkill(skill)">
+                                            <span class="oi oi-x"></span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="ClearSuggestions">
+                    Clear Suggestions
+                </button>
+            </div>
+        }
+
+        @* Linked Skills *@
+        @if (_linkedSkills.Any())
+        {
+            <div class="linked-skills">
+                <small class="text-muted">Linked Skills (@_linkedSkills.Count)</small>
+                <div class="list-group list-group-flush mt-2">
+                    @foreach (var skill in _linkedSkills)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                            <div class="d-flex align-items-center gap-2">
+                                @if (!string.IsNullOrEmpty(skill.Icon))
+                                {
+                                    <span>@skill.Icon</span>
+                                }
+                                <span class="fw-semibold">@skill.Name</span>
+                                <span class="badge @GetTypeBadge(skill.Type)">@(skill.Type == SkillType.Have ? "Have" : "Want")</span>
+                                <small class="text-muted">(@skill.CurrentProficiency/@skill.TargetProficiency)</small>
+                            </div>
+                            <button class="btn btn-sm btn-ghost text-danger" @onclick="() => UnlinkSkill(skill)" title="Unlink skill">
+                                <span class="oi oi-x"></span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (!_suggestedSkills.Any())
+        {
+            <div class="text-center py-3">
+                <p class="text-muted small mb-0">
+                    No skills linked yet.
+                    @if (_aiAvailable)
+                    {
+                        <text>Click "Suggest Skills" to get AI recommendations.</text>
+                    }
+                    else
+                    {
+                        <text>Use the link button to add existing skills.</text>
+                    }
+                </p>
+            </div>
+        }
+    </div>
+
+    @* Link Existing Skill Modal *@
+    @if (_showLinkModal)
+    {
+        <div class="modal-backdrop fade show" @onclick="CloseLinkModal"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Link Existing Skill</h5>
+                        <button type="button" class="btn-close" @onclick="CloseLinkModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!_availableSkills.Any())
+                        {
+                            <p class="text-muted">No skills available to link. <a href="skills/new">Create a skill</a> first!</p>
+                        }
+                        else
+                        {
+                            <div class="list-group">
+                                @foreach (var skill in _availableSkills)
+                                {
+                                    var isLinked = Goal?.LinkedSkillIds.Contains(skill.Id) ?? false;
+                                    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(isLinked ? "active" : "")"
+                                         @onclick="() => ToggleSkillLink(skill)" style="cursor: pointer;">
+                                        <div>
+                                            @if (!string.IsNullOrEmpty(skill.Icon))
+                                            {
+                                                <span class="me-1">@skill.Icon</span>
+                                            }
+                                            <span>@skill.Name</span>
+                                            <span class="badge @GetCategoryBadge(skill.Category) ms-2">@GetCategoryLabel(skill.Category)</span>
+                                        </div>
+                                        @if (isLinked)
+                                        {
+                                            <span class="oi oi-check"></span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseLinkModal">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Goal? Goal { get; set; }
+
+    [Parameter]
+    public EventCallback<Goal> GoalChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<Skill> OnSkillCreated { get; set; }
+
+    private bool _aiAvailable = false;
+    private bool _isSuggesting = false;
+    private bool _showLinkModal = false;
+    private string _overallStrategy = "";
+    private List<SuggestedSkill> _suggestedSkills = new();
+    private HashSet<string> _acceptedSkillNames = new();
+    private List<Skill> _linkedSkills = new();
+    private List<Skill> _availableSkills = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _aiAvailable = await SkillAiService.IsAvailableAsync();
+        await LoadSkills();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadLinkedSkills();
+    }
+
+    private async Task LoadSkills()
+    {
+        _availableSkills = (await SkillService.GetActiveSkillsAsync()).OrderBy(s => s.Name).ToList();
+        await LoadLinkedSkills();
+    }
+
+    private async Task LoadLinkedSkills()
+    {
+        if (Goal?.LinkedSkillIds == null || !Goal.LinkedSkillIds.Any())
+        {
+            _linkedSkills = new();
+            return;
+        }
+
+        _linkedSkills = new List<Skill>();
+        foreach (var skillId in Goal.LinkedSkillIds)
+        {
+            var skill = await SkillService.GetByIdAsync(skillId);
+            if (skill != null)
+            {
+                _linkedSkills.Add(skill);
+            }
+        }
+    }
+
+    private async Task SuggestSkills()
+    {
+        if (Goal == null || string.IsNullOrWhiteSpace(Goal.Title)) return;
+
+        _isSuggesting = true;
+        _suggestedSkills.Clear();
+        _acceptedSkillNames.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var result = await SkillAiService.GenerateSkillsForGoalAsync(Goal);
+            if (result != null)
+            {
+                _overallStrategy = result.OverallStrategy;
+                _suggestedSkills = result.SuggestedSkills;
+            }
+        }
+        finally
+        {
+            _isSuggesting = false;
+        }
+    }
+
+    private async Task AcceptSkill(SuggestedSkill suggestion)
+    {
+        if (Goal == null) return;
+
+        // Create the skill
+        var skill = new Skill
+        {
+            Id = Guid.NewGuid(),
+            Name = suggestion.Name,
+            Description = suggestion.Description,
+            Category = ParseCategory(suggestion.Category),
+            Type = ParseType(suggestion.Type),
+            CurrentProficiency = 1,
+            TargetProficiency = suggestion.RecommendedProficiency,
+            IsActive = true,
+            IsAiSuggested = true,
+            AiRationale = suggestion.Rationale,
+            Notes = suggestion.LearningPath,
+            LinkedGoalIds = new List<Guid> { Goal.Id },
+            StartDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow
+        };
+
+        await SkillService.CreateAsync(skill);
+
+        // Link to goal
+        await GoalService.LinkSkillAsync(Goal.Id, skill.Id);
+        Goal.LinkedSkillIds.Add(skill.Id);
+
+        _acceptedSkillNames.Add(suggestion.Name);
+        await LoadSkills();
+        await OnSkillCreated.InvokeAsync(skill);
+    }
+
+    private void DismissSkill(SuggestedSkill suggestion)
+    {
+        _suggestedSkills.Remove(suggestion);
+    }
+
+    private void ClearSuggestions()
+    {
+        _suggestedSkills.Clear();
+        _overallStrategy = "";
+        _acceptedSkillNames.Clear();
+    }
+
+    private async Task ToggleSkillLink(Skill skill)
+    {
+        if (Goal == null) return;
+
+        if (Goal.LinkedSkillIds.Contains(skill.Id))
+        {
+            await GoalService.UnlinkSkillAsync(Goal.Id, skill.Id);
+            Goal.LinkedSkillIds.Remove(skill.Id);
+        }
+        else
+        {
+            await GoalService.LinkSkillAsync(Goal.Id, skill.Id);
+            Goal.LinkedSkillIds.Add(skill.Id);
+        }
+
+        await GoalChanged.InvokeAsync(Goal);
+        await LoadLinkedSkills();
+    }
+
+    private async Task UnlinkSkill(Skill skill)
+    {
+        if (Goal == null) return;
+
+        await GoalService.UnlinkSkillAsync(Goal.Id, skill.Id);
+        Goal.LinkedSkillIds.Remove(skill.Id);
+
+        await GoalChanged.InvokeAsync(Goal);
+        await LoadLinkedSkills();
+    }
+
+    private void ShowLinkModal()
+    {
+        _showLinkModal = true;
+    }
+
+    private void CloseLinkModal()
+    {
+        _showLinkModal = false;
+    }
+
+    private SkillCategory ParseCategory(string category) => category?.ToLower() switch
+    {
+        "technical" => SkillCategory.Technical,
+        "softskills" or "soft skills" => SkillCategory.SoftSkills,
+        "creative" => SkillCategory.Creative,
+        "domainknowledge" or "domain knowledge" or "domain" => SkillCategory.DomainKnowledge,
+        "toolssoftware" or "tools & software" or "tools" => SkillCategory.ToolsSoftware,
+        _ => SkillCategory.Technical
+    };
+
+    private SkillType ParseType(string type) => type?.ToLower() switch
+    {
+        "have" => SkillType.Have,
+        "want" => SkillType.Want,
+        _ => SkillType.Want
+    };
+
+    private static string GetTypeBadge(SkillType type) => type switch
+    {
+        SkillType.Have => "bg-success",
+        SkillType.Want => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private static string GetCategoryBadge(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "bg-primary",
+        SkillCategory.SoftSkills => "bg-info",
+        SkillCategory.Creative => "bg-warning text-dark",
+        SkillCategory.DomainKnowledge => "bg-success",
+        SkillCategory.ToolsSoftware => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private static string GetCategoryLabel(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain",
+        SkillCategory.ToolsSoftware => "Tools",
+        _ => category.ToString()
+    };
+
+    private static string GetImpactBadge(string impact) => impact?.ToLower() switch
+    {
+        "high" => "bg-success",
+        "medium" => "bg-info",
+        "low" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

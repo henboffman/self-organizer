@@ -195,6 +195,101 @@
         </div>
     }
 
+    @* Skills Snapshot Section *@
+    @if (_report.Skills.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="oi oi-star me-2"></span>Skills Snapshot</span>
+                <span class="badge bg-secondary">@_report.Skills.Count active</span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach (var skill in _report.Skills)
+                    {
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="skill-snapshot-card p-3 rounded" style="border-left: 4px solid @(skill.Color ?? "var(--color-primary)");">
+                                <div class="d-flex align-items-center mb-2">
+                                    @if (!string.IsNullOrEmpty(skill.Icon))
+                                    {
+                                        <span class="me-2">@skill.Icon</span>
+                                    }
+                                    <h6 class="mb-0 flex-grow-1">@skill.Name</h6>
+                                    <span class="badge @(skill.Type == SkillType.Have ? "bg-success-subtle text-success" : "bg-info-subtle text-info") me-1">@skill.Type</span>
+                                    <span class="badge bg-secondary-subtle text-secondary">@skill.Category</span>
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        var starClass = i <= skill.CurrentProficiency ? "text-warning" : (i <= skill.TargetProficiency ? "text-muted opacity-25" : "text-muted opacity-10");
+                                        <span class="@starClass" style="font-size: 0.9rem;">★</span>
+                                    }
+                                    <span class="ms-2 small text-muted">@Skill.GetProficiencyName(skill.CurrentProficiency)</span>
+                                </div>
+                                <div class="progress mb-1" style="height: 4px;">
+                                    <div class="progress-bar" role="progressbar"
+                                         style="width: @skill.ProgressPercent%; background-color: @(skill.Color ?? "var(--color-primary)");">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>@skill.ProgressPercent% to target</span>
+                                    @if (skill.IsAiSuggested)
+                                    {
+                                        <span class="badge bg-purple-subtle text-purple" title="AI Suggested">AI</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* Career Development Section *@
+    @if (_report.CareerPlans.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <span class="oi oi-compass me-2"></span>Career Development
+            </div>
+            <div class="card-body">
+                @foreach (var plan in _report.CareerPlans)
+                {
+                    <div class="career-plan-card p-3 rounded mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">@plan.Title</h6>
+                                @if (!string.IsNullOrEmpty(plan.CurrentRole) || !string.IsNullOrEmpty(plan.TargetRole))
+                                {
+                                    <div class="small text-muted">
+                                        @(plan.CurrentRole ?? "Current")
+                                        <span class="text-primary fw-bold mx-1">→</span>
+                                        @(plan.TargetRole ?? "Target")
+                                    </div>
+                                }
+                            </div>
+                            <span class="badge @GetCareerStatusBadgeClass(plan.Status)">@plan.Status</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 8px;">
+                            <div class="progress-bar" role="progressbar" style="width: @plan.ProgressPercent%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>@plan.ProgressPercent% complete</span>
+                            <span>@plan.CompletedMilestones/@plan.TotalMilestones milestones</span>
+                        </div>
+                        @if (plan.MilestonesCompletedInPeriod > 0)
+                        {
+                            <div class="mt-2">
+                                <span class="badge bg-success">@plan.MilestonesCompletedInPeriod milestone@(plan.MilestonesCompletedInPeriod > 1 ? "s" : "") completed this period</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
     @* Focus Sessions Section *@
     @if (_report.FocusSessions.Any())
     {
@@ -582,10 +677,11 @@
                                     }
                                 </div>
                             </div>
-                            @if (item.Tags.Any())
+                            @{var sumItemTags = item.Tags ?? new List<string>();}
+                            @if (sumItemTags.Any())
                             {
                                 <div class="mt-1">
-                                    @foreach (var tag in item.Tags)
+                                    @foreach (var tag in sumItemTags)
                                     {
                                         <span class="badge bg-secondary me-1">#@tag</span>
                                     }
@@ -777,6 +873,15 @@ else if (!_isGenerating)
         GoalStatus.Completed => "bg-success",
         GoalStatus.Active => "bg-primary",
         GoalStatus.OnHold => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private string GetCareerStatusBadgeClass(CareerPlanStatus status) => status switch
+    {
+        CareerPlanStatus.Active => "bg-primary",
+        CareerPlanStatus.Completed => "bg-success",
+        CareerPlanStatus.OnHold => "bg-warning text-dark",
+        CareerPlanStatus.Draft => "bg-secondary",
         _ => "bg-secondary"
     };
 

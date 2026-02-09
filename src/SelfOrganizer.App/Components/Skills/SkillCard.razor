@@ -1,0 +1,218 @@
+@using SelfOrganizer.Core.Models
+
+<div class="skill-card card h-100 @GetTypeClass()" @onclick="HandleClick">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            @if (!string.IsNullOrEmpty(Skill.Icon))
+            {
+                <span class="skill-icon">@Skill.Icon</span>
+            }
+            else
+            {
+                <span class="oi oi-star"></span>
+            }
+            <span class="category-badge @GetCategoryClass()">@GetCategoryDisplayName()</span>
+        </div>
+        <span class="badge @GetTypeBadgeClass()">@(Skill.Type == SkillType.Have ? "Have" : "Want")</span>
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">@Skill.Name</h5>
+
+        @if (!string.IsNullOrEmpty(Skill.Description))
+        {
+            <p class="card-text small text-muted text-truncate-2">@Skill.Description</p>
+        }
+
+        @* Proficiency Progress *@
+        <div class="proficiency-section mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small class="text-muted">Proficiency</small>
+                <small class="fw-bold">@Skill.GetProficiencyName(Skill.CurrentProficiency) (@Skill.CurrentProficiency/@Skill.TargetProficiency)</small>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar @GetProgressBarClass()"
+                     role="progressbar"
+                     style="width: @Skill.ProgressPercent%"
+                     aria-valuenow="@Skill.ProgressPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+            </div>
+            <div class="d-flex justify-content-between mt-1">
+                <small class="text-muted">@Skill.GetProficiencyName(1)</small>
+                <small class="text-muted">@Skill.GetProficiencyName(5)</small>
+            </div>
+        </div>
+
+        @* Linked Items Summary *@
+        <div class="linked-items mt-3 d-flex flex-wrap gap-2">
+            @if (Skill.LinkedGoalIds.Count > 0)
+            {
+                <span class="badge bg-info" title="Linked Goals">
+                    <span class="oi oi-target me-1"></span>@Skill.LinkedGoalIds.Count Goal@(Skill.LinkedGoalIds.Count != 1 ? "s" : "")
+                </span>
+            }
+            @if (Skill.LinkedProjectIds.Count > 0)
+            {
+                <span class="badge bg-primary" title="Linked Projects">
+                    <span class="oi oi-folder me-1"></span>@Skill.LinkedProjectIds.Count Project@(Skill.LinkedProjectIds.Count != 1 ? "s" : "")
+                </span>
+            }
+            @if (CompletedTaskCount > 0)
+            {
+                <span class="badge bg-success" title="Completed Tasks">
+                    <span class="oi oi-task me-1"></span>@CompletedTaskCount Task@(CompletedTaskCount != 1 ? "s" : "")
+                </span>
+            }
+            @if (Skill.LinkedHabitIds.Count > 0)
+            {
+                <span class="badge bg-warning text-dark" title="Linked Habits">
+                    <span class="oi oi-loop-circular me-1"></span>@Skill.LinkedHabitIds.Count Habit@(Skill.LinkedHabitIds.Count != 1 ? "s" : "")
+                </span>
+            }
+        </div>
+
+        @* Target Date *@
+        @if (Skill.TargetDate.HasValue)
+        {
+            <div class="target-date mt-3">
+                <span class="oi oi-calendar me-1"></span>
+                <span class="@GetTargetDateClass()">
+                    @GetTargetDateDisplay()
+                </span>
+            </div>
+        }
+
+        @* Tags *@
+        @{var skillTags = Skill.Tags ?? new List<string>();}
+        @if (skillTags.Any())
+        {
+            <div class="tags mt-2">
+                @foreach (var tag in skillTags.Take(3))
+                {
+                    <span class="badge bg-secondary me-1">#@tag</span>
+                }
+                @if (skillTags.Count > 3)
+                {
+                    <span class="badge bg-secondary">+@(skillTags.Count - 3)</span>
+                }
+            </div>
+        }
+    </div>
+    <div class="card-footer bg-transparent">
+        <div class="d-flex justify-content-end gap-1">
+            <button class="btn btn-sm btn-outline-primary" @onclick="HandleEdit" @onclick:stopPropagation="true" title="Edit">
+                <span class="oi oi-pencil"></span>
+            </button>
+            @if (Skill.Type == SkillType.Want && Skill.CurrentProficiency < Skill.TargetProficiency)
+            {
+                <button class="btn btn-sm btn-outline-success" @onclick="HandleLevelUp" @onclick:stopPropagation="true" title="Increase Proficiency">
+                    <span class="oi oi-chevron-top"></span>
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-danger" @onclick="HandleDelete" @onclick:stopPropagation="true" title="Delete">
+                <span class="oi oi-trash"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Skill Skill { get; set; } = new();
+
+    [Parameter]
+    public int CompletedTaskCount { get; set; }
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnLevelUp { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private async Task HandleClick() => await OnClick.InvokeAsync();
+    private async Task HandleEdit() => await OnEdit.InvokeAsync();
+    private async Task HandleLevelUp() => await OnLevelUp.InvokeAsync();
+    private async Task HandleDelete() => await OnDelete.InvokeAsync();
+
+    private string GetTypeClass() => Skill.Type switch
+    {
+        SkillType.Have => "skill-have",
+        SkillType.Want => "skill-want",
+        _ => ""
+    };
+
+    private string GetTypeBadgeClass() => Skill.Type switch
+    {
+        SkillType.Have => "bg-success",
+        SkillType.Want => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetCategoryClass() => Skill.Category switch
+    {
+        SkillCategory.Technical => "category-technical",
+        SkillCategory.SoftSkills => "category-soft",
+        SkillCategory.Creative => "category-creative",
+        SkillCategory.DomainKnowledge => "category-domain",
+        SkillCategory.ToolsSoftware => "category-tools",
+        _ => "category-other"
+    };
+
+    private string GetCategoryDisplayName() => Skill.Category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain",
+        SkillCategory.ToolsSoftware => "Tools",
+        _ => "Other"
+    };
+
+    private string GetProgressBarClass()
+    {
+        var progress = Skill.ProgressPercent;
+        if (progress >= 100) return "bg-success";
+        if (progress >= 75) return "bg-info";
+        if (progress >= 50) return "bg-primary";
+        if (progress >= 25) return "bg-warning";
+        return "bg-secondary";
+    }
+
+    private string GetTargetDateClass()
+    {
+        if (!Skill.TargetDate.HasValue) return "text-muted";
+
+        var daysLeft = (Skill.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0) return "text-danger fw-bold";
+        if (daysLeft <= 7) return "text-warning";
+        return "text-muted";
+    }
+
+    private string GetTargetDateDisplay()
+    {
+        if (!Skill.TargetDate.HasValue) return "";
+
+        var daysLeft = (Skill.TargetDate.Value.Date - DateTime.Today).Days;
+
+        if (daysLeft < 0)
+            return $"Overdue by {Math.Abs(daysLeft)} day{(Math.Abs(daysLeft) != 1 ? "s" : "")}";
+        if (daysLeft == 0)
+            return "Target: today";
+        if (daysLeft == 1)
+            return "Target: tomorrow";
+        if (daysLeft <= 7)
+            return $"{daysLeft} days left";
+        if (daysLeft <= 30)
+            return $"{daysLeft} days left";
+
+        return Skill.TargetDate.Value.ToString("MMM d, yyyy");
+    }
+}

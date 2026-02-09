@@ -136,10 +136,11 @@
                                             }
                                         </div>
 
-                                        @if (task.Contexts.Any())
+                                        @{var taskContexts = task.Contexts ?? new List<string>();}
+                                        @if (taskContexts.Any())
                                         {
                                             <div class="task-card-contexts">
-                                                @foreach (var ctx in task.Contexts.Take(3))
+                                                @foreach (var ctx in taskContexts.Take(3))
                                                 {
                                                     <span class="context-badge">@@@ctx</span>
                                                 }

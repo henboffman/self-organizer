@@ -129,13 +129,14 @@ else
                             {
                                 <span class="badge bg-secondary">@idea.Category</span>
                             }
-                            @foreach (var tag in idea.Tags.Take(3))
+                            @{var ideaTags = idea.Tags ?? new List<string>();}
+                            @foreach (var tag in ideaTags.Take(3))
                             {
                                 <span class="badge status-badge">#@tag</span>
                             }
-                            @if (idea.Tags.Count > 3)
+                            @if (ideaTags.Count > 3)
                             {
-                                <span class="badge status-badge">+@(idea.Tags.Count - 3)</span>
+                                <span class="badge status-badge">+@(ideaTags.Count - 3)</span>
                             }
                         </div>
                         @if (idea.LinkedGoalId.HasValue || idea.LinkedProjectId.HasValue)
@@ -240,8 +241,16 @@ else
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseAddEditModal">Cancel</button>
-        <button class="btn btn-primary" @onclick="SaveIdea" disabled="@string.IsNullOrWhiteSpace(_ideaTitle)">
-            @(_editingIdea == null ? "Create Idea" : "Save Changes")
+        <button class="btn btn-primary" @onclick="SaveIdea" disabled="@(string.IsNullOrWhiteSpace(_ideaTitle) || _isSaving)">
+            @if (_isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Saving...</span>
+            }
+            else
+            {
+                @(_editingIdea == null ? "Create Idea" : "Save Changes")
+            }
         </button>
     </Footer>
 </Modal>
@@ -307,6 +316,7 @@ else
     private List<Goal> _goals = new();
     private List<Project> _projects = new();
     private bool _isLoading = true;
+    private bool _isSaving = false;
     private string _statusFilter = "active";
 
     // Counts
@@ -479,31 +489,39 @@ else
 
     private async Task SaveIdea()
     {
-        if (string.IsNullOrWhiteSpace(_ideaTitle)) return;
+        if (string.IsNullOrWhiteSpace(_ideaTitle) || _isSaving) return;
 
-        var idea = _editingIdea ?? new Idea();
-        idea.Title = _ideaTitle;
-        idea.Description = string.IsNullOrWhiteSpace(_ideaDescription) ? null : _ideaDescription;
-        idea.Priority = _ideaPriority;
-        idea.Category = string.IsNullOrWhiteSpace(_ideaCategory) ? null : _ideaCategory;
-        idea.Tags = ParseTags(_ideaTags);
-        idea.LinkedGoalId = Guid.TryParse(_ideaLinkedGoalId, out var goalId) ? goalId : null;
-        idea.LinkedProjectId = Guid.TryParse(_ideaLinkedProjectId, out var projectId) ? projectId : null;
-        idea.Source = string.IsNullOrWhiteSpace(_ideaSource) ? null : _ideaSource;
-        idea.Notes = string.IsNullOrWhiteSpace(_ideaNotes) ? null : _ideaNotes;
-        idea.HasActionPotential = _ideaHasActionPotential;
-
-        if (_editingIdea == null)
+        _isSaving = true;
+        try
         {
-            await IdeaService.CreateAsync(idea);
-        }
-        else
-        {
-            await IdeaService.UpdateAsync(idea);
-        }
+            var idea = _editingIdea ?? new Idea();
+            idea.Title = _ideaTitle;
+            idea.Description = string.IsNullOrWhiteSpace(_ideaDescription) ? null : _ideaDescription;
+            idea.Priority = _ideaPriority;
+            idea.Category = string.IsNullOrWhiteSpace(_ideaCategory) ? null : _ideaCategory;
+            idea.Tags = ParseTags(_ideaTags);
+            idea.LinkedGoalId = Guid.TryParse(_ideaLinkedGoalId, out var goalId) ? goalId : null;
+            idea.LinkedProjectId = Guid.TryParse(_ideaLinkedProjectId, out var projectId) ? projectId : null;
+            idea.Source = string.IsNullOrWhiteSpace(_ideaSource) ? null : _ideaSource;
+            idea.Notes = string.IsNullOrWhiteSpace(_ideaNotes) ? null : _ideaNotes;
+            idea.HasActionPotential = _ideaHasActionPotential;
 
-        CloseAddEditModal();
-        await LoadData();
+            if (_editingIdea == null)
+            {
+                await IdeaService.CreateAsync(idea);
+            }
+            else
+            {
+                await IdeaService.UpdateAsync(idea);
+            }
+
+            CloseAddEditModal();
+            await LoadData();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private List<string> ParseTags(string input)

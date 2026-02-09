@@ -1,0 +1,196 @@
+@using SelfOrganizer.Core.Models
+
+<EditForm Model="Skill" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+
+    @* Name (Required) *@
+    <div class="mb-3">
+        <label class="form-label">Skill Name <span class="text-danger">*</span></label>
+        <InputText class="form-control" @bind-Value="Skill.Name" placeholder="What skill do you have or want to develop?" />
+        <ValidationMessage For="() => Skill.Name" />
+    </div>
+
+    @* Description *@
+    <div class="mb-3">
+        <label class="form-label">Description</label>
+        <InputTextArea class="form-control" @bind-Value="Skill.Description" rows="2" placeholder="Describe this skill and what it encompasses..." />
+    </div>
+
+    @* Category, Type Row *@
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <InputSelect class="form-select" @bind-Value="Skill.Category">
+                @foreach (var cat in Enum.GetValues<SkillCategory>())
+                {
+                    <option value="@cat">@GetCategoryLabel(cat)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Type</label>
+            <InputSelect class="form-select" @bind-Value="Skill.Type">
+                <option value="@SkillType.Have">Have (already possess)</option>
+                <option value="@SkillType.Want">Want (to develop)</option>
+            </InputSelect>
+        </div>
+    </div>
+
+    @* Proficiency Levels *@
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Current Proficiency</label>
+            <InputSelect class="form-select" @bind-Value="Skill.CurrentProficiency">
+                <option value="1">1 - Novice</option>
+                <option value="2">2 - Beginner</option>
+                <option value="3">3 - Intermediate</option>
+                <option value="4">4 - Advanced</option>
+                <option value="5">5 - Expert</option>
+            </InputSelect>
+            <small class="text-muted">Where are you now?</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Target Proficiency</label>
+            <InputSelect class="form-select" @bind-Value="Skill.TargetProficiency">
+                <option value="1">1 - Novice</option>
+                <option value="2">2 - Beginner</option>
+                <option value="3">3 - Intermediate</option>
+                <option value="4">4 - Advanced</option>
+                <option value="5">5 - Expert</option>
+            </InputSelect>
+            <small class="text-muted">Where do you want to be?</small>
+        </div>
+    </div>
+
+    @* Target Date *@
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Target Date</label>
+            <InputDate class="form-control" @bind-Value="Skill.TargetDate" />
+            <small class="text-muted">When do you want to reach your target proficiency?</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Active</label>
+            <div class="form-check form-switch mt-2">
+                <InputCheckbox class="form-check-input" @bind-Value="Skill.IsActive" id="isActiveSwitch" />
+                <label class="form-check-label" for="isActiveSwitch">
+                    @(Skill.IsActive ? "Actively tracking" : "Inactive")
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @* Icon and Color *@
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Icon (optional)</label>
+            <InputText class="form-control" @bind-Value="Skill.Icon" placeholder="Emoji or icon class (e.g., oi-code)" />
+            <small class="text-muted">Use an emoji or Open Iconic class name.</small>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Color (optional)</label>
+            <div class="input-group">
+                <input type="color" class="form-control form-control-color" @bind="Skill.Color" title="Choose skill color" />
+                <InputText class="form-control" @bind-Value="Skill.Color" placeholder="#3b82f6" />
+            </div>
+            <small class="text-muted">Visual identifier for this skill.</small>
+        </div>
+    </div>
+
+    @* Notes *@
+    <div class="mb-3">
+        <label class="form-label">Notes</label>
+        <InputTextArea class="form-control" @bind-Value="Skill.Notes" rows="3" placeholder="Learning resources, progress notes, next steps..." />
+        <small class="text-muted">Track your learning journey and resources.</small>
+    </div>
+
+    @* Tags *@
+    <div class="mb-3">
+        <label class="form-label">Tags</label>
+        <input type="text" class="form-control" @bind="_tagsInput" @bind:event="oninput" placeholder="Use #hashtags separated by spaces (e.g., #programming #2024)" />
+        <small class="text-muted">Tags help organize and find related skills.</small>
+    </div>
+
+    @* Form Actions *@
+    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+        <button type="button" class="btn btn-secondary" @onclick="HandleCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled="@(!CanSave)">
+            @if (Skill.Id == default)
+            {
+                <span class="oi oi-plus me-1"></span>
+                <span>Create Skill</span>
+            }
+            else
+            {
+                <span class="oi oi-check me-1"></span>
+                <span>Save Changes</span>
+            }
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Skill Skill { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<Skill> OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string _tagsInput = "";
+
+    private bool CanSave => !string.IsNullOrWhiteSpace(Skill.Name) && Skill.Name.Length >= 1;
+
+    protected override void OnParametersSet()
+    {
+        // Initialize tags input from Skill.Tags
+        var skillTags = Skill.Tags ?? new List<string>();
+        if (skillTags.Any())
+        {
+            _tagsInput = string.Join(" ", skillTags.Select(t => $"#{t}"));
+        }
+        else
+        {
+            _tagsInput = "";
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (!CanSave) return;
+
+        // Parse tags from input
+        Skill.Tags = ParseTags(_tagsInput);
+
+        await OnSave.InvokeAsync(Skill);
+    }
+
+    private async Task HandleCancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string GetCategoryLabel(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain Knowledge",
+        SkillCategory.ToolsSoftware => "Tools & Software",
+        _ => category.ToString()
+    };
+}

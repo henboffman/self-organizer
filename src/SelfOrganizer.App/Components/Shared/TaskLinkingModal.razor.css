@@ -1,0 +1,400 @@
+/* ===========================================
+   Task Linking Modal - Cohesive Theme Styling
+   Uses app's CSS variables from theme.css
+   =========================================== */
+
+.task-linking-modal {
+    min-height: 400px;
+}
+
+/* === Search Section === */
+.search-section .input-group {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--border-default);
+    overflow: hidden;
+}
+
+.search-section .input-group-text {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding-left: 1rem;
+}
+
+.search-section .form-control {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 0.75rem 1rem 0.75rem 0.5rem;
+}
+
+.search-section .form-control::placeholder {
+    color: var(--text-muted);
+}
+
+.search-section .form-control:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.search-section .btn-outline-secondary {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+}
+
+.search-section .btn-outline-secondary:hover {
+    color: var(--text-primary);
+    background: transparent;
+}
+
+/* === Quick Filter Tabs === */
+.quick-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.quick-filters .btn-group {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.quick-filters .btn {
+    border-radius: var(--radius-full, 9999px) !important;
+    padding: 0.375rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast, 150ms);
+}
+
+.quick-filters .btn:hover {
+    background: var(--color-primary-subtle);
+    border-color: var(--color-primary);
+    color: var(--text-primary);
+}
+
+.quick-filters .btn.btn-primary,
+.quick-filters .btn-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--text-on-primary, #fff);
+}
+
+.quick-filters .btn.btn-primary:hover,
+.quick-filters .btn-primary:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.quick-filters .btn .badge {
+    font-size: 0.6875rem;
+    padding: 0.15em 0.5em;
+    margin-left: 0.25rem;
+    background: rgba(255,255,255,0.2) !important;
+}
+
+.quick-filters .btn-outline-secondary .badge {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-muted);
+}
+
+/* === Advanced Filters === */
+.advanced-filters .btn-link {
+    color: var(--color-primary-text, var(--color-primary));
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0;
+}
+
+.advanced-filters .btn-link:hover {
+    color: var(--color-primary-hover);
+}
+
+.advanced-filters .btn-link .badge {
+    background: var(--color-primary) !important;
+    color: var(--text-on-primary, #fff);
+    font-size: 0.625rem;
+}
+
+.advanced-filters .filter-panel {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md, 10px);
+}
+
+.advanced-filters .form-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 0.375rem;
+}
+
+.advanced-filters .form-select {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+}
+
+.advanced-filters .form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+/* Tag and Context filter buttons */
+.tag-filter-container,
+.context-filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.tag-filter-container .btn,
+.context-filter-container .btn {
+    border-radius: var(--radius-full, 9999px);
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.tag-filter-container .btn:hover,
+.context-filter-container .btn:hover {
+    background: var(--color-primary-subtle);
+    border-color: var(--color-primary);
+}
+
+.tag-filter-container .btn.btn-primary,
+.context-filter-container .btn.btn-info {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--text-on-primary, #fff);
+}
+
+.advanced-filters .btn-outline-secondary {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+}
+
+.advanced-filters .btn-outline-secondary:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+/* === Sort Section === */
+.sort-section {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+}
+
+.sort-section .form-label {
+    color: var(--text-muted);
+}
+
+.sort-section .form-select {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    min-width: 140px;
+}
+
+.sort-section .form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+/* === Task List === */
+.task-list {
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md, 10px);
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.task-item {
+    cursor: pointer;
+    transition: background-color var(--transition-fast, 150ms);
+    border-bottom: 1px solid var(--border-muted) !important;
+}
+
+.task-item:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.task-item:last-child {
+    border-bottom: none !important;
+}
+
+/* Task title */
+.task-title {
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+/* Task metadata */
+.task-meta {
+    font-size: 0.8125rem;
+}
+
+/* Status badges - using app's status colors */
+.task-meta .badge {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 0.25em 0.625em;
+    border-radius: var(--radius-full, 9999px);
+}
+
+/* Custom status badge colors matching the app */
+.status-badge-nextaction {
+    background: var(--color-primary) !important;
+    color: var(--text-on-primary, #fff) !important;
+}
+
+.status-badge-active {
+    background: var(--color-success) !important;
+    color: var(--text-on-primary, #fff) !important;
+}
+
+.status-badge-inbox {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-default);
+}
+
+.status-badge-waitingfor {
+    background: var(--color-warning) !important;
+    color: var(--text-inverse, #18181b) !important;
+}
+
+.status-badge-scheduled {
+    background: var(--color-info) !important;
+    color: var(--text-on-primary, #fff) !important;
+}
+
+.status-badge-somedaymaybe {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-muted) !important;
+    border: 1px solid var(--border-default);
+}
+
+/* Due date styling */
+.due-date-overdue {
+    color: var(--color-danger) !important;
+    font-weight: 600;
+}
+
+.due-date-today {
+    color: var(--color-warning) !important;
+    font-weight: 600;
+}
+
+.due-date-soon {
+    color: var(--color-warning-light, var(--color-warning)) !important;
+}
+
+.due-date-normal {
+    color: var(--text-muted) !important;
+}
+
+/* Time and energy indicators */
+.task-meta .text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Tags and contexts in task items */
+.task-tags .badge {
+    font-size: 0.625rem;
+    padding: 0.2em 0.5em;
+    background: var(--color-primary-subtle) !important;
+    color: var(--color-primary-text, var(--color-primary)) !important;
+    border: 1px solid var(--color-primary);
+}
+
+.task-tags .badge.bg-info {
+    background: var(--color-info-bg) !important;
+    color: var(--color-info) !important;
+    border: 1px solid var(--color-info-border);
+}
+
+.task-project {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Link button */
+.task-item .btn-outline-primary {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    border-radius: var(--radius-sm, 6px);
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all var(--transition-fast, 150ms);
+}
+
+.task-item .btn-outline-primary:hover {
+    background: var(--color-primary);
+    color: var(--text-on-primary, #fff);
+}
+
+/* Deep work badge */
+.badge.bg-info {
+    background: var(--color-info) !important;
+    color: var(--text-on-primary, #fff) !important;
+}
+
+/* Empty state */
+.task-list .text-muted {
+    color: var(--text-muted) !important;
+}
+
+.task-list .btn-link {
+    color: var(--color-primary-text, var(--color-primary));
+}
+
+/* Priority indicator - ensure proper alignment */
+::deep .priority-indicator {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Priority colors using app's theme */
+::deep .priority-indicator .text-danger {
+    color: var(--color-danger, #dc2626) !important;
+}
+
+::deep .priority-indicator .text-warning {
+    color: var(--color-purple, #a78bfa) !important;
+}
+
+::deep .priority-indicator .text-secondary {
+    color: var(--text-muted) !important;
+}
+
+/* === Responsive === */
+@media (max-width: 576px) {
+    .quick-filters .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.625rem;
+    }
+
+    .quick-filters .btn .oi {
+        display: none;
+    }
+
+    .task-meta {
+        font-size: 0.75rem;
+    }
+}

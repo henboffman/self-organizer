@@ -1,0 +1,78 @@
+@using SelfOrganizer.Core.Models
+
+<div class="d-flex align-items-start gap-2 p-2 rounded milestone-card @GetStatusClass()">
+    <div class="milestone-status-icon mt-1">
+        @switch (Milestone.Status)
+        {
+            case MilestoneStatus.Completed:
+                <span class="oi oi-circle-check text-success"></span>
+                break;
+            case MilestoneStatus.InProgress:
+                <span class="oi oi-media-record text-primary"></span>
+                break;
+            case MilestoneStatus.Skipped:
+                <span class="oi oi-circle-x text-muted"></span>
+                break;
+            default:
+                <span class="oi oi-record text-secondary"></span>
+                break;
+        }
+    </div>
+    <div class="flex-grow-1">
+        <div class="d-flex align-items-center gap-2">
+            <strong class="small">@Milestone.Title</strong>
+            <span class="badge bg-light text-dark small" style="font-size: 0.65em;">@Milestone.Category</span>
+        </div>
+        @if (!string.IsNullOrEmpty(Milestone.Description))
+        {
+            <div class="text-muted small">@Milestone.Description</div>
+        }
+        <div class="text-muted small mt-1">
+            @if (Milestone.TargetDate.HasValue)
+            {
+                <span class="me-2">
+                    <span class="oi oi-calendar me-1"></span>@Milestone.TargetDate.Value.ToString("MMM yyyy")
+                </span>
+            }
+            @if (Milestone.CompletedDate.HasValue)
+            {
+                <span class="text-success">
+                    <span class="oi oi-check me-1"></span>@Milestone.CompletedDate.Value.ToString("MMM yyyy")
+                </span>
+            }
+        </div>
+    </div>
+    @if (ShowActions)
+    {
+        <div class="d-flex gap-1">
+            @if (Milestone.Status != MilestoneStatus.Completed)
+            {
+                <button class="btn btn-sm btn-outline-success" title="Complete" @onclick="() => OnComplete.InvokeAsync(Milestone)">
+                    <span class="oi oi-check"></span>
+                </button>
+            }
+            <button class="btn btn-sm btn-outline-primary" title="Edit" @onclick="() => OnEdit.InvokeAsync(Milestone)">
+                <span class="oi oi-pencil"></span>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" title="Remove" @onclick="() => OnRemove.InvokeAsync(Milestone)">
+                <span class="oi oi-trash"></span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CareerMilestone Milestone { get; set; } = default!;
+    [Parameter] public bool ShowActions { get; set; }
+    [Parameter] public EventCallback<CareerMilestone> OnEdit { get; set; }
+    [Parameter] public EventCallback<CareerMilestone> OnRemove { get; set; }
+    [Parameter] public EventCallback<CareerMilestone> OnComplete { get; set; }
+
+    private string GetStatusClass() => Milestone.Status switch
+    {
+        MilestoneStatus.Completed => "bg-success bg-opacity-10",
+        MilestoneStatus.InProgress => "bg-primary bg-opacity-10",
+        MilestoneStatus.Skipped => "bg-secondary bg-opacity-10",
+        _ => ""
+    };
+}

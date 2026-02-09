@@ -1,0 +1,373 @@
+@page "/skills/new"
+@page "/skills/{SkillId:guid}/edit"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Skills
+@inject ISkillService SkillService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+
+<div class="skill-edit-page">
+    <div class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-outline-secondary" @onclick="GoBack" title="Back to Skills">
+                <span class="oi oi-arrow-left"></span>
+            </button>
+            <h3 class="mb-0">
+                <span class="oi oi-star me-2"></span>
+                @(IsEditMode ? "Edit Skill" : "New Skill")
+            </h3>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="GoBack">Cancel</button>
+            <button class="btn btn-primary" @onclick="SaveSkill" disabled="@(!CanSave)">
+                <span class="oi oi-check me-1"></span>
+                @(IsEditMode ? "Save Changes" : "Create Skill")
+            </button>
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-danger">
+            Skill not found. <a href="skills">Return to Skills</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Name *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Skill Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg" @bind="_skill.Name"
+                                   placeholder="What skill do you have or want to develop?" />
+                            <small class="text-muted">Be specific about the skill</small>
+                        </div>
+
+                        @* Description *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Description</label>
+                            <textarea class="form-control" @bind="_skill.Description" rows="3"
+                                      placeholder="Describe this skill and what it encompasses..."></textarea>
+                        </div>
+
+                        @* Notes *@
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <span class="oi oi-pencil me-1"></span> Learning Notes
+                            </label>
+                            <textarea class="form-control" @bind="_skill.Notes" rows="6"
+                                      placeholder="Learning resources, progress notes, next steps..."></textarea>
+                            <small class="text-muted">Track your learning journey and resources</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Classification</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Type *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Type</label>
+                            <select class="form-select" @bind="_skill.Type">
+                                <option value="@SkillType.Have">Have (already possess)</option>
+                                <option value="@SkillType.Want">Want (to develop)</option>
+                            </select>
+                            <small class="text-muted">Do you already have this skill or want to develop it?</small>
+                        </div>
+
+                        @* Category *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Category</label>
+                            <select class="form-select" @bind="_skill.Category">
+                                @foreach (var cat in Enum.GetValues<SkillCategory>())
+                                {
+                                    <option value="@cat">@GetCategoryLabel(cat)</option>
+                                }
+                            </select>
+                        </div>
+
+                        @* Active *@
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" @bind="_skill.IsActive" id="isActiveSwitch" />
+                                <label class="form-check-label" for="isActiveSwitch">
+                                    @(_skill.IsActive ? "Actively tracking" : "Inactive")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Proficiency</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Current Proficiency *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Current Level: <span class="text-primary">@Skill.GetProficiencyName(_skill.CurrentProficiency)</span>
+                            </label>
+                            <input type="range" class="form-range" min="1" max="5" step="1"
+                                   @bind="_skill.CurrentProficiency" @bind:event="oninput" />
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Novice</small>
+                                <small class="text-muted">Expert</small>
+                            </div>
+                        </div>
+
+                        @* Target Proficiency *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Target Level: <span class="text-success">@Skill.GetProficiencyName(_skill.TargetProficiency)</span>
+                            </label>
+                            <input type="range" class="form-range" min="1" max="5" step="1"
+                                   @bind="_skill.TargetProficiency" @bind:event="oninput" />
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">Novice</small>
+                                <small class="text-muted">Expert</small>
+                            </div>
+                        </div>
+
+                        @* Progress Preview *@
+                        <div class="mt-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small>Progress</small>
+                                <small class="fw-bold">@_skill.ProgressPercent%</small>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar @GetProgressBarClass()"
+                                     role="progressbar"
+                                     style="width: @_skill.ProgressPercent%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Dates</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Start Date *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Start Date</label>
+                            <input type="date" class="form-control" @bind="_skill.StartDate" />
+                            <small class="text-muted">When did you start developing this skill?</small>
+                        </div>
+
+                        @* Target Date *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Target Date</label>
+                            <input type="date" class="form-control" @bind="_skill.TargetDate" />
+                            <small class="text-muted">When do you want to reach your target?</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Appearance</h5>
+                    </div>
+                    <div class="card-body">
+                        @* Icon *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Icon (optional)</label>
+                            <input type="text" class="form-control" @bind="_skill.Icon"
+                                   placeholder="Emoji or icon class" />
+                            <small class="text-muted">Use an emoji or Open Iconic class name</small>
+                        </div>
+
+                        @* Color *@
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Color (optional)</label>
+                            <div class="input-group">
+                                <input type="color" class="form-control form-control-color" @bind="_skill.Color" />
+                                <input type="text" class="form-control" @bind="_skill.Color" placeholder="#3b82f6" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tags</h5>
+                    </div>
+                    <div class="card-body">
+                        <input type="text" class="form-control" @bind="_tagsInput" @bind:event="oninput"
+                               placeholder="#tag1 #tag2 #tag3" />
+                        <small class="text-muted">Use #hashtags separated by spaces</small>
+
+                        @{var skillTags = _skill.Tags ?? new List<string>();}
+                        @if (skillTags.Any())
+                        {
+                            <div class="mt-2">
+                                @foreach (var tag in skillTags)
+                                {
+                                    <span class="badge bg-secondary me-1">#@tag</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Bottom action bar for mobile *@
+        <div class="d-lg-none fixed-bottom bg-body border-top p-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary flex-fill" @onclick="GoBack">Cancel</button>
+                <button class="btn btn-primary flex-fill" @onclick="SaveSkill" disabled="@(!CanSave)">
+                    <span class="oi oi-check me-1"></span>
+                    @(IsEditMode ? "Save" : "Create")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? SkillId { get; set; }
+
+    private Skill _skill = new();
+    private string _tagsInput = "";
+    private bool _isLoading = true;
+    private bool _notFound = false;
+
+    private bool IsEditMode => SkillId.HasValue;
+    private bool CanSave => !string.IsNullOrWhiteSpace(_skill.Name) && _skill.Name.Length >= 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode)
+        {
+            var existingSkill = await SkillService.GetByIdAsync(SkillId!.Value);
+            if (existingSkill == null)
+            {
+                _notFound = true;
+            }
+            else
+            {
+                _skill = new Skill
+                {
+                    Id = existingSkill.Id,
+                    Name = existingSkill.Name,
+                    Description = existingSkill.Description,
+                    Icon = existingSkill.Icon,
+                    Color = existingSkill.Color,
+                    Category = existingSkill.Category,
+                    Type = existingSkill.Type,
+                    CurrentProficiency = existingSkill.CurrentProficiency,
+                    TargetProficiency = existingSkill.TargetProficiency,
+                    SortOrder = existingSkill.SortOrder,
+                    IsActive = existingSkill.IsActive,
+                    StartDate = existingSkill.StartDate,
+                    TargetDate = existingSkill.TargetDate,
+                    LinkedGoalIds = new List<Guid>(existingSkill.LinkedGoalIds),
+                    LinkedProjectIds = new List<Guid>(existingSkill.LinkedProjectIds),
+                    LinkedHabitIds = new List<Guid>(existingSkill.LinkedHabitIds),
+                    LinkedTaskIds = new List<Guid>(existingSkill.LinkedTaskIds),
+                    AiRationale = existingSkill.AiRationale,
+                    IsAiSuggested = existingSkill.IsAiSuggested,
+                    Notes = existingSkill.Notes,
+                    Tags = new List<string>(existingSkill.Tags),
+                    CreatedAt = existingSkill.CreatedAt,
+                    ModifiedAt = existingSkill.ModifiedAt
+                };
+                _tagsInput = string.Join(" ", _skill.Tags.Select(t => $"#{t}"));
+            }
+        }
+        else
+        {
+            _skill = new Skill
+            {
+                Type = SkillType.Want,
+                Category = SkillCategory.Technical,
+                CurrentProficiency = 1,
+                TargetProficiency = 3,
+                IsActive = true,
+                StartDate = DateTime.Today
+            };
+        }
+        _isLoading = false;
+    }
+
+    private async Task SaveSkill()
+    {
+        if (!CanSave) return;
+
+        // Parse tags
+        _skill.Tags = ParseTags(_tagsInput);
+        _skill.ModifiedAt = DateTime.UtcNow;
+
+        if (IsEditMode)
+        {
+            await SkillService.UpdateAsync(_skill);
+        }
+        else
+        {
+            _skill.CreatedAt = DateTime.UtcNow;
+            await SkillService.CreateAsync(_skill);
+        }
+
+        DataChangeNotification.NotifyDataChanged();
+        NavigationManager.NavigateTo("skills");
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("skills");
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string GetCategoryLabel(SkillCategory category) => category switch
+    {
+        SkillCategory.Technical => "Technical",
+        SkillCategory.SoftSkills => "Soft Skills",
+        SkillCategory.Creative => "Creative",
+        SkillCategory.DomainKnowledge => "Domain Knowledge",
+        SkillCategory.ToolsSoftware => "Tools & Software",
+        _ => category.ToString()
+    };
+
+    private string GetProgressBarClass()
+    {
+        var progress = _skill.ProgressPercent;
+        if (progress >= 100) return "bg-success";
+        if (progress >= 75) return "bg-info";
+        if (progress >= 50) return "bg-primary";
+        if (progress >= 25) return "bg-warning";
+        return "bg-secondary";
+    }
+}

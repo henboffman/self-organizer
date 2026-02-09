@@ -4,13 +4,13 @@
 }
 
 /* Compact event card styling */
-.event-card-compact {
+.calendar-page .event-card-compact {
     background-color: var(--card-bg);
-    border-color: var(--border-default) !important;
+    border-color: var(--border-default);
     transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.event-card-compact:hover {
+.calendar-page .event-card-compact:hover {
     background-color: var(--bg-tertiary);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -289,8 +289,8 @@
     background: linear-gradient(90deg, rgba(66, 133, 244, 0.05) 0%, transparent 100%);
 }
 
-.event-external.border-bottom {
-    border-left: 3px solid var(--color-info) !important;
+.calendar-page .event-external.border-bottom {
+    border-left: 3px solid var(--color-info);
 }
 
 /* Smart blocks - Prep and Decompress */

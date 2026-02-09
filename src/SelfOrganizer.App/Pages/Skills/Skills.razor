@@ -1,0 +1,127 @@
+@page "/skills"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
+@using SelfOrganizer.App.Components.Skills
+@inject ISkillService SkillService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        <span class="oi oi-star me-2"></span>Skills
+    </h3>
+    <button class="btn btn-primary" @onclick="NavigateToNewSkill">
+        <span class="oi oi-plus me-1"></span> New Skill
+    </button>
+</div>
+
+@* Filter Tabs *@
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_typeFilter == "all" ? "active" : "")" @onclick="@(() => FilterByType("all"))">
+            All
+            @if (_allCount > 0)
+            {
+                <span class="badge bg-secondary ms-1">@_allCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_typeFilter == "have" ? "active" : "")" @onclick="@(() => FilterByType("have"))">
+            Have
+            @if (_haveCount > 0)
+            {
+                <span class="badge bg-success ms-1">@_haveCount</span>
+            }
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_typeFilter == "want" ? "active" : "")" @onclick="@(() => FilterByType("want"))">
+            Want
+            @if (_wantCount > 0)
+            {
+                <span class="badge bg-info ms-1">@_wantCount</span>
+            }
+        </button>
+    </li>
+</ul>
+
+@* Category Pills *@
+<div class="mb-4 d-flex flex-wrap gap-2">
+    <button class="btn btn-sm @(_categoryFilter == null ? "btn-primary" : "btn-outline-secondary")"
+            @onclick="@(() => FilterByCategory(null))">
+        All Categories
+    </button>
+    @foreach (var cat in Enum.GetValues<SkillCategory>())
+    {
+        var count = _allSkills.Count(s => s.Category == cat && s.IsActive);
+        <button class="btn btn-sm @(_categoryFilter == cat ? "btn-primary" : "btn-outline-secondary")"
+                @onclick="@(() => FilterByCategory(cat))">
+            @GetCategoryLabel(cat)
+            @if (count > 0)
+            {
+                <span class="badge bg-light text-dark ms-1">@count</span>
+            }
+        </button>
+    }
+</div>
+
+@if (_isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!_filteredSkills.Any())
+{
+    <div class="text-center py-5">
+        <h5 class="text-muted">No @GetTypeLabel() skills</h5>
+        <p class="text-muted">@GetEmptyMessage()</p>
+        <button class="btn btn-primary mt-2" @onclick="NavigateToNewSkill">
+            <span class="oi oi-plus me-1"></span> Add Your First Skill
+        </button>
+    </div>
+}
+else
+{
+    @* Skill Cards Grid *@
+    <div class="row">
+        @foreach (var skill in _filteredSkills.OrderBy(s => s.Type).ThenBy(s => s.SortOrder).ThenBy(s => s.Name))
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <SkillCard
+                    Skill="skill"
+                    CompletedTaskCount="@GetCompletedTaskCount(skill.Id)"
+                    OnClick="@(() => ShowDetailModal(skill))"
+                    OnEdit="@(() => NavigateToEditSkill(skill.Id))"
+                    OnLevelUp="@(() => LevelUpSkill(skill))"
+                    OnDelete="@(() => DeleteSkill(skill))" />
+            </div>
+        }
+    </div>
+}
+
+@* Skill Detail Modal *@
+<Modal Title="Skill Details" IsVisible="@_showDetailModal" OnClose="CloseDetailModal" Size="modal-lg">
+    <ChildContent>
+        @if (_viewingSkill != null)
+        {
+            <SkillDetail
+                Skill="_viewingSkill"
+                OnEdit="@(() => { var id = _viewingSkill!.Id; CloseDetailModal(); NavigateToEditSkill(id); })"
+                OnClose="CloseDetailModal"
+                OnSkillUpdated="OnSkillUpdatedFromDetail" />
+        }
+    </ChildContent>
+</Modal>
+
+<ConfirmDialog
+    Title="Delete Skill"
+    Message="Are you sure you want to delete this skill? This action cannot be undone."
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="@(() => _showDeleteConfirm = false)" />

@@ -48,8 +48,12 @@ window.keyboardShortcuts = {
                 return;
             }
 
-            // Cmd+Enter for quick capture (works even when typing)
+            // Cmd+Enter for quick capture (works even when typing, but not inside modals)
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                // If a modal is open, let the event propagate to the modal's own handler
+                if (document.querySelector('.modal.show')) {
+                    return;
+                }
                 e.preventDefault();
                 if (this._dotNetRef) {
                     this._dotNetRef.invokeMethodAsync('OnQuickCaptureShortcut');
@@ -129,16 +133,16 @@ window.keyboardShortcuts = {
                 this._pendingNavKey = null;
 
                 const navRoutes = {
-                    'h': '/',           // Home
-                    'i': '/inbox',      // Inbox
-                    't': '/tasks',      // Tasks
-                    'p': '/projects',   // Projects
-                    'c': '/calendar',   // Calendar
-                    'g': '/goals',      // Goals
-                    'd': '/ideas',      // Ideas
-                    's': '/settings',   // Settings
-                    'f': '/focus',      // Focus timer
-                    'r': '/review/daily' // Review
+                    'h': '',            // Home
+                    'i': 'inbox',       // Inbox
+                    't': 'tasks',       // Tasks
+                    'p': 'projects',    // Projects
+                    'c': 'calendar',    // Calendar
+                    'g': 'goals',       // Goals
+                    'd': 'ideas',       // Ideas
+                    's': 'settings',    // Settings
+                    'f': 'focus',       // Focus timer
+                    'r': 'review/daily' // Review
                 };
 
                 const route = navRoutes[e.key];

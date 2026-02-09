@@ -297,4 +297,17 @@ public class UserPreferences : BaseEntity
 
     /// <summary>Last successful sync timestamp</summary>
     public DateTime? GoogleCalendarLastSyncTime { get; set; }
+
+    // Outlook Calendar (Microsoft Entra)
+    /// <summary>IDs of Outlook calendars selected for sync</summary>
+    public List<string>? OutlookCalendarSelectedIds { get; set; }
+
+    /// <summary>How many days in the past to sync from Outlook</summary>
+    public int OutlookCalendarSyncPastDays { get; set; } = 7;
+
+    /// <summary>How many days in the future to sync from Outlook</summary>
+    public int OutlookCalendarSyncFutureDays { get; set; } = 30;
+
+    /// <summary>Last successful Outlook sync timestamp</summary>
+    public DateTime? OutlookCalendarLastSyncTime { get; set; }
 }

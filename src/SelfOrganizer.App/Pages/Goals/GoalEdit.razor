@@ -191,6 +191,17 @@
 
                 <div class="card mb-4">
                     <div class="card-header">
+                        <h5 class="mb-0">External Link</h5>
+                    </div>
+                    <div class="card-body">
+                        <input type="url" class="form-control" @bind="_goal.Url"
+                               placeholder="https://..." />
+                        <small class="text-muted">Link to a time tracker, portfolio, or external tool</small>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
                         <h5 class="mb-0">Tags</h5>
                     </div>
                     <div class="card-body">
@@ -198,10 +209,11 @@
                                placeholder="#tag1 #tag2 #tag3" />
                         <small class="text-muted">Use #hashtags separated by spaces</small>
 
-                        @if (_goal.Tags.Any())
+                        @{var goalEditTags = _goal.Tags ?? new List<string>();}
+                        @if (goalEditTags.Any())
                         {
                             <div class="mt-2">
-                                @foreach (var tag in _goal.Tags)
+                                @foreach (var tag in goalEditTags)
                                 {
                                     <span class="badge bg-primary me-1">#@tag</span>
                                 }
@@ -232,6 +244,14 @@
                     <GoalHabitsPanel Goal="_goal"
                                      GoalChanged="OnGoalChanged"
                                      OnHabitCreated="OnHabitCreated" />
+                }
+
+                @* Skills Panel - show prominently in edit mode *@
+                @if (IsEditMode && _goal.Id != Guid.Empty)
+                {
+                    <GoalSkillsPanel Goal="_goal"
+                                     GoalChanged="OnGoalChanged"
+                                     OnSkillCreated="OnSkillCreated" />
                 }
 
                 @* Balance Impact Section *@
@@ -377,6 +397,7 @@
                     Tags = new List<string>(existingGoal.Tags),
                     AiGeneratedPlan = existingGoal.AiGeneratedPlan,
                     Notes = existingGoal.Notes,
+                    Url = existingGoal.Url,
                     CreatedAt = existingGoal.CreatedAt,
                     ModifiedAt = existingGoal.ModifiedAt,
                     // Balance fields
@@ -516,6 +537,20 @@
         if (!_goal.LinkedHabitIds.Contains(habit.Id))
         {
             _goal.LinkedHabitIds.Add(habit.Id);
+        }
+
+        // Save the goal to persist the link
+        await GoalService.UpdateAsync(_goal);
+        DataChangeNotification.NotifyDataChanged();
+        StateHasChanged();
+    }
+
+    private async Task OnSkillCreated(Skill skill)
+    {
+        // Link the skill to the goal (already done by the panel, just update local state)
+        if (!_goal.LinkedSkillIds.Contains(skill.Id))
+        {
+            _goal.LinkedSkillIds.Add(skill.Id);
         }
 
         // Save the goal to persist the link

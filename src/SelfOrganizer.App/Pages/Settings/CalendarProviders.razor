@@ -2,16 +2,15 @@
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.Core.Interfaces
 @using SelfOrganizer.App.Services
-@using SelfOrganizer.App.Services.GoogleCalendar
+@using SelfOrganizer.App.Services.OutlookCalendar
 @using SelfOrganizer.App.Components.Shared
 @using Microsoft.AspNetCore.Components.Web
 @inject IExternalCalendarService ExternalCalendarService
 @inject IRepository<UserPreferences> PreferencesRepository
 @inject IDataChangeNotificationService DataChangeNotification
-@inject IGoogleCalendarAuthService GoogleAuthService
-@inject IGoogleCalendarSyncService GoogleSyncService
+@inject IOutlookCalendarSyncService OutlookSyncService
+@inject IEntraAuthService AuthService
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
@@ -33,22 +32,24 @@
 
 <div class="row">
     <div class="col-lg-8">
-        @* Google Calendar *@
+        @* Microsoft Outlook *@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
-                    <span class="me-2" style="font-size: 1.2rem;">
-                        <div class="google-icon-small">G</div>
+                    <span class="me-2" style="color: #0078d4; font-size: 1.2rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M21 3H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-9 14H4V7h8v10zm8 0h-6v-4h6v4zm0-6h-6V7h6v4z"/>
+                        </svg>
                     </span>
-                    <span>Google Calendar</span>
+                    <span>Microsoft Outlook</span>
                 </div>
-                @if (_googleConnected)
+                @if (_outlookConnected)
                 {
                     <span class="badge bg-success"><span class="oi oi-check me-1"></span>Connected</span>
                 }
-                else if (!_googleConfigured)
+                else if (!_isAuthenticated)
                 {
-                    <span class="badge bg-warning text-dark">Not Configured</span>
+                    <span class="badge bg-warning text-dark">Sign In Required</span>
                 }
                 else
                 {
@@ -56,23 +57,25 @@
                 }
             </div>
             <div class="card-body">
-                @if (!_googleConfigured)
+                @if (!_isAuthenticated)
                 {
-                    <div class="alert alert-warning mb-3">
-                        <span class="oi oi-warning me-2"></span>
-                        <strong>Server Configuration Required</strong>
+                    <div class="alert alert-info mb-3">
+                        <span class="oi oi-info me-2"></span>
+                        <strong>Sign In Required</strong>
                         <p class="mb-0 small mt-1">
-                            Google Calendar OAuth requires server-side configuration. Please add your Google OAuth credentials
-                            to the server's appsettings.json file.
+                            Please sign in with your Microsoft account to connect Outlook calendar.
                         </p>
                     </div>
+                    <button class="btn btn-primary" @onclick="SignIn">
+                        <span class="oi oi-account-login me-1"></span> Sign In with Microsoft
+                    </button>
                 }
-                else if (!_googleConnected)
+                else if (!_outlookConnected)
                 {
                     <p class="text-muted">
-                        Connect your Google Calendar to automatically sync events and meetings.
+                        Connect your Outlook Calendar to automatically sync events and meetings.
                     </p>
-                    <button class="btn btn-outline-primary" @onclick="ConnectGoogleCalendar" disabled="@_isConnecting">
+                    <button class="btn btn-outline-primary" @onclick="ConnectOutlookCalendar" disabled="@_isConnecting">
                         @if (_isConnecting)
                         {
                             <span class="spinner-border spinner-border-sm me-1"></span>
@@ -81,7 +84,7 @@
                         else
                         {
                             <span class="oi oi-external-link me-1"></span>
-                            <span>Connect Google Calendar</span>
+                            <span>Connect Outlook Calendar</span>
                         }
                     </button>
                 }
@@ -90,8 +93,8 @@
                     <div class="mb-3">
                         <label class="form-label">Connected Account</label>
                         <div class="d-flex align-items-center">
-                            <span class="me-2">@_googleEmail</span>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="DisconnectGoogleCalendar">
+                            <span class="me-2">@_outlookEmail</span>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="DisconnectOutlookCalendar">
                                 <span class="oi oi-account-logout me-1"></span> Disconnect
                             </button>
                         </div>
@@ -106,20 +109,20 @@
                                 Loading calendars...
                             </div>
                         }
-                        else if (_googleCalendars.Any())
+                        else if (_outlookCalendars.Any())
                         {
-                            @foreach (var cal in _googleCalendars)
+                            @foreach (var cal in _outlookCalendars)
                             {
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="cal-@cal.Id"
                                            checked="@cal.Selected"
                                            @onchange="() => ToggleCalendarSelection(cal)" />
                                     <label class="form-check-label" for="cal-@cal.Id">
-                                        <span class="me-2" style="color: @(cal.BackgroundColor ?? "#4285f4");">@("\u25CF")</span>
-                                        @cal.Summary
-                                        @if (cal.Primary)
+                                        <span class="me-2" style="color: @(cal.Color ?? "#0078d4");">@("\u25CF")</span>
+                                        @cal.Name
+                                        @if (cal.IsDefault)
                                         {
-                                            <span class="badge bg-primary ms-1">Primary</span>
+                                            <span class="badge bg-primary ms-1">Default</span>
                                         }
                                     </label>
                                 </div>
@@ -169,7 +172,7 @@
                                 <span>Never synced</span>
                             }
                         </div>
-                        <button class="btn btn-primary" @onclick="SyncGoogleCalendar" disabled="@_isSyncing">
+                        <button class="btn btn-primary" @onclick="SyncOutlookCalendar" disabled="@_isSyncing">
                             @if (_isSyncing)
                             {
                                 <span class="spinner-border spinner-border-sm me-1"></span>
@@ -197,7 +200,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted">
-                    Import calendar events from .ics files exported from Google Calendar, Outlook, or other calendar applications.
+                    Import calendar events from .ics files exported from Outlook, Google Calendar, or other calendar applications.
                 </p>
 
                 <div class="mb-3">
@@ -243,29 +246,6 @@
                 </button>
             </div>
         </div>
-
-        @* Microsoft Outlook (Future) *@
-        <div class="card mb-4 opacity-75">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <span class="me-2" style="color: #0078d4; font-size: 1.2rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M21 3H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-9 14H4V7h8v10zm8 0h-6v-4h6v4zm0-6h-6V7h6v4z"/>
-                        </svg>
-                    </span>
-                    <span>Microsoft Outlook</span>
-                </div>
-                <span class="badge bg-secondary">Coming Soon</span>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">
-                    Microsoft Outlook integration via Microsoft Graph API will be available in a future update.
-                </p>
-                <button class="btn btn-outline-secondary" disabled>
-                    <span class="oi oi-external-link me-1"></span> Connect Outlook
-                </button>
-            </div>
-        </div>
     </div>
 
     <div class="col-lg-4">
@@ -278,8 +258,8 @@
                     <strong>@_totalExternalEvents</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span>Google Calendar:</span>
-                    <strong>@_googleEventCount</strong>
+                    <span>Outlook Calendar:</span>
+                    <strong>@_outlookEventCount</strong>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
                     <span>ICS Imports:</span>
@@ -310,8 +290,8 @@
 
                 <h6>ICS Export Tips</h6>
                 <ul class="text-muted mb-0">
-                    <li>Google Calendar: Settings > Import & Export > Export</li>
                     <li>Outlook: File > Open & Export > Import/Export</li>
+                    <li>Google Calendar: Settings > Import & Export > Export</li>
                     <li>Apple Calendar: File > Export > Export...</li>
                 </ul>
             </div>
@@ -319,34 +299,21 @@
     </div>
 </div>
 
-<style>
-    .google-icon-small {
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 0.9rem;
-        color: white;
-        background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335);
-    }
-</style>
-
 @code {
-    // Google Calendar state
-    private bool _googleConfigured = false;
-    private bool _googleConnected = false;
-    private string? _googleEmail;
-    private List<GoogleCalendarDto> _googleCalendars = new();
+    // Authentication state
+    private bool _isAuthenticated = false;
+
+    // Outlook Calendar state
+    private bool _outlookConnected = false;
+    private string? _outlookEmail;
+    private List<OutlookCalendarDto> _outlookCalendars = new();
     private int _syncPastDays = 7;
     private int _syncFutureDays = 30;
     private DateTime? _lastSyncTime;
     private bool _isConnecting = false;
     private bool _isSyncing = false;
     private bool _isLoadingCalendars = false;
-    private CalendarSyncResult? _syncResult;
+    private CalendarSyncResultCore? _syncResult;
 
     // ICS Import state
     private string? _icsFileName;
@@ -356,7 +323,7 @@
 
     // Statistics
     private int _totalExternalEvents = 0;
-    private int _googleEventCount = 0;
+    private int _outlookEventCount = 0;
     private int _icsEventCount = 0;
     private int _linkedEventCount = 0;
 
@@ -366,36 +333,61 @@
         public string Message { get; set; } = "";
     }
 
+    private class OutlookCalendarDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? Color { get; set; }
+        public bool IsDefault { get; set; }
+        public bool Selected { get; set; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        // Check for OAuth callback
-        var uri = new Uri(Navigation.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        var code = query["code"];
+        _isAuthenticated = AuthService.State == AuthState.Authenticated;
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
 
-        if (!string.IsNullOrEmpty(code))
+        if (_isAuthenticated)
         {
-            // Complete the OAuth flow
-            await CompleteOAuthCallback(code);
+            await LoadOutlookStatus();
         }
 
-        await LoadGoogleStatus();
         await LoadStatistics();
         await LoadSyncSettings();
     }
 
-    private async Task LoadGoogleStatus()
+    private void HandleAuthStateChanged(AuthState state)
     {
-        _googleConfigured = await GoogleAuthService.IsConfiguredAsync();
-        _googleConnected = await GoogleAuthService.IsConnectedAsync();
+        _isAuthenticated = state == AuthState.Authenticated;
+        InvokeAsync(StateHasChanged);
+    }
 
-        if (_googleConnected)
+    private void SignIn()
+    {
+        // Navigate to login
+        Navigation.NavigateTo("api/auth/login?returnUrl=" + Uri.EscapeDataString(Navigation.Uri), true);
+    }
+
+    private async Task LoadOutlookStatus()
+    {
+        // Check if we can access calendars (which indicates we're connected)
+        try
+        {
+            var calendars = await OutlookSyncService.GetCalendarsAsync();
+            _outlookConnected = calendars.Any();
+        }
+        catch
+        {
+            _outlookConnected = false;
+        }
+
+        if (_outlookConnected)
         {
             var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
-            _googleEmail = prefs?.GoogleCalendarEmail;
-            _lastSyncTime = prefs?.GoogleCalendarLastSyncTime;
-            _syncPastDays = prefs?.GoogleCalendarSyncPastDays ?? 7;
-            _syncFutureDays = prefs?.GoogleCalendarSyncFutureDays ?? 30;
+            _outlookEmail = AuthService.CurrentUser?.Email;
+            _lastSyncTime = prefs?.OutlookCalendarLastSyncTime;
+            _syncPastDays = prefs?.OutlookCalendarSyncPastDays ?? 7;
+            _syncFutureDays = prefs?.OutlookCalendarSyncFutureDays ?? 30;
 
             await LoadCalendars();
         }
@@ -408,7 +400,22 @@
 
         try
         {
-            _googleCalendars = await GoogleSyncService.GetCalendarsAsync();
+            var calendars = await OutlookSyncService.GetCalendarsAsync();
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            var selectedIds = prefs?.OutlookCalendarSelectedIds ?? new List<string>();
+
+            _outlookCalendars = calendars.Select(c => new OutlookCalendarDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Color = c.Color,
+                IsDefault = c.IsDefaultCalendar,
+                Selected = selectedIds.Contains(c.Id) || (selectedIds.Count == 0 && c.IsDefaultCalendar)
+            }).ToList();
+        }
+        catch
+        {
+            _outlookCalendars = new List<OutlookCalendarDto>();
         }
         finally
         {
@@ -420,7 +427,7 @@
     {
         // TODO: Query actual event counts from calendar service
         _totalExternalEvents = 0;
-        _googleEventCount = 0;
+        _outlookEventCount = 0;
         _icsEventCount = 0;
         _linkedEventCount = 0;
         await Task.CompletedTask;
@@ -431,33 +438,25 @@
         var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
         if (prefs != null)
         {
-            _syncPastDays = prefs.GoogleCalendarSyncPastDays;
-            _syncFutureDays = prefs.GoogleCalendarSyncFutureDays;
+            _syncPastDays = prefs.OutlookCalendarSyncPastDays;
+            _syncFutureDays = prefs.OutlookCalendarSyncFutureDays;
         }
     }
 
-    private async Task ConnectGoogleCalendar()
+    private async Task ConnectOutlookCalendar()
     {
         _isConnecting = true;
         StateHasChanged();
 
         try
         {
-            var result = await GoogleAuthService.StartAuthFlowAsync();
+            // In the hosted model, we just need to check if calendars are accessible
+            await LoadCalendars();
+            _outlookConnected = _outlookCalendars.Any();
 
-            if (result.Success && !string.IsNullOrEmpty(result.AuthUrl))
+            if (_outlookConnected)
             {
-                // Redirect to Google OAuth
-                await JS.InvokeVoidAsync("open", result.AuthUrl, "_self");
-            }
-            else
-            {
-                // Show error
-                _syncResult = new CalendarSyncResult
-                {
-                    Success = false,
-                    Error = result.Error ?? "Failed to start authorization"
-                };
+                _outlookEmail = AuthService.CurrentUser?.Email;
             }
         }
         finally
@@ -466,57 +465,30 @@
         }
     }
 
-    private async Task CompleteOAuthCallback(string code)
+    private async Task DisconnectOutlookCalendar()
     {
-        _isConnecting = true;
-        StateHasChanged();
-
-        try
+        // Clear Outlook calendar settings from preferences
+        var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+        if (prefs != null)
         {
-            var result = await GoogleAuthService.CompleteAuthFlowAsync(code);
-
-            if (result.Success)
-            {
-                _googleConnected = true;
-                _googleEmail = result.Email;
-
-                // Clear the query string
-                Navigation.NavigateTo("settings/calendar-providers", replace: true);
-
-                // Load calendars
-                await LoadCalendars();
-            }
-            else
-            {
-                _syncResult = new CalendarSyncResult
-                {
-                    Success = false,
-                    Error = result.Error ?? "Authorization failed"
-                };
-            }
+            prefs.OutlookCalendarSelectedIds = new List<string>();
+            prefs.OutlookCalendarLastSyncTime = null;
+            await PreferencesRepository.UpdateAsync(prefs);
         }
-        finally
-        {
-            _isConnecting = false;
-        }
-    }
 
-    private async Task DisconnectGoogleCalendar()
-    {
-        await GoogleAuthService.DisconnectAsync();
-        _googleConnected = false;
-        _googleEmail = null;
-        _googleCalendars.Clear();
+        _outlookConnected = false;
+        _outlookEmail = null;
+        _outlookCalendars.Clear();
         _lastSyncTime = null;
         _syncResult = null;
     }
 
-    private void ToggleCalendarSelection(GoogleCalendarDto calendar)
+    private void ToggleCalendarSelection(OutlookCalendarDto calendar)
     {
         calendar.Selected = !calendar.Selected;
     }
 
-    private async Task SyncGoogleCalendar()
+    private async Task SyncOutlookCalendar()
     {
         _isSyncing = true;
         _syncResult = null;
@@ -524,11 +496,11 @@
 
         try
         {
-            var selectedCalendars = _googleCalendars.Where(c => c.Selected).Select(c => c.Id);
+            var selectedCalendars = _outlookCalendars.Where(c => c.Selected).Select(c => c.Id);
 
             if (!selectedCalendars.Any())
             {
-                _syncResult = new CalendarSyncResult
+                _syncResult = new CalendarSyncResultCore
                 {
                     Success = false,
                     Error = "Please select at least one calendar to sync"
@@ -536,11 +508,29 @@
                 return;
             }
 
-            _syncResult = await GoogleSyncService.SyncCalendarsAsync(selectedCalendars, _syncPastDays, _syncFutureDays);
+            // Save selected calendars to preferences
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            if (prefs != null)
+            {
+                prefs.OutlookCalendarSelectedIds = selectedCalendars.ToList();
+                prefs.OutlookCalendarSyncPastDays = _syncPastDays;
+                prefs.OutlookCalendarSyncFutureDays = _syncFutureDays;
+                await PreferencesRepository.UpdateAsync(prefs);
+            }
+
+            _syncResult = await OutlookSyncService.SyncCalendarsAsync(selectedCalendars, _syncPastDays, _syncFutureDays);
 
             if (_syncResult.Success)
             {
                 _lastSyncTime = DateTime.UtcNow;
+
+                // Update last sync time in preferences
+                if (prefs != null)
+                {
+                    prefs.OutlookCalendarLastSyncTime = _lastSyncTime;
+                    await PreferencesRepository.UpdateAsync(prefs);
+                }
+
                 await LoadStatistics();
                 DataChangeNotification.NotifyDataChanged();
             }
@@ -623,5 +613,10 @@
         {
             _isImporting = false;
         }
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
     }
 }

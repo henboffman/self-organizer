@@ -16,7 +16,8 @@
                 @for (int i = 0; i < TotalSteps; i++)
                 {
                     var stepIndex = i;
-                    <div class="progress-step @(stepIndex == _currentStep ? "active" : "") @(stepIndex < _currentStep ? "completed" : "")"
+                    var isInteractive = IsInteractiveStep(stepIndex);
+                    <div class="progress-step @(stepIndex == _currentStep ? "active" : "") @(stepIndex < _currentStep ? "completed" : "") @(isInteractive ? "interactive" : "")"
                          @onclick="() => GoToStep(stepIndex)">
                         <div class="step-dot">
                             @if (stepIndex < _currentStep)
@@ -41,7 +42,7 @@
                         @* Theme Selection - First step for immediate visual comfort *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-sun" style="font-size: 3rem; color: #f59e0b;"></span>
+                                <span class="oi oi-sun step-icon-large icon-theme-sun"></span>
                             </div>
                             <h2 class="mb-3">Choose Your Theme</h2>
                             <p class="text-muted mb-4">
@@ -102,7 +103,7 @@
                         @* Accessibility Settings *@
                         <div class="text-center animate-fade-in">
                             <div class="step-icon mb-3">
-                                <span class="oi oi-text" style="font-size: 3rem; color: #8b5cf6;"></span>
+                                <span class="oi oi-text step-icon-large icon-a11y-text"></span>
                             </div>
                             <h2 class="mb-3">Reading Preferences</h2>
                             <p class="text-muted mb-4">
@@ -136,16 +137,19 @@
                                 <div class="accessibility-option">
                                     <label class="option-label">Reduce Motion</label>
                                     <div class="toggle-group">
-                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.RespectSystem ? "selected" : "")"
-                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.RespectSystem)">
+                                        <button
+                                            class="toggle-btn @(_reducedMotion == ReducedMotionMode.RespectSystem ? "selected" : "")"
+                                            @onclick="() => SelectReducedMotion(ReducedMotionMode.RespectSystem)">
                                             System
                                         </button>
-                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.AlwaysReduce ? "selected" : "")"
-                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.AlwaysReduce)">
+                                        <button
+                                            class="toggle-btn @(_reducedMotion == ReducedMotionMode.AlwaysReduce ? "selected" : "")"
+                                            @onclick="() => SelectReducedMotion(ReducedMotionMode.AlwaysReduce)">
                                             Reduce
                                         </button>
-                                        <button class="toggle-btn @(_reducedMotion == ReducedMotionMode.NeverReduce ? "selected" : "")"
-                                                @onclick="() => SelectReducedMotion(ReducedMotionMode.NeverReduce)">
+                                        <button
+                                            class="toggle-btn @(_reducedMotion == ReducedMotionMode.NeverReduce ? "selected" : "")"
+                                            @onclick="() => SelectReducedMotion(ReducedMotionMode.NeverReduce)">
                                             Full
                                         </button>
                                     </div>
@@ -153,8 +157,7 @@
 
                                 <div class="accessibility-option">
                                     <label class="option-label">High Contrast</label>
-                                    <button class="contrast-toggle @(_highContrast ? "enabled" : "")"
-                                            @onclick="ToggleHighContrast">
+                                    <button class="contrast-toggle @(_highContrast ? "enabled" : "")" @onclick="ToggleHighContrast">
                                         <span class="toggle-track">
                                             <span class="toggle-thumb"></span>
                                         </span>
@@ -175,11 +178,12 @@
                         @* Welcome *@
                         <div class="text-center animate-fade-in">
                             <div class="welcome-icon mb-3">
-                                <span class="oi oi-task" style="font-size: 4rem; color: #0d6efd;"></span>
+                                <span class="oi oi-task step-icon-xl icon-welcome-task"></span>
                             </div>
                             <h2 class="mb-3">Welcome to Self Organizer</h2>
                             <p class="lead text-muted mb-4">
-                                A GTD-inspired productivity app designed to help you capture, organize, and focus on what matters most.
+                                A GTD-inspired productivity app designed to help you capture, organize, and focus on what matters
+                                most — with AI coaching and neurodivergent-friendly design.
                             </p>
                             <div class="features-grid">
                                 <div class="feature-item animate-pop-in" style="animation-delay: 0.1s">
@@ -198,15 +202,27 @@
                                     <span class="oi oi-graph"></span>
                                     <span>Life Balance</span>
                                 </div>
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.5s">
+                                    <span class="oi oi-pulse"></span>
+                                    <span>Habit Tracking</span>
+                                </div>
+                                <div class="feature-item animate-pop-in" style="animation-delay: 0.6s">
+                                    <span class="oi oi-lightbulb"></span>
+                                    <span>AI Suggestions</span>
+                                </div>
                             </div>
                         </div>
                         break;
 
                     case 3:
                         @* App Mode Selection *@
-                        <div class="text-center animate-fade-in">
+                        <div class="text-center animate-fade-in interactive-content">
+                            <div class="interactive-step-banner">
+                                <span class="oi oi-hand"></span>
+                                <span>Choose an option below to continue</span>
+                            </div>
                             <div class="step-icon mb-3">
-                                <span class="oi oi-dial" style="font-size: 3rem; color: #0d6efd;"></span>
+                                <span class="oi oi-dial step-icon-large icon-mode-dial"></span>
                             </div>
                             <h2 class="mb-3">How Will You Use Self Organizer?</h2>
                             <p class="text-muted mb-4">
@@ -220,275 +236,295 @@
                                     </div>
                                     <div class="mode-info">
                                         <h4>Work Mode</h4>
-                                        <p>Career-focused contexts like deep work, meetings, and 1-on-1s. Track professional growth dimensions.</p>
-                                    </div>
-                                    @if (_selectedMode == AppMode.Work)
-                                    {
-                                        <span class="oi oi-check mode-check"></span>
-                                    }
-                                </button>
-                                <button class="mode-card @(_selectedMode == AppMode.Life ? "selected" : "")"
-                                        @onclick="() => SelectMode(AppMode.Life)">
-                                    <div class="mode-icon life-gradient">
-                                        <span class="oi oi-heart"></span>
-                                    </div>
-                                    <div class="mode-info">
-                                        <h4>Life Mode</h4>
-                                        <p>Personal contexts like home, errands, and weekends. Balance health, relationships, and recreation.</p>
-                                    </div>
-                                    @if (_selectedMode == AppMode.Life)
-                                    {
-                                        <span class="oi oi-check mode-check"></span>
-                                    }
-                                </button>
-                                <button class="mode-card @(_selectedMode == AppMode.Balanced ? "selected" : "")"
-                                        @onclick="() => SelectMode(AppMode.Balanced)">
-                                    <div class="mode-icon balanced-gradient">
-                                        <span class="oi oi-infinity"></span>
-                                    </div>
-                                    <div class="mode-info">
-                                        <h4>Balanced Mode</h4>
-                                        <p>Best of both worlds. A curated mix of work and life contexts with 10 key balance dimensions.</p>
-                                    </div>
-                                    @if (_selectedMode == AppMode.Balanced)
-                                    {
-                                        <span class="oi oi-check mode-check"></span>
-                                    }
-                                </button>
-                            </div>
-                        </div>
-                        break;
-
-                    case 4:
-                        @* Mode Preview *@
-                        <div class="text-center animate-fade-in">
-                            <div class="step-icon mb-3">
-                                <span class="oi oi-eye" style="font-size: 3rem; color: #06b6d4;"></span>
-                            </div>
-                            <h2 class="mb-3">Your @(_selectedMode) Setup</h2>
-                            <p class="text-muted mb-4">
-                                Here's what we'll set up for you. You can customize these later in Settings.
-                            </p>
-
-                            <div class="preview-section">
-                                <h5 class="preview-title">
-                                    <span class="oi oi-tag me-2"></span>Contexts
-                                </h5>
-                                <div class="context-preview-grid">
-                                    @foreach (var (name, icon, color) in _previewContexts.Take(8))
-                                    {
-                                        <span class="context-badge animate-pop-in" style="background-color: @color">
-                                            @name
-                                        </span>
-                                    }
-                                </div>
-                            </div>
-
-                            <div class="preview-section mt-4">
-                                <h5 class="preview-title">
-                                    <span class="oi oi-pie-chart me-2"></span>Balance Dimensions
-                                </h5>
-                                <div class="dimension-preview-grid">
-                                    @foreach (var dim in _previewDimensions.Take(6))
-                                    {
-                                        <div class="dimension-preview-item animate-pop-in" style="border-left-color: @dim.Color">
-                                            <span class="dimension-name">@dim.Name</span>
+                                        <p>Career-focused contexts like deep work, meetings, and 1-on-1s. Track professional growth
+                                            dimensions.</p>
                                         </div>
-                                    }
-                                </div>
-                                @if (_previewDimensions.Count > 6)
-                                {
-                                    <p class="text-muted small mt-2">+ @(_previewDimensions.Count - 6) more dimensions</p>
-                                }
-                            </div>
-                        </div>
-                        break;
-
-                    case 5:
-                        @* Capture Flow *@
-                        <div class="text-center animate-fade-in">
-                            <div class="step-icon mb-3">
-                                <span class="oi oi-inbox" style="font-size: 3rem; color: #22c55e;"></span>
-                            </div>
-                            <h2 class="mb-3">Capture Everything</h2>
-                            <p class="text-muted mb-4">
-                                Get things out of your head and into your inbox. Quick capture lets you jot down thoughts, tasks, and ideas instantly.
-                            </p>
-                            <div class="workflow-steps">
-                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.1s">
-                                    <div class="workflow-number">1</div>
-                                    <div class="workflow-text">
-                                        <strong>Capture</strong>
-                                        <small>Write it down quickly</small>
-                                    </div>
-                                </div>
-                                <div class="workflow-arrow">
-                                    <span class="oi oi-arrow-right"></span>
-                                </div>
-                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.2s">
-                                    <div class="workflow-number">2</div>
-                                    <div class="workflow-text">
-                                        <strong>Clarify</strong>
-                                        <small>Process your inbox</small>
-                                    </div>
-                                </div>
-                                <div class="workflow-arrow">
-                                    <span class="oi oi-arrow-right"></span>
-                                </div>
-                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.3s">
-                                    <div class="workflow-number">3</div>
-                                    <div class="workflow-text">
-                                        <strong>Organize</strong>
-                                        <small>Put it where it belongs</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        break;
-
-                    case 6:
-                        @* Calendar Provider *@
-                        <div class="text-center animate-fade-in">
-                            <div class="step-icon mb-3">
-                                <span class="oi oi-calendar" style="font-size: 3rem; color: #06b6d4;"></span>
-                            </div>
-                            <h2 class="mb-3">Calendar Integration</h2>
-                            <p class="text-muted mb-4">
-                                Connect your calendar to sync meetings and schedule tasks around your existing commitments.
-                            </p>
-                            <div class="provider-selection">
-                                <button class="provider-option @(_selectedProvider == CalendarProvider.Google ? "selected" : "")"
-                                        @onclick="() => SelectProvider(CalendarProvider.Google)">
-                                    <div class="provider-icon google-icon">G</div>
-                                    <span class="provider-name">Google Calendar</span>
-                                    @if (_selectedProvider == CalendarProvider.Google)
-                                    {
-                                        <span class="oi oi-check selected-check"></span>
-                                    }
-                                </button>
-                                <button class="provider-option @(_selectedProvider == CalendarProvider.Outlook ? "selected" : "")"
-                                        @onclick="() => SelectProvider(CalendarProvider.Outlook)">
-                                    <div class="provider-icon outlook-icon">O</div>
-                                    <span class="provider-name">Outlook Calendar</span>
-                                    @if (_selectedProvider == CalendarProvider.Outlook)
-                                    {
-                                        <span class="oi oi-check selected-check"></span>
-                                    }
-                                </button>
-                                <button class="provider-option skip-option @(_selectedProvider == CalendarProvider.None ? "selected" : "")"
-                                        @onclick="() => SelectProvider(CalendarProvider.None)">
-                                    <div class="provider-icon skip-icon">
-                                        <span class="oi oi-x"></span>
-                                    </div>
-                                    <span class="provider-name">Skip for now</span>
-                                    @if (_selectedProvider == CalendarProvider.None)
-                                    {
-                                        <span class="oi oi-check selected-check"></span>
-                                    }
-                                </button>
-                            </div>
-                            <p class="text-muted small mt-3">
-                                You can connect your calendar later in Settings.
-                            </p>
-                        </div>
-                        break;
-
-                    case 7:
-                        @* Balance Areas Selection *@
-                        <div class="text-center animate-fade-in">
-                            <div class="step-icon mb-3">
-                                <span class="oi oi-pie-chart" style="font-size: 3rem; color: #eab308;"></span>
-                            </div>
-                            <h2 class="mb-3">Track Your Balance</h2>
-                            <p class="text-muted mb-4">
-                                Select the life areas you want to track. These will appear in your Balance Wheel.
-                            </p>
-                            <div class="life-area-grid">
-                                @foreach (var dim in _previewDimensions)
-                                {
-                                    var isEnabled = _enabledDimensions.Contains(dim.Id);
-                                    <button class="life-area-item @(isEnabled ? "enabled" : "")"
-                                            @onclick="() => ToggleDimension(dim.Id)"
-                                            style="--dim-color: @dim.Color">
-                                        <div class="area-indicator" style="background-color: @dim.Color"></div>
-                                        <span class="area-name">@dim.Name</span>
-                                        @if (isEnabled)
+                                        @if (_selectedMode == AppMode.Work)
                                         {
-                                            <span class="oi oi-check area-check"></span>
+                                            <span class="oi oi-check mode-check"></span>
                                         }
                                     </button>
-                                }
-                            </div>
-                            <p class="text-muted small mt-3">
-                                <span class="oi oi-info me-1"></span>
-                                @_enabledDimensions.Count of @_previewDimensions.Count selected
-                            </p>
-                        </div>
-                        break;
+                                    <button class="mode-card @(_selectedMode == AppMode.Life ? "selected" : "")"
+                                            @onclick="() => SelectMode(AppMode.Life)">
+                                        <div class="mode-icon life-gradient">
+                                            <span class="oi oi-heart"></span>
+                                        </div>
+                                        <div class="mode-info">
+                                            <h4>Life Mode</h4>
+                                            <p>Personal contexts like home, errands, and weekends. Balance health, relationships, and
+                                                recreation.</p>
+                                            </div>
+                                            @if (_selectedMode == AppMode.Life)
+                                            {
+                                                <span class="oi oi-check mode-check"></span>
+                                            }
+                                        </button>
+                                        <button class="mode-card @(_selectedMode == AppMode.Balanced ? "selected" : "")"
+                                                @onclick="() => SelectMode(AppMode.Balanced)">
+                                            <div class="mode-icon balanced-gradient">
+                                                <span class="oi oi-infinity"></span>
+                                            </div>
+                                            <div class="mode-info">
+                                                <h4>Balanced Mode</h4>
+                                                <p>Best of both worlds. A curated mix of work and life contexts with 10 key balance
+                                                    dimensions.</p>
+                                                </div>
+                                                @if (_selectedMode == AppMode.Balanced)
+                                                {
+                                                    <span class="oi oi-check mode-check"></span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                    break;
 
-                    case 8:
-                        @* Get Started *@
-                        <div class="text-center animate-fade-in">
-                            <div class="step-icon mb-3 animate-bounce">
-                                <span class="oi oi-bolt" style="font-size: 3rem; color: #22c55e;"></span>
-                            </div>
-                            <h2 class="mb-3">You're All Set!</h2>
-                            <p class="text-muted mb-4">
-                                Start by capturing your first thought or task. Remember: getting things out of your head is the first step to staying organized.
-                            </p>
-                            <div class="tip-box">
-                                <strong>Pro Tips:</strong>
-                                <ul class="tip-list">
-                                    <li>Press <kbd>C</kbd> anywhere to quickly capture a new item</li>
-                                    <li>Press <kbd>?</kbd> to see all keyboard shortcuts</li>
-                                    <li>Check your Balance Wheel regularly in Reports</li>
-                                </ul>
-                            </div>
-                        </div>
-                        break;
-                }
-            </div>
+            case 4:
+                                        @* Mode Preview *@
+                                        <div class="text-center animate-fade-in">
+                                            <div class="step-icon mb-3">
+                                                <span class="oi oi-eye step-icon-large icon-preview-eye"></span>
+                                            </div>
+                                            <h2 class="mb-3">Your @(_selectedMode) Setup</h2>
+                                            <p class="text-muted mb-4">
+                                                Here's what we'll set up for you. You can customize these later in Settings.
+                                            </p>
 
-            @* Navigation *@
-            <div class="wizard-navigation mt-4">
-                @if (_currentStep > 0)
-                {
-                    <button class="btn btn-outline-secondary" @onclick="PreviousStep">
-                        <span class="oi oi-arrow-left me-1"></span> Back
-                    </button>
-                }
-                else
-                {
-                    <div></div>
-                }
+                                            <div class="preview-section">
+                                                <h5 class="preview-title">
+                                                    <span class="oi oi-tag me-2"></span>Contexts
+                                                </h5>
+                                                <div class="context-preview-grid">
+                                                    @foreach (var (name, icon, color) in _previewContexts.Take(8))
+                                                    {
+                                                        <span class="context-badge animate-pop-in" style="background-color: @color">
+                                                            @name
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </div>
 
-                @if (_currentStep < TotalSteps - 1)
-                {
-                    <button class="btn btn-primary" @onclick="NextStep">
-                        Next <span class="oi oi-arrow-right ms-1"></span>
-                    </button>
-                }
-                else
-                {
-                    <button class="btn btn-success btn-lg" @onclick="CompleteOnboarding" disabled="@_isCompleting">
-                        @if (_isCompleting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                            <span>Setting up...</span>
-                        }
-                        else
-                        {
-                            <span class="oi oi-check me-1"></span>
-                            <span>Get Started</span>
-                        }
-                    </button>
-                }
-            </div>
-        </div>
-    </div>
-}
+                                            <div class="preview-section mt-4">
+                                                <h5 class="preview-title">
+                                                    <span class="oi oi-pie-chart me-2"></span>Balance Dimensions
+                                                </h5>
+                                                <div class="dimension-preview-grid">
+                                                    @foreach (var dim in _previewDimensions.Take(6))
+                                                    {
+                                                        <div class="dimension-preview-item animate-pop-in" style="border-left-color: @dim.Color">
+                                                            <span class="dimension-name">@dim.Name</span>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                @if (_previewDimensions.Count > 6)
+                                                {
+                                                    <p class="text-muted small mt-2">+ @(_previewDimensions.Count - 6) more dimensions</p>
+                                                }
+                                            </div>
+                                        </div>
+                                        break;
 
-@code {
+                                    case 5:
+                                        @* Capture Flow *@
+                                        <div class="text-center animate-fade-in">
+                                            <div class="step-icon mb-3">
+                                                <span class="oi oi-inbox" style="font-size: 3rem; color: #22c55e;"></span>
+                                            </div>
+                                            <h2 class="mb-3">Capture Everything</h2>
+                                            <p class="text-muted mb-4">
+                                                Get things out of your head and into your inbox. Quick capture lets you jot down thoughts, tasks,
+                                                and ideas instantly.
+                                            </p>
+                                            <div class="workflow-steps">
+                                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.1s">
+                                                    <div class="workflow-number">1</div>
+                                                    <div class="workflow-text">
+                                                        <strong>Capture</strong>
+                                                        <small>Write it down quickly</small>
+                                                    </div>
+                                                </div>
+                                                <div class="workflow-arrow">
+                                                    <span class="oi oi-arrow-right"></span>
+                                                </div>
+                                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.2s">
+                                                    <div class="workflow-number">2</div>
+                                                    <div class="workflow-text">
+                                                        <strong>Clarify</strong>
+                                                        <small>Process your inbox</small>
+                                                    </div>
+                                                </div>
+                                                <div class="workflow-arrow">
+                                                    <span class="oi oi-arrow-right"></span>
+                                                </div>
+                                                <div class="workflow-step animate-slide-in" style="animation-delay: 0.3s">
+                                                    <div class="workflow-number">3</div>
+                                                    <div class="workflow-text">
+                                                        <strong>Organize</strong>
+                                                        <small>Put it where it belongs</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        break;
+
+                                    case 6:
+                                        @* Calendar Provider *@
+                                        <div class="text-center animate-fade-in interactive-content">
+                                            <div class="interactive-step-banner">
+                                                <span class="oi oi-hand"></span>
+                                                <span>Select a calendar provider or skip</span>
+                                            </div>
+                                            <div class="step-icon mb-3">
+                                                <span class="oi oi-calendar" style="font-size: 3rem; color: #06b6d4;"></span>
+                                            </div>
+                                            <h2 class="mb-3">Calendar Integration</h2>
+                                            <p class="text-muted mb-4">
+                                                Connect your calendar to sync meetings and schedule tasks around your existing commitments.
+                                            </p>
+                                            <div class="provider-selection">
+                                                <button class="provider-option @(_selectedProvider == CalendarProvider.Google ? "selected" : "")"
+                                                        @onclick="() => SelectProvider(CalendarProvider.Google)">
+                                                    <div class="provider-icon google-icon">G</div>
+                                                    <span class="provider-name">Google Calendar</span>
+                                                    @if (_selectedProvider == CalendarProvider.Google)
+                                                    {
+                                                        <span class="oi oi-check selected-check"></span>
+                                                    }
+                                                </button>
+                                                <button class="provider-option @(_selectedProvider == CalendarProvider.Outlook ? "selected" : "")"
+                                                        @onclick="() => SelectProvider(CalendarProvider.Outlook)">
+                                                    <div class="provider-icon outlook-icon">O</div>
+                                                    <span class="provider-name">Outlook Calendar</span>
+                                                    @if (_selectedProvider == CalendarProvider.Outlook)
+                                                    {
+                                                        <span class="oi oi-check selected-check"></span>
+                                                    }
+                                                </button>
+                                                <button
+                                                    class="provider-option skip-option @(_selectedProvider == CalendarProvider.None ? "selected" : "")"
+                                                    @onclick="() => SelectProvider(CalendarProvider.None)">
+                                                    <div class="provider-icon skip-icon">
+                                                        <span class="oi oi-x"></span>
+                                                    </div>
+                                                    <span class="provider-name">Skip for now</span>
+                                                    @if (_selectedProvider == CalendarProvider.None)
+                                                    {
+                                                        <span class="oi oi-check selected-check"></span>
+                                                    }
+                                                </button>
+                                            </div>
+                                            <p class="text-muted small mt-3">
+                                                You can connect your calendar later in Settings.
+                                            </p>
+                                        </div>
+                                        break;
+
+                                    case 7:
+                                        @* Balance Areas Selection *@
+                                        <div class="text-center animate-fade-in interactive-content">
+                                            <div class="interactive-step-banner">
+                                                <span class="oi oi-hand"></span>
+                                                <span>Toggle the life areas you want to track</span>
+                                            </div>
+                                            <div class="step-icon mb-3">
+                                                <span class="oi oi-pie-chart" style="font-size: 3rem; color: #eab308;"></span>
+                                            </div>
+                                            <h2 class="mb-3">Track Your Balance</h2>
+                                            <p class="text-muted mb-4">
+                                                Select the life areas you want to track. These will appear in your Balance Wheel.
+                                            </p>
+                                            <div class="life-area-grid">
+                                                @foreach (var dim in _previewDimensions)
+                                                {
+                                                    var isEnabled = _enabledDimensions.Contains(dim.Id);
+                                                    <button class="life-area-item @(isEnabled ? "enabled" : "")"
+                                                            @onclick="() => ToggleDimension(dim.Id)" style="--dim-color: @dim.Color">
+                                                        <div class="area-indicator" style="background-color: @dim.Color"></div>
+                                                        <span class="area-name">@dim.Name</span>
+                                                        @if (isEnabled)
+                                                        {
+                                                            <span class="oi oi-check area-check"></span>
+                                                        }
+                                                    </button>
+                                                }
+                                            </div>
+                                            <p class="text-muted small mt-3">
+                                                <span class="oi oi-info me-1"></span>
+                                                @_enabledDimensions.Count of @_previewDimensions.Count selected
+                                            </p>
+                                        </div>
+                                        break;
+
+                                    case 8:
+                                        @* Get Started *@
+                                        <div class="text-center animate-fade-in">
+                                            <div class="step-icon mb-3 animate-bounce">
+                                                <span class="oi oi-bolt" style="font-size: 3rem; color: #22c55e;"></span>
+                                            </div>
+                                            <h2 class="mb-3">You're All Set!</h2>
+                                            <p class="text-muted mb-4">
+                                                Start by capturing your first thought or task. Remember: getting things out of your head is the
+                                                first step to staying organized.
+                                            </p>
+                                            <div class="tip-box">
+                                                <strong>Pro Tips:</strong>
+                                                <ul class="tip-list">
+                                                    <li>Press <kbd>C</kbd> anywhere to quickly capture a new item</li>
+                                                    <li>Press <kbd>?</kbd> to see all keyboard shortcuts</li>
+                                                    <li>Use the <strong>Focus Timer</strong> to batch tasks in a queue and build deep work streaks
+                                                    </li>
+                                                    <li>Check the <strong>Life Balance</strong> report — AI can suggest goals and tasks for
+                                                        neglected areas</li>
+                                                        <li>Visit <strong>Learn</strong> for neurodivergent strategies and one-click presets</li>
+                                                        <li>Stale task reminders will gently nudge you about forgotten items — snooze or act on them
+                                                            anytime</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                                break;
+                                            }
+                                        </div>
+
+                                        @* Navigation *@
+                                        <div class="wizard-navigation mt-4">
+                                            @if (_currentStep > 0)
+                                            {
+                                                <button class="btn btn-outline-secondary" @onclick="PreviousStep">
+                                                    <span class="oi oi-arrow-left me-1"></span> Back
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <div></div>
+                                            }
+
+                                            @if (_currentStep < TotalSteps - 1)
+                                            {
+                                                <button class="btn btn-primary" @onclick="NextStep">
+                                                    Next <span class="oi oi-arrow-right ms-1"></span>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-success btn-lg" @onclick="CompleteOnboarding" disabled="@_isCompleting">
+                                                    @if (_isCompleting)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                                        <span>Setting up...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="oi oi-check me-1"></span>
+                                                        <span>Get Started</span>
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+@code
+{
     [Parameter]
     public bool IsVisible { get; set; }
 
@@ -554,6 +590,18 @@
         7 => "Balance",
         8 => "Start",
         _ => ""
+    };
+
+    /// <summary>
+    /// Returns true for steps that require user interaction/selection.
+    /// These steps get visual emphasis to indicate user action is needed.
+    /// </summary>
+    private static bool IsInteractiveStep(int step) => step switch
+    {
+        3 => true, // Mode selection
+        6 => true, // Calendar provider selection
+        7 => true, // Balance areas selection
+        _ => false
     };
 
     private void GoToStep(int step)

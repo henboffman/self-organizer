@@ -1,0 +1,113 @@
+@using SelfOrganizer.Core.Models
+
+<div class="growth-journey">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="mb-0"><span class="oi oi-pulse me-2"></span>Growth Journey</h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn @(_monthly ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetGranularity(true)">Monthly</button>
+            <button class="btn @(!_monthly ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetGranularity(false)">Quarterly</button>
+        </div>
+    </div>
+
+    @if (Periods.Count == 0)
+    {
+        <div class="journey-empty">
+            <span class="oi oi-pulse fs-1 d-block mb-2 opacity-50"></span>
+            <p class="mb-1">No growth data yet.</p>
+            <p class="small" style="color: #555;">Capture a snapshot to start tracking your growth journey. Activity metrics will appear as you complete tasks, habits, and focus sessions.</p>
+        </div>
+    }
+    else
+    {
+        <div class="journey-grid">
+            @foreach (var period in DisplayPeriods)
+            {
+                <div class="journey-row @(_expandedPeriod == period ? "journey-row-expanded" : "")"
+                     @onclick="() => ToggleExpand(period)">
+                    <div class="journey-row-header">
+                        <span class="journey-period-label">@FormatPeriod(period)</span>
+                        <div class="journey-mini-metrics">
+                            <span class="journey-mini" title="Tasks completed">
+                                <span class="oi oi-task"></span> @period.TasksCompleted
+                            </span>
+                            <span class="journey-mini" title="Focus time">
+                                <span class="oi oi-timer"></span> @FormatFocusShort(period.FocusMinutes)
+                            </span>
+                            <span class="journey-mini" title="Habit rate">
+                                <span class="oi oi-check"></span> @FormatRate(period.HabitCompletionRate)
+                            </span>
+                            @if (period.AverageEnergy.HasValue)
+                            {
+                                <span class="journey-mini" title="Avg energy">
+                                    <span class="oi oi-bolt"></span> @period.AverageEnergy.Value.ToString("F1")
+                                </span>
+                            }
+                        </div>
+                        @if (period.HasSnapshot)
+                        {
+                            <span class="journey-snapshot-indicator" title="Snapshot captured">
+                                <span class="snapshot-diamond"></span>
+                            </span>
+                        }
+                        <span class="journey-expand-arrow @(_expandedPeriod == period ? "expanded" : "")">
+                            <span class="oi oi-chevron-bottom"></span>
+                        </span>
+                    </div>
+                </div>
+
+                @if (_expandedPeriod == period)
+                {
+                    <div class="journey-row-detail">
+                        <GrowthContextPanel Context="@period" />
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<GrowthContextSummary> Periods { get; set; } = new();
+    [Parameter] public EventCallback<GrowthContextSummary> OnPeriodSelected { get; set; }
+
+    private bool _monthly = true;
+    private GrowthContextSummary? _expandedPeriod;
+
+    private List<GrowthContextSummary> DisplayPeriods =>
+        Periods.OrderByDescending(p => p.PeriodStart).ToList();
+
+    private void SetGranularity(bool monthly)
+    {
+        _monthly = monthly;
+        _expandedPeriod = null;
+        OnPeriodSelected.InvokeAsync(null!);
+    }
+
+    private void ToggleExpand(GrowthContextSummary period)
+    {
+        _expandedPeriod = _expandedPeriod == period ? null : period;
+        if (_expandedPeriod != null)
+            OnPeriodSelected.InvokeAsync(_expandedPeriod);
+    }
+
+    private string FormatPeriod(GrowthContextSummary period)
+    {
+        if (_monthly)
+            return period.PeriodStart.ToString("MMM yyyy");
+
+        var quarter = (period.PeriodStart.Month - 1) / 3 + 1;
+        return $"Q{quarter} {period.PeriodStart.Year}";
+    }
+
+    private string FormatFocusShort(int minutes)
+    {
+        if (minutes >= 60)
+            return $"{minutes / 60}h";
+        return $"{minutes}m";
+    }
+
+    private string FormatRate(double rate) =>
+        $"{(rate * 100):F0}%";
+}

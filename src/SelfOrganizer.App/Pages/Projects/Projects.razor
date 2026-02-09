@@ -99,16 +99,17 @@ else
                             </div>
                             <small class="text-muted">@progress.Item1 / @progress.Item2 tasks completed</small>
                         }
-                        @if (project.Tags.Any())
+                        @{var projectTags = project.Tags ?? new List<string>();}
+                        @if (projectTags.Any())
                         {
                             <div class="mt-2">
-                                @foreach (var tag in project.Tags.Take(3))
+                                @foreach (var tag in projectTags.Take(3))
                                 {
                                     <a href="tags/@tag" class="badge bg-primary text-decoration-none me-1">#@tag</a>
                                 }
-                                @if (project.Tags.Count > 3)
+                                @if (projectTags.Count > 3)
                                 {
-                                    <span class="badge bg-secondary">+@(project.Tags.Count - 3)</span>
+                                    <span class="badge bg-secondary">+@(projectTags.Count - 3)</span>
                                 }
                             </div>
                         }
@@ -199,8 +200,16 @@ else
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-        <button class="btn btn-primary" @onclick="SaveProject" disabled="@string.IsNullOrWhiteSpace(_projectName)">
-            @(_editingProject == null ? "Create" : "Save")
+        <button class="btn btn-primary" @onclick="SaveProject" disabled="@(string.IsNullOrWhiteSpace(_projectName) || _isSaving)">
+            @if (_isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Saving...</span>
+            }
+            else
+            {
+                @(_editingProject == null ? "Create" : "Save")
+            }
         </button>
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
@@ -218,6 +227,7 @@ else
     private HashSet<Guid> _stalledProjects = new();
     private Dictionary<Guid, (int completed, int total)> _projectProgress = new();
     private bool _isLoading = true;
+    private bool _isSaving = false;
     private string _statusFilter = "active";
     private bool _showModal = false;
     private bool _showDeleteConfirm = false;
@@ -318,7 +328,7 @@ else
         _projectPriority = project.Priority;
         _projectStatus = project.Status;
         _projectDueDate = project.DueDate;
-        _projectTags = project.Tags.Any() ? string.Join(" ", project.Tags.Select(t => $"#{t}")) : string.Empty;
+        _projectTags = (project.Tags ?? new List<string>()).Any() ? string.Join(" ", project.Tags!.Select(t => $"#{t}")) : string.Empty;
         _projectUrl = project.Url;
         _showModal = true;
     }
@@ -331,42 +341,50 @@ else
 
     private async Task SaveProject()
     {
-        if (string.IsNullOrWhiteSpace(_projectName)) return;
+        if (string.IsNullOrWhiteSpace(_projectName) || _isSaving) return;
 
-        // Parse tags from input
-        var tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_projectTags);
-
-        if (_editingProject == null)
+        _isSaving = true;
+        try
         {
-            var project = new Project
+            // Parse tags from input
+            var tags = SelfOrganizer.Core.Services.TagParsingService.ExtractTags(_projectTags);
+
+            if (_editingProject == null)
             {
-                Name = _projectName,
-                DesiredOutcome = _projectOutcome,
-                Description = _projectDescription,
-                Priority = _projectPriority,
-                Status = _projectStatus,
-                DueDate = _projectDueDate,
-                Tags = tags,
-                Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl
-            };
-            await ProjectService.CreateAsync(project);
-        }
-        else
-        {
-            _editingProject.Name = _projectName;
-            _editingProject.DesiredOutcome = _projectOutcome;
-            _editingProject.Description = _projectDescription;
-            _editingProject.Priority = _projectPriority;
-            _editingProject.Status = _projectStatus;
-            _editingProject.DueDate = _projectDueDate;
-            _editingProject.Tags = tags;
-            _editingProject.Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl;
-            await ProjectService.UpdateAsync(_editingProject);
-        }
+                var project = new Project
+                {
+                    Name = _projectName,
+                    DesiredOutcome = _projectOutcome,
+                    Description = _projectDescription,
+                    Priority = _projectPriority,
+                    Status = _projectStatus,
+                    DueDate = _projectDueDate,
+                    Tags = tags,
+                    Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl
+                };
+                await ProjectService.CreateAsync(project);
+            }
+            else
+            {
+                _editingProject.Name = _projectName;
+                _editingProject.DesiredOutcome = _projectOutcome;
+                _editingProject.Description = _projectDescription;
+                _editingProject.Priority = _projectPriority;
+                _editingProject.Status = _projectStatus;
+                _editingProject.DueDate = _projectDueDate;
+                _editingProject.Tags = tags;
+                _editingProject.Url = string.IsNullOrWhiteSpace(_projectUrl) ? null : _projectUrl;
+                await ProjectService.UpdateAsync(_editingProject);
+            }
 
-        CloseModal();
-        DataChangeNotification.NotifyDataChanged();
-        await LoadProjects();
+            CloseModal();
+            DataChangeNotification.NotifyDataChanged();
+            await LoadProjects();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void DeleteProject(Project project)

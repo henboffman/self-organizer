@@ -22,6 +22,8 @@
 @implements IDisposable
 @implements IAsyncDisposable
 
+<div class="calendar-page">
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>
         <span class="oi oi-calendar me-2"></span>Calendar
@@ -655,12 +657,12 @@ else
                 }
             </div>
 
-            @if (_viewingTask.Contexts.Any())
+            @if ((_viewingTask.Contexts ?? new List<string>()).Any())
             {
                 <div class="mb-3">
                     <label class="form-label text-muted small">Contexts</label>
                     <div>
-                        @foreach (var context in _viewingTask.Contexts)
+                        @foreach (var context in _viewingTask.Contexts ?? new List<string>())
                         {
                             <span class="badge bg-info me-1">@context</span>
                         }
@@ -683,6 +685,8 @@ else
 </SelfOrganizer.App.Components.Shared.Modal>
 
 <RadialMenu @ref="_radialMenu" OnSelected="HandleRadialMenuSelection" OnCancelled="HandleRadialMenuCancelled" />
+
+</div>
 
 @code {
     [Parameter] public string? DateParam { get; set; }

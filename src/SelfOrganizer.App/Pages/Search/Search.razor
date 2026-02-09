@@ -1,0 +1,702 @@
+@page "/search"
+@using SelfOrganizer.Core.Models
+@using SelfOrganizer.Core.Interfaces
+@using SelfOrganizer.App.Components.Shared
+@inject ISearchService SearchService
+@inject ITaskService TaskService
+@inject IProjectService ProjectService
+@inject IGoalService GoalService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Search - Self Organizer</PageTitle>
+
+<div class="search-page">
+    <div class="search-header">
+        <h3>Search</h3>
+        <p class="text-muted">Find tasks, projects, events, goals, and more</p>
+    </div>
+
+    <div class="row">
+        @* Search Input and Filters Column *@
+        <div class="col-lg-3 mb-4">
+            <div class="search-sidebar">
+                @* Main Search Input *@
+                <div class="search-input-section mb-4">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <span class="oi oi-magnifying-glass"></span>
+                        </span>
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               placeholder="Search..."
+                               @bind="_searchQuery"
+                               @bind:event="oninput"
+                               @onkeydown="HandleSearchKeyDown"
+                               @ref="_searchInput" />
+                        @if (!string.IsNullOrEmpty(_searchQuery))
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+                                <span class="oi oi-x"></span>
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @* Facets/Filters *@
+                <div class="facets-section">
+                    <h6 class="facet-header">
+                        <span class="oi oi-cog me-2"></span>Filters
+                        @if (_activeFilters.Any())
+                        {
+                            <button class="btn btn-link btn-sm p-0 ms-2" @onclick="ClearAllFilters">
+                                Clear all
+                            </button>
+                        }
+                    </h6>
+
+                    @* Entity Type Filter *@
+                    <div class="facet-group">
+                        <div class="facet-title" @onclick='() => ToggleFacet("type")'>
+                            <span>Type</span>
+                            <span class="oi @(_expandedFacets.Contains("type") ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                        </div>
+                        @if (_expandedFacets.Contains("type"))
+                        {
+                            <div class="facet-options">
+                                @foreach (var type in _entityTypes)
+                                {
+                                    var isSelected = _selectedTypes.Contains(type.Key);
+                                    <label class="facet-option @(isSelected ? "selected" : "")">
+                                        <input type="checkbox"
+                                               checked="@isSelected"
+                                               @onchange="() => ToggleTypeFilter(type.Key)" />
+                                        <span class="oi @type.Value.Icon me-2"></span>
+                                        <span>@type.Value.Label</span>
+                                        @if (_searchResults != null && _searchResults.CountByType.TryGetValue(type.Key, out var count))
+                                        {
+                                            <span class="facet-count">@count</span>
+                                        }
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* Status Filter *@
+                    <div class="facet-group">
+                        <div class="facet-title" @onclick='() => ToggleFacet("status")'>
+                            <span>Status</span>
+                            <span class="oi @(_expandedFacets.Contains("status") ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                        </div>
+                        @if (_expandedFacets.Contains("status"))
+                        {
+                            <div class="facet-options">
+                                @foreach (var status in _statusFilters)
+                                {
+                                    var isSelected = _selectedStatuses.Contains(status.Key);
+                                    <label class="facet-option @(isSelected ? "selected" : "")">
+                                        <input type="checkbox"
+                                               checked="@isSelected"
+                                               @onchange="() => ToggleStatusFilter(status.Key)" />
+                                        <span class="status-dot" style="background-color: @status.Value.Color"></span>
+                                        <span>@status.Value.Label</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* Date Range Filter *@
+                    <div class="facet-group">
+                        <div class="facet-title" @onclick='() => ToggleFacet("date")'>
+                            <span>Date</span>
+                            <span class="oi @(_expandedFacets.Contains("date") ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                        </div>
+                        @if (_expandedFacets.Contains("date"))
+                        {
+                            <div class="facet-options">
+                                @foreach (var date in _dateFilters)
+                                {
+                                    var isSelected = _selectedDateRange == date.Key;
+                                    <label class="facet-option @(isSelected ? "selected" : "")">
+                                        <input type="radio"
+                                               name="dateFilter"
+                                               checked="@isSelected"
+                                               @onchange="() => SetDateFilter(date.Key)" />
+                                        <span>@date.Value</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* Priority Filter (for tasks) *@
+                    <div class="facet-group">
+                        <div class="facet-title" @onclick='() => ToggleFacet("priority")'>
+                            <span>Priority</span>
+                            <span class="oi @(_expandedFacets.Contains("priority") ? "oi-chevron-top" : "oi-chevron-bottom")"></span>
+                        </div>
+                        @if (_expandedFacets.Contains("priority"))
+                        {
+                            <div class="facet-options">
+                                @foreach (var priority in _priorityFilters)
+                                {
+                                    var isSelected = _selectedPriorities.Contains(priority.Key);
+                                    <label class="facet-option @(isSelected ? "selected" : "")">
+                                        <input type="checkbox"
+                                               checked="@isSelected"
+                                               @onchange="() => TogglePriorityFilter(priority.Key)" />
+                                        <span class="priority-indicator priority-@priority.Key"></span>
+                                        <span>@priority.Value</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Results Column *@
+        <div class="col-lg-9">
+            @* Active Filters Bar *@
+            @if (_activeFilters.Any())
+            {
+                <div class="active-filters-bar mb-3">
+                    @foreach (var filter in _activeFilters)
+                    {
+                        <span class="active-filter-chip">
+                            @filter.Label
+                            <button class="chip-remove" @onclick="() => RemoveFilter(filter)">
+                                <span class="oi oi-x"></span>
+                            </button>
+                        </span>
+                    }
+                </div>
+            }
+
+            @* Results Header *@
+            <div class="results-header d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    @if (_isSearching)
+                    {
+                        <span class="text-muted">Searching...</span>
+                    }
+                    else if (_searchResults != null)
+                    {
+                        <span>@_searchResults.TotalCount results</span>
+                        @if (!string.IsNullOrEmpty(_searchQuery))
+                        {
+                            <span class="text-muted ms-2">for "@_searchQuery"</span>
+                        }
+                    }
+                </div>
+                <div class="results-actions">
+                    @* View Toggle *@
+                    <div class="btn-group btn-group-sm me-2">
+                        <button class="btn @(_viewMode == "list" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => SetViewMode("list")'
+                                title="List view">
+                            <span class="oi oi-list"></span>
+                        </button>
+                        <button class="btn @(_viewMode == "grid" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => SetViewMode("grid")'
+                                title="Grid view">
+                            <span class="oi oi-grid-three-up"></span>
+                        </button>
+                    </div>
+
+                    @* Export Button *@
+                    @if (_searchResults?.Results.Any() == true)
+                    {
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                    type="button"
+                                    data-bs-toggle="dropdown">
+                                <span class="oi oi-data-transfer-download me-1"></span>
+                                Export
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><button class="dropdown-item" @onclick='() => ExportResults("csv")'>Export as CSV</button></li>
+                                <li><button class="dropdown-item" @onclick='() => ExportResults("json")'>Export as JSON</button></li>
+                                <li><button class="dropdown-item" @onclick='() => ExportResults("markdown")'>Export as Markdown</button></li>
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* Results Display *@
+            @if (_isSearching)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Searching...</span>
+                    </div>
+                </div>
+            }
+            else if (_searchResults == null || !_searchResults.Results.Any())
+            {
+                <div class="no-results text-center py-5">
+                    <span class="oi oi-magnifying-glass no-results-icon mb-3"></span>
+                    @if (string.IsNullOrEmpty(_searchQuery) && !_activeFilters.Any())
+                    {
+                        <h5>Enter a search term or select filters</h5>
+                        <p class="text-muted">Search across tasks, projects, goals, events, and more</p>
+                    }
+                    else
+                    {
+                        <h5>No results found</h5>
+                        <p class="text-muted">Try adjusting your search or filters</p>
+                        <button class="btn btn-outline-primary" @onclick="ClearAllFilters">
+                            Clear all filters
+                        </button>
+                    }
+                </div>
+            }
+            else
+            {
+                @if (_viewMode == "list")
+                {
+                    <div class="results-list">
+                        @foreach (var group in _searchResults.Results.GroupBy(r => r.Type))
+                        {
+                            <div class="result-type-group mb-4">
+                                <h6 class="result-group-header">
+                                    <span class="oi @GetTypeIcon(group.Key) me-2"></span>
+                                    @GetTypeLabel(group.Key)
+                                    <span class="badge bg-secondary ms-2">@group.Count()</span>
+                                </h6>
+                                <div class="result-items">
+                                    @foreach (var result in group)
+                                    {
+                                        <a href="@result.NavigationUrl" class="result-item">
+                                            <div class="result-item-content">
+                                                <span class="result-title">@result.Title</span>
+                                                @if (!string.IsNullOrEmpty(result.Subtitle))
+                                                {
+                                                    <span class="result-subtitle">@result.Subtitle</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(result.MatchedField))
+                                                {
+                                                    <span class="result-match">Matched in: @result.MatchedField</span>
+                                                }
+                                            </div>
+                                            <span class="oi oi-chevron-right result-arrow"></span>
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="results-grid">
+                        @foreach (var result in _searchResults.Results)
+                        {
+                            <a href="@result.NavigationUrl" class="result-card">
+                                <div class="result-card-icon">
+                                    <span class="oi @result.Icon"></span>
+                                </div>
+                                <div class="result-card-content">
+                                    <span class="result-card-type">@GetTypeLabel(result.Type)</span>
+                                    <span class="result-card-title">@result.Title</span>
+                                    @if (!string.IsNullOrEmpty(result.Subtitle))
+                                    {
+                                        <span class="result-card-subtitle">@result.Subtitle</span>
+                                    }
+                                </div>
+                            </a>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")]
+    public string? QueryParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? TypeParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "export")]
+    public string? ExportParam { get; set; }
+
+    private string _searchQuery = string.Empty;
+    private SearchResults? _searchResults;
+    private bool _isSearching = false;
+    private string _viewMode = "list";
+    private ElementReference _searchInput;
+
+    // Facet state
+    private HashSet<string> _expandedFacets = new() { "type" };
+    private HashSet<string> _selectedTypes = new();
+    private HashSet<string> _selectedStatuses = new();
+    private HashSet<int> _selectedPriorities = new();
+    private string? _selectedDateRange;
+    private List<ActiveFilter> _activeFilters = new();
+
+    // Debouncing
+    private CancellationTokenSource? _searchDebounce;
+
+    // Filter options
+    private readonly Dictionary<string, (string Icon, string Label)> _entityTypes = new()
+    {
+        { "task", ("oi-task", "Tasks") },
+        { "project", ("oi-folder", "Projects") },
+        { "goal", ("oi-target", "Goals") },
+        { "event", ("oi-calendar", "Events") },
+        { "capture", ("oi-inbox", "Inbox Items") }
+    };
+
+    private readonly Dictionary<string, (string Label, string Color)> _statusFilters = new()
+    {
+        { "active", ("Active", "#28a745") },
+        { "completed", ("Completed", "#6c757d") },
+        { "pending", ("Pending", "#ffc107") },
+        { "someday", ("Someday", "#17a2b8") }
+    };
+
+    private readonly Dictionary<string, string> _dateFilters = new()
+    {
+        { "today", "Today" },
+        { "week", "This Week" },
+        { "month", "This Month" },
+        { "year", "This Year" },
+        { "any", "Any Date" }
+    };
+
+    private readonly Dictionary<int, string> _priorityFilters = new()
+    {
+        { 1, "High" },
+        { 2, "Medium" },
+        { 3, "Low" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize from query params
+        if (!string.IsNullOrEmpty(QueryParam))
+        {
+            _searchQuery = QueryParam;
+        }
+
+        if (!string.IsNullOrEmpty(TypeParam))
+        {
+            _selectedTypes.Add(TypeParam);
+            UpdateActiveFilters();
+        }
+
+        // If export param is present, perform search and export
+        if (!string.IsNullOrEmpty(ExportParam) && !string.IsNullOrEmpty(_searchQuery))
+        {
+            await PerformSearchAsync();
+            await ExportResults(ExportParam);
+        }
+        else if (!string.IsNullOrEmpty(_searchQuery))
+        {
+            await PerformSearchAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _searchInput.FocusAsync();
+        }
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await PerformSearchAsync();
+        }
+        else
+        {
+            // Debounce search
+            _searchDebounce?.Cancel();
+            _searchDebounce = new CancellationTokenSource();
+            try
+            {
+                await Task.Delay(300, _searchDebounce.Token);
+                await PerformSearchAsync();
+            }
+            catch (TaskCanceledException) { }
+        }
+    }
+
+    private async Task PerformSearchAsync()
+    {
+        _isSearching = true;
+        StateHasChanged();
+
+        try
+        {
+            var options = new SearchOptions
+            {
+                FilterTypes = _selectedTypes.Any() ? _selectedTypes.ToArray() : null,
+                MaxResults = 100
+            };
+
+            _searchResults = await SearchService.SearchAsync(_searchQuery, options);
+
+            // Update URL without navigation
+            var uri = NavigationManager.GetUriWithQueryParameter("q", _searchQuery);
+            NavigationManager.NavigateTo(uri, replace: true);
+        }
+        finally
+        {
+            _isSearching = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleFacet(string facetName)
+    {
+        if (_expandedFacets.Contains(facetName))
+            _expandedFacets.Remove(facetName);
+        else
+            _expandedFacets.Add(facetName);
+    }
+
+    private async Task ToggleTypeFilter(string type)
+    {
+        if (_selectedTypes.Contains(type))
+            _selectedTypes.Remove(type);
+        else
+            _selectedTypes.Add(type);
+
+        UpdateActiveFilters();
+        await PerformSearchAsync();
+    }
+
+    private async Task ToggleStatusFilter(string status)
+    {
+        if (_selectedStatuses.Contains(status))
+            _selectedStatuses.Remove(status);
+        else
+            _selectedStatuses.Add(status);
+
+        UpdateActiveFilters();
+        await PerformSearchAsync();
+    }
+
+    private async Task SetDateFilter(string dateRange)
+    {
+        _selectedDateRange = _selectedDateRange == dateRange ? null : dateRange;
+        UpdateActiveFilters();
+        await PerformSearchAsync();
+    }
+
+    private async Task TogglePriorityFilter(int priority)
+    {
+        if (_selectedPriorities.Contains(priority))
+            _selectedPriorities.Remove(priority);
+        else
+            _selectedPriorities.Add(priority);
+
+        UpdateActiveFilters();
+        await PerformSearchAsync();
+    }
+
+    private void UpdateActiveFilters()
+    {
+        _activeFilters.Clear();
+
+        foreach (var type in _selectedTypes)
+        {
+            if (_entityTypes.TryGetValue(type, out var info))
+            {
+                _activeFilters.Add(new ActiveFilter
+                {
+                    Type = "type",
+                    Value = type,
+                    Label = info.Label
+                });
+            }
+        }
+
+        foreach (var status in _selectedStatuses)
+        {
+            if (_statusFilters.TryGetValue(status, out var info))
+            {
+                _activeFilters.Add(new ActiveFilter
+                {
+                    Type = "status",
+                    Value = status,
+                    Label = info.Label
+                });
+            }
+        }
+
+        if (!string.IsNullOrEmpty(_selectedDateRange) && _dateFilters.TryGetValue(_selectedDateRange, out var dateLabel))
+        {
+            _activeFilters.Add(new ActiveFilter
+            {
+                Type = "date",
+                Value = _selectedDateRange,
+                Label = dateLabel
+            });
+        }
+
+        foreach (var priority in _selectedPriorities)
+        {
+            if (_priorityFilters.TryGetValue(priority, out var label))
+            {
+                _activeFilters.Add(new ActiveFilter
+                {
+                    Type = "priority",
+                    Value = priority.ToString(),
+                    Label = $"{label} Priority"
+                });
+            }
+        }
+    }
+
+    private async Task RemoveFilter(ActiveFilter filter)
+    {
+        switch (filter.Type)
+        {
+            case "type":
+                _selectedTypes.Remove(filter.Value);
+                break;
+            case "status":
+                _selectedStatuses.Remove(filter.Value);
+                break;
+            case "date":
+                _selectedDateRange = null;
+                break;
+            case "priority":
+                if (int.TryParse(filter.Value, out var p))
+                    _selectedPriorities.Remove(p);
+                break;
+        }
+
+        UpdateActiveFilters();
+        await PerformSearchAsync();
+    }
+
+    private async Task ClearAllFilters()
+    {
+        _selectedTypes.Clear();
+        _selectedStatuses.Clear();
+        _selectedPriorities.Clear();
+        _selectedDateRange = null;
+        _activeFilters.Clear();
+        await PerformSearchAsync();
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = string.Empty;
+        _searchResults = null;
+    }
+
+    private void SetViewMode(string mode)
+    {
+        _viewMode = mode;
+    }
+
+    private async Task ExportResults(string format)
+    {
+        if (_searchResults == null || !_searchResults.Results.Any())
+            return;
+
+        var content = format switch
+        {
+            "csv" => GenerateCsv(),
+            "json" => GenerateJson(),
+            "markdown" => GenerateMarkdown(),
+            _ => ""
+        };
+
+        var filename = $"search-results-{DateTime.Now:yyyyMMdd-HHmmss}.{format}";
+        var mimeType = format switch
+        {
+            "csv" => "text/csv",
+            "json" => "application/json",
+            "markdown" => "text/markdown",
+            _ => "text/plain"
+        };
+
+        await JS.InvokeVoidAsync("downloadFile", filename, content, mimeType);
+    }
+
+    private string GenerateCsv()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Type,Title,Subtitle,MatchedField,URL");
+
+        foreach (var result in _searchResults!.Results)
+        {
+            sb.AppendLine($"\"{result.Type}\",\"{EscapeCsv(result.Title)}\",\"{EscapeCsv(result.Subtitle ?? "")}\",\"{result.MatchedField ?? ""}\",\"{result.NavigationUrl ?? ""}\"");
+        }
+
+        return sb.ToString();
+    }
+
+    private string GenerateJson()
+    {
+        return System.Text.Json.JsonSerializer.Serialize(_searchResults!.Results, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+    }
+
+    private string GenerateMarkdown()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# Search Results");
+        sb.AppendLine();
+        sb.AppendLine($"Query: {_searchQuery}");
+        sb.AppendLine($"Date: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine($"Total Results: {_searchResults!.TotalCount}");
+        sb.AppendLine();
+
+        foreach (var group in _searchResults.Results.GroupBy(r => r.Type))
+        {
+            sb.AppendLine($"## {GetTypeLabel(group.Key)} ({group.Count()})");
+            sb.AppendLine();
+
+            foreach (var result in group)
+            {
+                sb.AppendLine($"- **{result.Title}**");
+                if (!string.IsNullOrEmpty(result.Subtitle))
+                    sb.AppendLine($"  - {result.Subtitle}");
+            }
+
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        return value.Replace("\"", "\"\"");
+    }
+
+    private string GetTypeIcon(string type)
+    {
+        return _entityTypes.TryGetValue(type, out var info) ? info.Icon : "oi-file";
+    }
+
+    private string GetTypeLabel(string type)
+    {
+        return _entityTypes.TryGetValue(type, out var info) ? info.Label : type;
+    }
+
+    private class ActiveFilter
+    {
+        public string Type { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+    }
+}

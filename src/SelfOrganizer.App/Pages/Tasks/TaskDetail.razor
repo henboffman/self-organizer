@@ -33,9 +33,10 @@ else
             </h3>
             <div class="text-muted">
                 <span class="badge bg-secondary">@_task.Status</span>
-                @if (_task.Contexts.Any())
+                @{var taskContexts = _task.Contexts ?? new List<string>();}
+                @if (taskContexts.Any())
                 {
-                    @foreach (var ctx in _task.Contexts)
+                    @foreach (var ctx in taskContexts)
                     {
                         <SelfOrganizer.App.Components.Shared.ContextBadge Context="@ctx" />
                     }
@@ -81,7 +82,18 @@ else
                             <p class="mb-0" style="white-space: pre-wrap;">@_task.Notes</p>
                         </div>
                     }
-                    @if (string.IsNullOrEmpty(_task.Description) && string.IsNullOrEmpty(_task.Notes))
+                    @if (!string.IsNullOrEmpty(_task.Url))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label text-muted">External Link</label>
+                            <div>
+                                <a href="@_task.Url" target="_blank" rel="noopener noreferrer">
+                                    <span class="oi oi-external-link me-1"></span>@_task.Url
+                                </a>
+                            </div>
+                        </div>
+                    }
+                    @if (string.IsNullOrEmpty(_task.Description) && string.IsNullOrEmpty(_task.Notes) && string.IsNullOrEmpty(_task.Url))
                     {
                         <p class="text-muted">No description or notes added.</p>
                     }
@@ -255,6 +267,11 @@ else
                 </div>
             </div>
             <div class="mb-3">
+                <label class="form-label">External URL</label>
+                <input type="url" class="form-control" @bind="_editUrl" placeholder="https://..." />
+                <small class="text-muted">Link to time tracker, portfolio, or external tool</small>
+            </div>
+            <div class="mb-3">
                 <SelfOrganizer.App.Components.Shared.ContextSelector
                     Label="Contexts"
                     SelectedContexts="_editContexts"
@@ -328,6 +345,7 @@ else
     private List<string> _editContexts = new();
     private string _editEnergyLevel = string.Empty;
     private string _editCategory = string.Empty;
+    private string _editUrl = string.Empty;
 
     // Schedule fields
     private DateTime _scheduleDate = DateTime.Today;
@@ -363,6 +381,7 @@ else
                 _editContexts = new List<string>(_task.Contexts);
                 _editEnergyLevel = _task.EnergyLevel?.ToString() ?? string.Empty;
                 _editCategory = _task.Category ?? string.Empty;
+                _editUrl = _task.Url ?? string.Empty;
             }
         }
         finally
@@ -393,6 +412,7 @@ else
             _task.Contexts = new List<string>(_editContexts);
             _task.EnergyLevel = string.IsNullOrWhiteSpace(_editEnergyLevel) ? null : int.Parse(_editEnergyLevel);
             _task.Category = string.IsNullOrWhiteSpace(_editCategory) ? null : _editCategory;
+            _task.Url = string.IsNullOrWhiteSpace(_editUrl) ? null : _editUrl;
             await TaskService.UpdateAsync(_task);
             _isEditing = false;
             await LoadTask();

@@ -3,7 +3,12 @@
 @using SelfOrganizer.App.Services
 @using SelfOrganizer.App.Components.Shared
 @inject SelfOrganizer.Core.Interfaces.IRepository<ReferenceItem> ReferenceRepository
+@inject IProjectService ProjectService
+@inject ITaskService TaskService
 @inject IExportService ExportService
+@inject IDataChangeNotificationService DataChangeNotification
+@inject NavigationManager NavigationManager
+@implements IDisposable
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h3>
@@ -23,6 +28,82 @@
     </div>
 </div>
 
+@* Search and Filter Bar *@
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text bg-transparent">
+                <span class="oi oi-magnifying-glass"></span>
+            </span>
+            <input type="text" class="form-control" placeholder="Search references..."
+                   @bind="_searchQuery" @bind:event="oninput" @onkeyup="HandleSearch" />
+            @if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                    <span class="oi oi-x"></span>
+                </button>
+            }
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" @bind="_selectedCategory" @bind:after="ApplyFilters">
+            <option value="">All Categories</option>
+            @foreach (var category in _categories)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" @bind="_selectedTag" @bind:after="ApplyFilters">
+            <option value="">All Tags</option>
+            @foreach (var tag in _allTags)
+            {
+                <option value="@tag">#@tag</option>
+            }
+        </select>
+    </div>
+</div>
+
+@* Stats Overview *@
+@if (_items.Any())
+{
+    <div class="row mb-4">
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card bg-light">
+                <div class="card-body py-2 text-center">
+                    <div class="h4 mb-0">@_items.Count</div>
+                    <small class="text-muted">Total Items</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card bg-light">
+                <div class="card-body py-2 text-center">
+                    <div class="h4 mb-0">@_categories.Count</div>
+                    <small class="text-muted">Categories</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card bg-light">
+                <div class="card-body py-2 text-center">
+                    <div class="h4 mb-0">@_allTags.Count</div>
+                    <small class="text-muted">Tags</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-2">
+            <div class="card bg-light">
+                <div class="card-body py-2 text-center">
+                    <div class="h4 mb-0">@_items.Count(i => !string.IsNullOrEmpty(i.Url))</div>
+                    <small class="text-muted">With Links</small>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (_isLoading)
 {
     <div class="text-center py-5">
@@ -31,78 +112,132 @@
         </div>
     </div>
 }
-else if (!_items.Any())
+else if (!_filteredItems.Any())
 {
     <div class="text-center py-5">
-        <h5 class="text-muted">No reference items</h5>
-        <p class="text-muted">Store non-actionable information here for future reference.</p>
+        <div class="mb-3">
+            <span class="oi oi-book display-4 text-muted"></span>
+        </div>
+        @if (!string.IsNullOrEmpty(_searchQuery) || !string.IsNullOrEmpty(_selectedCategory) || !string.IsNullOrEmpty(_selectedTag))
+        {
+            <h5 class="text-muted">No matching references</h5>
+            <p class="text-muted">Try adjusting your search or filters.</p>
+            <button class="btn btn-outline-secondary" @onclick="ClearAllFilters">
+                <span class="oi oi-loop-circular me-1"></span> Clear Filters
+            </button>
+        }
+        else
+        {
+            <h5 class="text-muted">No reference items</h5>
+            <p class="text-muted">Store non-actionable information here for future reference.</p>
+            <button class="btn btn-primary mt-2" @onclick="ShowAddModal">
+                <span class="oi oi-plus me-1"></span> Add Your First Reference
+            </button>
+        }
     </div>
 }
 else
 {
-    <div class="row">
-        @foreach (var item in _items.OrderByDescending(i => i.ModifiedAt))
+    @* Category Sections *@
+    @if (string.IsNullOrEmpty(_selectedCategory) && string.IsNullOrEmpty(_searchQuery) && string.IsNullOrEmpty(_selectedTag))
+    {
+        @* Group by category when no filters active *@
+        @foreach (var group in _filteredItems.GroupBy(i => i.Category ?? "Uncategorized").OrderBy(g => g.Key == "Uncategorized" ? "zzz" : g.Key))
         {
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>@item.Title</span>
-                        @if (!string.IsNullOrEmpty(item.Category))
-                        {
-                            <span class="badge bg-secondary">@item.Category</span>
-                        }
-                    </div>
-                    <div class="card-body">
-                        @if (!string.IsNullOrEmpty(item.Content))
-                        {
-                            <p class="card-text small" style="max-height: 100px; overflow: hidden;">@item.Content</p>
-                        }
-                        @if (!string.IsNullOrEmpty(item.Url))
-                        {
-                            <a href="@item.Url" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <span class="oi oi-external-link"></span> Open Link
-                            </a>
-                        }
-                    </div>
-                    <div class="card-footer bg-transparent">
-                        <small class="text-muted">Updated @item.ModifiedAt.ToString("MMM d, yyyy")</small>
-                        <div class="float-end">
-                            <button class="btn btn-sm btn-link text-primary" @onclick="() => EditItem(item)">
-                                <span class="oi oi-pencil"></span>
-                            </button>
-                            <button class="btn btn-sm btn-link text-danger" @onclick="() => DeleteItem(item)">
-                                <span class="oi oi-trash"></span>
-                            </button>
-                        </div>
-                    </div>
+            <div class="mb-4">
+                <h5 class="border-bottom pb-2 mb-3">
+                    <span class="oi oi-folder me-2"></span>@group.Key
+                    <span class="badge bg-secondary ms-2">@group.Count()</span>
+                </h5>
+                <div class="row">
+                    @foreach (var item in group.OrderByDescending(i => i.ModifiedAt))
+                    {
+                        @RenderReferenceCard(item)
+                    }
                 </div>
             </div>
         }
-    </div>
+    }
+    else
+    {
+        @* Flat list when filters are active *@
+        <div class="row">
+            @foreach (var item in _filteredItems.OrderByDescending(i => i.ModifiedAt))
+            {
+                @RenderReferenceCard(item)
+            }
+        </div>
+    }
 }
 
-<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingItem == null ? "Add Reference" : "Edit Reference")" IsVisible="@_showModal" OnClose="CloseModal">
+@* Add/Edit Modal *@
+<SelfOrganizer.App.Components.Shared.Modal Title="@(_editingItem == null ? "Add Reference" : "Edit Reference")" IsVisible="@_showModal" OnClose="CloseModal" Size="modal-lg">
     <ChildContent>
         <div class="mb-3">
-            <label class="form-label">Title</label>
-            <input type="text" class="form-control" @bind="_itemTitle" />
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" @bind="_itemTitle" placeholder="Reference title" />
         </div>
         <div class="mb-3">
             <label class="form-label">Content</label>
-            <textarea class="form-control" @bind="_itemContent" rows="4"></textarea>
+            <textarea class="form-control" @bind="_itemContent" rows="5" placeholder="Content, notes, or description..."></textarea>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">URL (optional)</label>
+                <input type="url" class="form-control" @bind="_itemUrl" placeholder="https://..." />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Category</label>
+                <input type="text" class="form-control" @bind="_itemCategory" list="categoryList" placeholder="e.g., Documentation, Research" />
+                <datalist id="categoryList">
+                    @foreach (var cat in _categories)
+                    {
+                        <option value="@cat" />
+                    }
+                </datalist>
+            </div>
         </div>
         <div class="mb-3">
-            <label class="form-label">URL (optional)</label>
-            <input type="url" class="form-control" @bind="_itemUrl" />
+            <label class="form-label">Tags</label>
+            <input type="text" class="form-control" @bind="_itemTags" placeholder="#tag1 #tag2 #tag3" />
+            <small class="text-muted">Use #hashtags separated by spaces</small>
         </div>
-        <div class="mb-3">
-            <label class="form-label">Category</label>
-            <input type="text" class="form-control" @bind="_itemCategory" />
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Link to Projects</label>
+                <select class="form-select" multiple @onchange="HandleProjectSelection" style="height: 120px;">
+                    @foreach (var project in _projects.Where(p => p.Status == ProjectStatus.Active))
+                    {
+                        <option value="@project.Id" selected="@_selectedProjectIds.Contains(project.Id)">@project.Name</option>
+                    }
+                </select>
+                <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Link to Tasks</label>
+                <select class="form-select" multiple @onchange="HandleTaskSelection" style="height: 120px;">
+                    @foreach (var task in _tasks.Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Deleted))
+                    {
+                        <option value="@task.Id" selected="@_selectedTaskIds.Contains(task.Id)">@task.Title</option>
+                    }
+                </select>
+                <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+            </div>
         </div>
     </ChildContent>
     <Footer>
         <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-        <button class="btn btn-primary" @onclick="SaveItem" disabled="@string.IsNullOrWhiteSpace(_itemTitle)">Save</button>
+        <button class="btn btn-primary" @onclick="SaveItem" disabled="@(string.IsNullOrWhiteSpace(_itemTitle) || _isSaving)">
+            @if (_isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Saving...</span>
+            }
+            else
+            {
+                @(_editingItem == null ? "Add Reference" : "Save Changes")
+            }
+        </button>
     </Footer>
 </SelfOrganizer.App.Components.Shared.Modal>
 
@@ -115,28 +250,89 @@ else
 
 @code {
     private List<ReferenceItem> _items = new();
+    private List<ReferenceItem> _filteredItems = new();
+    private List<Project> _projects = new();
+    private List<TodoTask> _tasks = new();
+    private List<string> _categories = new();
+    private List<string> _allTags = new();
+
     private bool _isLoading = true;
+    private bool _isSaving = false;
     private bool _showModal = false;
     private bool _showDeleteConfirm = false;
     private ReferenceItem? _editingItem;
     private ReferenceItem? _deletingItem;
 
+    // Search and filter
+    private string _searchQuery = string.Empty;
+    private string _selectedCategory = string.Empty;
+    private string _selectedTag = string.Empty;
+
+    // Form fields
     private string _itemTitle = string.Empty;
     private string _itemContent = string.Empty;
     private string _itemUrl = string.Empty;
     private string _itemCategory = string.Empty;
+    private string _itemTags = string.Empty;
+    private List<Guid> _selectedProjectIds = new();
+    private List<Guid> _selectedTaskIds = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadItems();
+        DataChangeNotification.OnDataChanged += HandleDataChanged;
+        await LoadData();
     }
 
-    private async Task LoadItems()
+    private async void HandleDataChanged()
+    {
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadData();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed while handling data change
+        }
+        catch (Exception)
+        {
+            // Log error but don't crash - data will be stale until next refresh
+        }
+    }
+
+    private async Task LoadData()
     {
         _isLoading = true;
         try
         {
-            _items = (await ReferenceRepository.GetAllAsync()).ToList();
+            var itemsTask = ReferenceRepository.GetAllAsync();
+            var projectsTask = ProjectService.GetAllAsync();
+            var tasksTask = TaskService.GetAllAsync();
+
+            await Task.WhenAll(itemsTask, projectsTask, tasksTask);
+
+            _items = (await itemsTask).ToList();
+            _projects = (await projectsTask).ToList();
+            _tasks = (await tasksTask).ToList();
+
+            // Extract unique categories and tags
+            _categories = _items
+                .Where(i => !string.IsNullOrEmpty(i.Category))
+                .Select(i => i.Category!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(c => c)
+                .ToList();
+
+            _allTags = _items
+                .SelectMany(i => i.Tags ?? new List<string>())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(t => t)
+                .ToList();
+
+            ApplyFilters();
         }
         finally
         {
@@ -144,13 +340,61 @@ else
         }
     }
 
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        ApplyFilters();
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = string.Empty;
+        ApplyFilters();
+    }
+
+    private void ClearAllFilters()
+    {
+        _searchQuery = string.Empty;
+        _selectedCategory = string.Empty;
+        _selectedTag = string.Empty;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var filtered = _items.AsEnumerable();
+
+        // Search filter
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            var query = _searchQuery.ToLowerInvariant();
+            filtered = filtered.Where(i =>
+                i.Title.ToLowerInvariant().Contains(query) ||
+                (i.Content?.ToLowerInvariant().Contains(query) ?? false) ||
+                (i.Category?.ToLowerInvariant().Contains(query) ?? false) ||
+                (i.Tags ?? new List<string>()).Any(t => t.ToLowerInvariant().Contains(query)));
+        }
+
+        // Category filter
+        if (!string.IsNullOrEmpty(_selectedCategory))
+        {
+            filtered = filtered.Where(i =>
+                string.Equals(i.Category, _selectedCategory, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Tag filter
+        if (!string.IsNullOrEmpty(_selectedTag))
+        {
+            filtered = filtered.Where(i =>
+                (i.Tags ?? new List<string>()).Any(t => string.Equals(t, _selectedTag, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        _filteredItems = filtered.ToList();
+    }
+
     private void ShowAddModal()
     {
         _editingItem = null;
-        _itemTitle = string.Empty;
-        _itemContent = string.Empty;
-        _itemUrl = string.Empty;
-        _itemCategory = string.Empty;
+        ResetForm();
         _showModal = true;
     }
 
@@ -161,7 +405,21 @@ else
         _itemContent = item.Content ?? string.Empty;
         _itemUrl = item.Url ?? string.Empty;
         _itemCategory = item.Category ?? string.Empty;
+        _itemTags = string.Join(" ", (item.Tags ?? new List<string>()).Select(t => $"#{t}"));
+        _selectedProjectIds = new List<Guid>(item.LinkedProjectIds ?? new List<Guid>());
+        _selectedTaskIds = new List<Guid>(item.LinkedTaskIds ?? new List<Guid>());
         _showModal = true;
+    }
+
+    private void ResetForm()
+    {
+        _itemTitle = string.Empty;
+        _itemContent = string.Empty;
+        _itemUrl = string.Empty;
+        _itemCategory = string.Empty;
+        _itemTags = string.Empty;
+        _selectedProjectIds = new();
+        _selectedTaskIds = new();
     }
 
     private void CloseModal()
@@ -170,32 +428,94 @@ else
         _editingItem = null;
     }
 
+    private void HandleProjectSelection(ChangeEventArgs e)
+    {
+        // In Blazor WASM, multi-select returns object[] or string[], handle both
+        var values = e.Value switch
+        {
+            string[] strArr => strArr,
+            object[] objArr => objArr.Select(o => o?.ToString() ?? "").ToArray(),
+            IEnumerable<string> strEnum => strEnum.ToArray(),
+            _ => Array.Empty<string>()
+        };
+
+        _selectedProjectIds = values
+            .Where(v => !string.IsNullOrEmpty(v))
+            .Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .ToList();
+    }
+
+    private void HandleTaskSelection(ChangeEventArgs e)
+    {
+        // In Blazor WASM, multi-select returns object[] or string[], handle both
+        var values = e.Value switch
+        {
+            string[] strArr => strArr,
+            object[] objArr => objArr.Select(o => o?.ToString() ?? "").ToArray(),
+            IEnumerable<string> strEnum => strEnum.ToArray(),
+            _ => Array.Empty<string>()
+        };
+
+        _selectedTaskIds = values
+            .Where(v => !string.IsNullOrEmpty(v))
+            .Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .ToList();
+    }
+
+    private List<string> ParseTags(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return new List<string>();
+
+        return input
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.TrimStart('#').Trim())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private async Task SaveItem()
     {
-        if (string.IsNullOrWhiteSpace(_itemTitle)) return;
+        if (string.IsNullOrWhiteSpace(_itemTitle) || _isSaving) return;
 
-        if (_editingItem == null)
+        _isSaving = true;
+        try
         {
-            var item = new ReferenceItem
+            if (_editingItem == null)
             {
-                Title = _itemTitle,
-                Content = _itemContent,
-                Url = _itemUrl,
-                Category = _itemCategory
-            };
-            await ReferenceRepository.AddAsync(item);
-        }
-        else
-        {
-            _editingItem.Title = _itemTitle;
-            _editingItem.Content = _itemContent;
-            _editingItem.Url = _itemUrl;
-            _editingItem.Category = _itemCategory;
-            await ReferenceRepository.UpdateAsync(_editingItem);
-        }
+                var item = new ReferenceItem
+                {
+                    Title = _itemTitle,
+                    Content = string.IsNullOrWhiteSpace(_itemContent) ? null : _itemContent,
+                    Url = string.IsNullOrWhiteSpace(_itemUrl) ? null : _itemUrl,
+                    Category = string.IsNullOrWhiteSpace(_itemCategory) ? null : _itemCategory,
+                    Tags = ParseTags(_itemTags),
+                    LinkedProjectIds = _selectedProjectIds,
+                    LinkedTaskIds = _selectedTaskIds
+                };
+                await ReferenceRepository.AddAsync(item);
+            }
+            else
+            {
+                _editingItem.Title = _itemTitle;
+                _editingItem.Content = string.IsNullOrWhiteSpace(_itemContent) ? null : _itemContent;
+                _editingItem.Url = string.IsNullOrWhiteSpace(_itemUrl) ? null : _itemUrl;
+                _editingItem.Category = string.IsNullOrWhiteSpace(_itemCategory) ? null : _itemCategory;
+                _editingItem.Tags = ParseTags(_itemTags);
+                _editingItem.LinkedProjectIds = _selectedProjectIds;
+                _editingItem.LinkedTaskIds = _selectedTaskIds;
+                await ReferenceRepository.UpdateAsync(_editingItem);
+            }
 
-        CloseModal();
-        await LoadItems();
+            CloseModal();
+            await LoadData();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void DeleteItem(ReferenceItem item)
@@ -212,7 +532,134 @@ else
             _deletingItem = null;
         }
         _showDeleteConfirm = false;
-        await LoadItems();
+        await LoadData();
+    }
+
+    private RenderFragment RenderReferenceCard(ReferenceItem item) => __builder =>
+    {
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 reference-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-medium text-truncate" style="max-width: 70%;" title="@item.Title">@item.Title</span>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown">
+                            <span class="oi oi-ellipses"></span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item" @onclick="() => EditItem(item)"><span class="oi oi-pencil me-2"></span>Edit</button></li>
+                            @if (!string.IsNullOrEmpty(item.Url))
+                            {
+                                <li><a class="dropdown-item" href="@item.Url" target="_blank"><span class="oi oi-external-link me-2"></span>Open Link</a></li>
+                            }
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item text-danger" @onclick="() => DeleteItem(item)"><span class="oi oi-trash me-2"></span>Delete</button></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(item.Content))
+                    {
+                        <p class="card-text small text-muted" style="max-height: 80px; overflow: hidden;">
+                            @(item.Content.Length > 150 ? item.Content.Substring(0, 150) + "..." : item.Content)
+                        </p>
+                    }
+
+                    @* Tags *@
+                    @{
+                        var itemTags = item.Tags ?? new List<string>();
+                        var linkedProjectIds = item.LinkedProjectIds ?? new List<Guid>();
+                        var linkedTaskIds = item.LinkedTaskIds ?? new List<Guid>();
+                    }
+                    @if (itemTags.Any())
+                    {
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            @foreach (var tag in itemTags.Take(4))
+                            {
+                                <span class="badge status-badge" @onclick="() => FilterByTag(tag)" style="cursor: pointer;">#@tag</span>
+                            }
+                            @if (itemTags.Count > 4)
+                            {
+                                <span class="badge status-badge">+@(itemTags.Count - 4)</span>
+                            }
+                        </div>
+                    }
+
+                    @* Linked Items *@
+                    @if (linkedProjectIds.Any() || linkedTaskIds.Any())
+                    {
+                        <div class="small text-muted mt-2">
+                            @if (linkedProjectIds.Any())
+                            {
+                                @foreach (var projectId in linkedProjectIds.Take(2))
+                                {
+                                    var project = _projects.FirstOrDefault(p => p.Id == projectId);
+                                    if (project != null)
+                                    {
+                                        <a href="projects/@project.Id" class="d-block text-decoration-none text-truncate">
+                                            <span class="oi oi-folder me-1"></span>@project.Name
+                                        </a>
+                                    }
+                                }
+                                @if (linkedProjectIds.Count > 2)
+                                {
+                                    <small class="text-muted">+@(linkedProjectIds.Count - 2) more projects</small>
+                                }
+                            }
+                            @if (linkedTaskIds.Any())
+                            {
+                                @foreach (var taskId in linkedTaskIds.Take(2))
+                                {
+                                    var task = _tasks.FirstOrDefault(t => t.Id == taskId);
+                                    if (task != null)
+                                    {
+                                        <a href="tasks/@task.Id" class="d-block text-decoration-none text-truncate">
+                                            <span class="oi oi-task me-1"></span>@task.Title
+                                        </a>
+                                    }
+                                }
+                                @if (linkedTaskIds.Count > 2)
+                                {
+                                    <small class="text-muted">+@(linkedTaskIds.Count - 2) more tasks</small>
+                                }
+                            }
+                        </div>
+                    }
+
+                    @* URL indicator *@
+                    @if (!string.IsNullOrEmpty(item.Url))
+                    {
+                        <div class="mt-2">
+                            <a href="@item.Url" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <span class="oi oi-external-link me-1"></span> Open Link
+                            </a>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                    <small class="text-muted">@item.ModifiedAt.ToString("MMM d, yyyy")</small>
+                    @if (!string.IsNullOrEmpty(item.Category))
+                    {
+                        <span class="badge bg-secondary" @onclick="() => FilterByCategory(item.Category!)" style="cursor: pointer;">@item.Category</span>
+                    }
+                </div>
+            </div>
+        </div>
+    };
+
+    private void FilterByTag(string tag)
+    {
+        _selectedTag = tag;
+        _selectedCategory = string.Empty;
+        _searchQuery = string.Empty;
+        ApplyFilters();
+    }
+
+    private void FilterByCategory(string category)
+    {
+        _selectedCategory = category;
+        _selectedTag = string.Empty;
+        _searchQuery = string.Empty;
+        ApplyFilters();
     }
 
     // Export methods
@@ -246,5 +693,10 @@ else
             args.SetSuccess(0, "Template downloaded");
         else
             args.SetError(result.ErrorMessage ?? "Download failed");
+    }
+
+    public void Dispose()
+    {
+        DataChangeNotification.OnDataChanged -= HandleDataChanged;
     }
 }

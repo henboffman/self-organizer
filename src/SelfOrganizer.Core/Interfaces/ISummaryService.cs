@@ -78,6 +78,12 @@ public class SummaryReport
     public int TotalMeetings { get; set; }
     public int TotalMeetingMinutes { get; set; }
     public Dictionary<string, int> MeetingsByCategory { get; set; } = new();
+
+    // Skills
+    public List<SkillSnapshotSummary> Skills { get; set; } = new();
+
+    // Career Plans
+    public List<CareerPlanSnapshotSummary> CareerPlans { get; set; } = new();
 }
 
 public class CompletedTaskSummary
@@ -185,4 +191,48 @@ public class HabitSummary
     /// Titles of goals this habit is linked to
     /// </summary>
     public List<string> LinkedGoalTitles { get; set; } = new();
+}
+
+public class SkillSnapshotSummary
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public SkillCategory Category { get; set; }
+    public SkillType Type { get; set; }
+    public int CurrentProficiency { get; set; }
+    public int TargetProficiency { get; set; }
+    public int ProgressPercent { get; set; }
+    public bool IsActive { get; set; }
+    public bool IsAiSuggested { get; set; }
+    public List<string> LinkedGoalTitles { get; set; } = new();
+    public string? Icon { get; set; }
+    public string? Color { get; set; }
+}
+
+public class CareerPlanSnapshotSummary
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? CurrentRole { get; set; }
+    public string? TargetRole { get; set; }
+    public CareerPlanStatus Status { get; set; }
+    public int ProgressPercent { get; set; }
+    public int TotalMilestones { get; set; }
+    public int CompletedMilestones { get; set; }
+    public int MilestonesCompletedInPeriod { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? TargetDate { get; set; }
+    public List<MilestoneSnapshotSummary> Milestones { get; set; } = new();
+    public List<string> LinkedGoalTitles { get; set; } = new();
+    public List<string> LinkedSkillNames { get; set; } = new();
+}
+
+public class MilestoneSnapshotSummary
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public MilestoneCategory Category { get; set; }
+    public MilestoneStatus Status { get; set; }
+    public DateTime? TargetDate { get; set; }
+    public DateTime? CompletedDate { get; set; }
 }

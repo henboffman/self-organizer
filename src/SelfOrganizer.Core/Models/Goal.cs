@@ -26,10 +26,25 @@ public class Goal : BaseEntity
     public List<Guid> LinkedProjectIds { get; set; } = new();
     public List<Guid> LinkedTaskIds { get; set; } = new();
     public List<Guid> LinkedHabitIds { get; set; } = new();
+
+    /// <summary>Skills this goal helps develop (bidirectional with Skill.LinkedGoalIds)</summary>
+    public List<Guid> LinkedSkillIds { get; set; } = new();
+
+    /// <summary>
+    /// The single designated "next action" task for this goal.
+    /// This task will be pinned to the top of task lists with a star indicator.
+    /// Independent from project-level next actions.
+    /// </summary>
+    public Guid? NextActionTaskId { get; set; }
     public List<string> Tags { get; set; } = new();
     public string? AiGeneratedPlan { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// External URL linking to a tracker, portfolio, or other application
+    /// </summary>
+    public string? Url { get; set; }
 
     // Balance Dimension Integration
     /// <summary>IDs of balance dimensions this goal contributes to</summary>
@@ -50,4 +65,9 @@ public class Goal : BaseEntity
     /// Base64 data URL for custom uploaded image (64x64)
     /// </summary>
     public string? IconImageUrl { get; set; }
+
+    // Completion reflection fields
+    public string? CompletionReflection { get; set; }
+    public string? CompletionLessonsLearned { get; set; }
+    public string? CompletionChallenges { get; set; }
 }

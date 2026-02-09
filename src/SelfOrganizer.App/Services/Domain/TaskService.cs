@@ -6,15 +6,21 @@ namespace SelfOrganizer.App.Services.Domain;
 public class TaskService : ITaskService
 {
     private readonly IRepository<TodoTask> _repository;
+    private readonly IRepository<Project> _projectRepository;
+    private readonly IRepository<Goal> _goalRepository;
     private readonly IUserPreferencesProvider _preferencesProvider;
     private readonly ITaskIconIntelligenceService? _iconIntelligenceService;
 
     public TaskService(
         IRepository<TodoTask> repository,
+        IRepository<Project> projectRepository,
+        IRepository<Goal> goalRepository,
         IUserPreferencesProvider preferencesProvider,
         ITaskIconIntelligenceService? iconIntelligenceService = null)
     {
         _repository = repository;
+        _projectRepository = projectRepository;
+        _goalRepository = goalRepository;
         _preferencesProvider = preferencesProvider;
         _iconIntelligenceService = iconIntelligenceService;
     }
@@ -143,7 +149,12 @@ public class TaskService : ITaskService
 
         task.Status = TodoTaskStatus.Completed;
         task.CompletedAt = DateTime.UtcNow;
-        return await _repository.UpdateAsync(task);
+        var result = await _repository.UpdateAsync(task);
+
+        // Clear next action references on project and goals
+        await ClearNextActionReferencesAsync(id, task.ProjectId);
+
+        return result;
     }
 
     public async Task<TodoTask> DeactivateAsync(Guid id)
@@ -190,6 +201,37 @@ public class TaskService : ITaskService
         {
             task.Status = TodoTaskStatus.Deleted;
             await _repository.UpdateAsync(task);
+
+            // Clear next action references on project and goals
+            await ClearNextActionReferencesAsync(id, task.ProjectId);
+        }
+    }
+
+    /// <summary>
+    /// Clears next action references from the task's project and any goals that have this task as their next action.
+    /// Called when a task is completed or deleted.
+    /// </summary>
+    private async Task ClearNextActionReferencesAsync(Guid taskId, Guid? projectId)
+    {
+        // Clear from project if task belongs to one
+        if (projectId.HasValue)
+        {
+            var project = await _projectRepository.GetByIdAsync(projectId.Value);
+            if (project?.NextActionTaskId == taskId)
+            {
+                project.NextActionTaskId = null;
+                project.ModifiedAt = DateTime.UtcNow;
+                await _projectRepository.UpdateAsync(project);
+            }
+        }
+
+        // Clear from any goals that have this task as next action
+        var allGoals = await _goalRepository.GetAllAsync();
+        foreach (var goal in allGoals.Where(g => g.NextActionTaskId == taskId))
+        {
+            goal.NextActionTaskId = null;
+            goal.ModifiedAt = DateTime.UtcNow;
+            await _goalRepository.UpdateAsync(goal);
         }
     }
 
@@ -387,6 +429,9 @@ public class TaskService : ITaskService
         task.LastRecurrenceDate = DateTime.UtcNow;
         await _repository.UpdateAsync(task);
 
+        // Clear next action references on project and goals
+        await ClearNextActionReferencesAsync(id, task.ProjectId);
+
         // Create next occurrence
         var nextTask = new TodoTask
         {
@@ -456,6 +501,9 @@ public class TaskService : ITaskService
             {
                 task.Status = TodoTaskStatus.Deleted;
                 await _repository.UpdateAsync(task);
+
+                // Clear next action references
+                await ClearNextActionReferencesAsync(id, task.ProjectId);
             }
         }
     }
@@ -481,6 +529,9 @@ public class TaskService : ITaskService
                     task.CompletedAt = now;
                     await _repository.UpdateAsync(task);
                 }
+
+                // Clear next action references
+                await ClearNextActionReferencesAsync(id, task.ProjectId);
             }
         }
     }
@@ -518,6 +569,12 @@ public class TaskService : ITaskService
                 }
 
                 await _repository.UpdateAsync(task);
+
+                // Clear next action references when completing or deleting
+                if (newStatus == TodoTaskStatus.Completed || newStatus == TodoTaskStatus.Deleted)
+                {
+                    await ClearNextActionReferencesAsync(id, task.ProjectId);
+                }
             }
         }
     }

@@ -62,6 +62,11 @@ public class Habit : BaseEntity
     public List<Guid> LinkedGoalIds { get; set; } = new();
 
     /// <summary>
+    /// Skills this habit helps develop (bidirectional with Skill.LinkedHabitIds)
+    /// </summary>
+    public List<Guid> LinkedSkillIds { get; set; } = new();
+
+    /// <summary>
     /// If AI-generated, the rationale for why this habit helps
     /// </summary>
     public string? AiRationale { get; set; }

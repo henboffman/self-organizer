@@ -2,6 +2,7 @@
 @page "/workspaces/{Context}"
 @using SelfOrganizer.Core.Models
 @using SelfOrganizer.App.Services
+@using SelfOrganizer.App.Components.Shared
 @inject SelfOrganizer.Core.Interfaces.ITaskService TaskService
 @inject SelfOrganizer.Core.Interfaces.IProjectService ProjectService
 @inject SelfOrganizer.Core.Interfaces.ICalendarService CalendarService
@@ -18,7 +19,7 @@
         }
         else
         {
-            <span>@@Context</span>
+            <span>@@@Context</span>
         }
     </h3>
     @if (!string.IsNullOrEmpty(Context))
@@ -42,60 +43,149 @@ else if (string.IsNullOrEmpty(Context))
     @* Show all workspaces overview *@
     <div class="row mb-4">
         <div class="col-12">
-            <p class="text-muted">
-                Workspaces help you focus by grouping tasks by context. Use @@context tags in your tasks (like @@computer, @@phone, @@office) to organize your work.
-            </p>
+            <div class="alert alert-info">
+                <span class="oi oi-info me-2"></span>
+                <strong>GTD Contexts</strong> help you focus on tasks you can do right now based on your location, tools, or situation.
+                Add contexts to your tasks (like <code>@@computer</code>, <code>@@phone</code>, <code>@@errands</code>) when creating or editing them.
+            </div>
         </div>
     </div>
 
-    @if (!_workspaces.Any())
+    @if (!_workspaces.Any() && !_tasksWithoutContext.Any())
     {
         <div class="text-center py-5">
+            <div class="mb-4">
+                <span class="oi oi-layers display-1 text-muted"></span>
+            </div>
             <h5 class="text-muted">No workspaces yet</h5>
-            <p class="text-muted">Add context tags to your tasks (e.g., @@computer, @@phone, @@errands) to create workspaces.</p>
+            <p class="text-muted mb-4">
+                Add contexts to your tasks to organize by location or situation.
+            </p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                <span class="badge bg-secondary fs-6">@@computer</span>
+                <span class="badge bg-secondary fs-6">@@phone</span>
+                <span class="badge bg-secondary fs-6">@@errands</span>
+                <span class="badge bg-secondary fs-6">@@home</span>
+                <span class="badge bg-secondary fs-6">@@office</span>
+                <span class="badge bg-secondary fs-6">@@anywhere</span>
+            </div>
         </div>
     }
     else
     {
+        @* Stats Overview *@
+        <div class="row mb-4">
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-primary">@_workspaces.Count</div>
+                        <small class="text-muted">Workspaces</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-success">@_workspaces.Sum(w => w.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction))</div>
+                        <small class="text-muted">Next Actions</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body py-3">
+                        <div class="fs-2 fw-bold text-warning">@_tasksWithoutContext.Count</div>
+                        <small class="text-muted">No Context</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body py-3">
+                        @{
+                            var totalMinutes = _workspaces.SelectMany(w => w.Tasks)
+                                .Where(t => t.Status == TodoTaskStatus.NextAction && t.EstimatedMinutes > 0)
+                                .Sum(t => t.EstimatedMinutes);
+                        }
+                        <div class="fs-2 fw-bold text-info">
+                            @if (totalMinutes >= 60)
+                            {
+                                @($"{totalMinutes / 60}h")
+                            }
+                            else
+                            {
+                                @($"{totalMinutes}m")
+                            }
+                        </div>
+                        <small class="text-muted">Total Time</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* Workspace Cards *@
         <div class="row">
-            @foreach (var workspace in _workspaces.OrderByDescending(w => w.Tasks.Count))
+            @foreach (var workspace in _workspaces.OrderByDescending(w => w.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction)))
             {
+                var nextActions = workspace.Tasks.Where(t => t.Status == TodoTaskStatus.NextAction).ToList();
+                var waitingCount = workspace.Tasks.Count(t => t.Status == TodoTaskStatus.WaitingFor);
+                var scheduledCount = workspace.Tasks.Count(t => t.Status == TodoTaskStatus.Scheduled);
+                var workspaceMinutes = nextActions.Where(t => t.EstimatedMinutes > 0).Sum(t => t.EstimatedMinutes);
+
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100 workspace-card" @onclick="() => NavigateToContext(workspace.Name)" style="cursor: pointer;">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">@@@workspace.Name</span>
-                            <span class="badge bg-primary">@workspace.Tasks.Count tasks</span>
+                            <span class="fw-bold">
+                                <span class="oi @GetContextIcon(workspace.Name) me-2"></span>@@@workspace.Name
+                            </span>
+                            <span class="badge bg-primary">@nextActions.Count</span>
                         </div>
                         <div class="card-body">
-                            @if (workspace.Tasks.Any())
+                            @if (nextActions.Any())
                             {
-                                <div class="small mb-2">
-                                    <strong>Next Actions:</strong>
-                                </div>
-                                @foreach (var task in workspace.Tasks.Where(t => t.Status == TodoTaskStatus.NextAction).Take(3))
+                                @foreach (var task in nextActions.OrderBy(t => t.Priority).Take(3))
                                 {
-                                    <div class="small text-truncate mb-1">
-                                        <span class="oi oi-task me-1 text-muted"></span>@task.Title
+                                    <div class="d-flex align-items-start mb-2">
+                                        <PriorityIndicator Priority="@task.Priority" Size="small" />
+                                        <span class="small text-truncate ms-2">@task.Title</span>
                                     </div>
                                 }
-                                @if (workspace.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction) > 3)
+                                @if (nextActions.Count > 3)
                                 {
-                                    <div class="small text-muted">+@(workspace.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction) - 3) more</div>
+                                    <div class="small text-muted">+@(nextActions.Count - 3) more</div>
                                 }
                             }
+                            else
+                            {
+                                <div class="text-muted small text-center py-2">
+                                    <span class="oi oi-check me-1"></span>No next actions
+                                </div>
+                            }
                         </div>
-                        <div class="card-footer bg-transparent small text-muted">
-                            @{
-                                var nextCount = workspace.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction);
-                                var waitingCount = workspace.Tasks.Count(t => t.Status == TodoTaskStatus.WaitingFor);
-                            }
-                            @if (nextCount > 0)
+                        <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                            <div class="small">
+                                @if (waitingCount > 0)
+                                {
+                                    <span class="badge bg-warning text-dark me-1" title="Waiting for">@waitingCount waiting</span>
+                                }
+                                @if (scheduledCount > 0)
+                                {
+                                    <span class="badge bg-info me-1" title="Scheduled">@scheduledCount scheduled</span>
+                                }
+                            </div>
+                            @if (workspaceMinutes > 0)
                             {
-                                <span class="me-2"><span class="badge bg-success">@nextCount</span> next</span>
-                            }
-                            @if (waitingCount > 0)
-                            {
-                                <span><span class="badge bg-warning text-dark">@waitingCount</span> waiting</span>
+                                <small class="text-muted">
+                                    <span class="oi oi-timer me-1"></span>
+                                    @if (workspaceMinutes >= 60)
+                                    {
+                                        @($"{workspaceMinutes / 60}h {workspaceMinutes % 60}m")
+                                    }
+                                    else
+                                    {
+                                        @($"{workspaceMinutes}m")
+                                    }
+                                </small>
                             }
                         </div>
                     </div>
@@ -106,28 +196,38 @@ else if (string.IsNullOrEmpty(Context))
         @* Tasks without context *@
         @if (_tasksWithoutContext.Any())
         {
-            <div class="card mt-4 border-secondary">
-                <div class="card-header bg-secondary text-white">
-                    <span class="oi oi-question-mark me-2"></span>Tasks Without Context
-                    <span class="badge status-badge ms-2">@_tasksWithoutContext.Count</span>
+            <div class="card mt-4 border-warning">
+                <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="oi oi-question-mark me-2"></span>Tasks Without Context
+                    </span>
+                    <span class="badge bg-warning text-dark">@_tasksWithoutContext.Count</span>
                 </div>
                 <div class="card-body">
-                    <p class="small text-muted mb-3">These tasks don't have a context assigned. Consider adding a context like @@computer, @@phone, or @@errands.</p>
+                    <p class="small text-muted mb-3">
+                        These next actions don't have a context assigned. Adding a context helps you find the right tasks for your current situation.
+                    </p>
                     <div class="list-group list-group-flush">
                         @foreach (var task in _tasksWithoutContext.Take(5))
                         {
                             <a href="tasks/@task.Id" class="list-group-item list-group-item-action py-2">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span>@task.Title</span>
-                                    <span class="badge status-badge">@task.Status</span>
+                                    <div class="d-flex align-items-center">
+                                        <PriorityIndicator Priority="@task.Priority" Size="small" />
+                                        <span class="ms-2">@task.Title</span>
+                                    </div>
+                                    @if (task.EstimatedMinutes > 0)
+                                    {
+                                        <small class="text-muted">~@task.EstimatedMinutes min</small>
+                                    }
                                 </div>
                             </a>
                         }
                         @if (_tasksWithoutContext.Count > 5)
                         {
-                            <div class="list-group-item text-muted small">
-                                +@(_tasksWithoutContext.Count - 5) more tasks without context
-                            </div>
+                            <a href="tasks?filter=no-context" class="list-group-item list-group-item-action text-center text-primary">
+                                View all @_tasksWithoutContext.Count tasks without context
+                            </a>
                         }
                     </div>
                 </div>
@@ -138,48 +238,72 @@ else if (string.IsNullOrEmpty(Context))
 else
 {
     @* Show specific workspace (context) *@
-    @if (_selectedWorkspace != null)
+    @if (_selectedWorkspace == null)
+    {
+        <div class="alert alert-warning">
+            <span class="oi oi-warning me-2"></span>
+            No tasks found with context <strong>@@@Context</strong>.
+            <a href="workspaces" class="alert-link">View all workspaces</a>
+        </div>
+    }
+    else
     {
         <div class="row">
             <div class="col-lg-8">
+                @* Quick Add for this context *@
+                <div class="card mb-4">
+                    <div class="card-body py-2">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-0">
+                                <span class="oi oi-plus"></span>
+                            </span>
+                            <input type="text" class="form-control border-0" placeholder="Quick add task to @@@Context..."
+                                   @bind="_quickAddTitle" @bind:event="oninput"
+                                   @onkeydown="HandleQuickAddKeyDown" />
+                            @if (!string.IsNullOrWhiteSpace(_quickAddTitle))
+                            {
+                                <button class="btn btn-primary" @onclick="QuickAddTask">Add</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+
                 @* Next Actions *@
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <span><span class="oi oi-target me-2"></span>Next Actions</span>
                         <span class="badge bg-success">@_selectedWorkspace.Tasks.Count(t => t.Status == TodoTaskStatus.NextAction)</span>
                     </div>
-                    <div class="list-group list-group-flush">
-                        @foreach (var task in _selectedWorkspace.Tasks.Where(t => t.Status == TodoTaskStatus.NextAction).OrderBy(t => t.Priority))
-                        {
-                            <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-bold">@task.Title</div>
-                                        @if (!string.IsNullOrEmpty(task.Description))
-                                        {
-                                            <div class="small text-muted">@task.Description</div>
-                                        }
-                                    </div>
-                                    <div class="text-end">
-                                        @if (task.Priority == 1)
-                                        {
-                                            <span class="badge bg-danger">High</span>
-                                        }
-                                        @if (task.EstimatedMinutes > 0)
-                                        {
-                                            <div class="small text-muted">~@task.EstimatedMinutes min</div>
-                                        }
-                                    </div>
+                    @{
+                        var nextActions = _selectedWorkspace.Tasks
+                            .Where(t => t.Status == TodoTaskStatus.NextAction)
+                            .OrderBy(t => t.Priority)
+                            .ThenBy(t => t.DueDate)
+                            .ToList();
+                    }
+                    @if (nextActions.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var task in nextActions)
+                            {
+                                <div class="list-group-item">
+                                    <TaskCard Task="@task"
+                                              OnComplete="CompleteTask"
+                                              OnEdit="EditTask"
+                                              OnDelete="DeleteTask"
+                                              OnFocus="FocusOnTask"
+                                              Compact="true" />
                                 </div>
-                            </a>
-                        }
-                        @if (!_selectedWorkspace.Tasks.Any(t => t.Status == TodoTaskStatus.NextAction))
-                        {
-                            <div class="list-group-item text-center text-muted py-4">
-                                No next actions in this workspace
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-body text-center text-muted py-4">
+                            <span class="oi oi-check display-4 mb-3 d-block"></span>
+                            No next actions in this workspace
+                        </div>
+                    }
                 </div>
 
                 @* Waiting For *@
@@ -197,11 +321,18 @@ else
                             @foreach (var task in waitingTasks)
                             {
                                 <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between">
-                                        <span>@task.Title</span>
-                                        @if (!string.IsNullOrEmpty(task.WaitingForNote))
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <div>@task.Title</div>
+                                            @if (!string.IsNullOrEmpty(task.WaitingForNote))
+                                            {
+                                                <small class="text-muted">Waiting for: @task.WaitingForNote</small>
+                                            }
+                                        </div>
+                                        @if (task.WaitingForSince.HasValue)
                                         {
-                                            <span class="badge status-badge">@task.WaitingForNote</span>
+                                            var days = (DateTime.UtcNow - task.WaitingForSince.Value).Days;
+                                            <span class="badge @(days > 7 ? "bg-danger" : "bg-secondary")">@days days</span>
                                         }
                                     </div>
                                 </a>
@@ -229,10 +360,42 @@ else
                                         <span>@task.Title</span>
                                         @if (task.ScheduledDate.HasValue)
                                         {
-                                            <span class="small text-muted">@task.ScheduledDate.Value.ToString("MMM d")</span>
+                                            var isToday = task.ScheduledDate.Value.Date == DateTime.Today;
+                                            var isPast = task.ScheduledDate.Value.Date < DateTime.Today;
+                                            <span class="badge @(isPast ? "bg-danger" : isToday ? "bg-primary" : "bg-secondary")">
+                                                @(isToday ? "Today" : task.ScheduledDate.Value.ToString("MMM d"))
+                                            </span>
                                         }
                                     </div>
                                 </a>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @* Someday/Maybe *@
+                @{
+                    var somedayTasks = _selectedWorkspace.Tasks.Where(t => t.Status == TodoTaskStatus.SomedayMaybe).ToList();
+                }
+                @if (somedayTasks.Any())
+                {
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><span class="oi oi-star me-2"></span>Someday/Maybe</span>
+                            <span class="badge bg-secondary">@somedayTasks.Count</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            @foreach (var task in somedayTasks.Take(5))
+                            {
+                                <a href="tasks/@task.Id" class="list-group-item list-group-item-action">
+                                    @task.Title
+                                </a>
+                            }
+                            @if (somedayTasks.Count > 5)
+                            {
+                                <div class="list-group-item text-muted small text-center">
+                                    +@(somedayTasks.Count - 5) more
+                                </div>
                             }
                         </div>
                     </div>
@@ -295,6 +458,32 @@ else
                     </div>
                 }
 
+                @* Other Contexts on Tasks *@
+                @{
+                    var otherContexts = _selectedWorkspace.Tasks
+                        .SelectMany(t => t.Contexts)
+                        .Where(c => !c.Equals(Context, StringComparison.OrdinalIgnoreCase))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Take(10)
+                        .ToList();
+                }
+                @if (otherContexts.Any())
+                {
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <span class="oi oi-link-intact me-2"></span>Related Contexts
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var ctx in otherContexts)
+                                {
+                                    <a href="workspaces/@ctx" class="badge bg-secondary text-decoration-none">@@@ctx</a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
                 @* Today's Events *@
                 @if (_todayEvents.Any())
                 {
@@ -320,6 +509,48 @@ else
     }
 }
 
+@* Edit Task Modal *@
+<Modal Title="Edit Task" IsVisible="@_showEditModal" OnClose="CloseEditModal">
+    <ChildContent>
+        @if (_editingTask != null)
+        {
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" class="form-control" @bind="_editingTask.Title" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" @bind="_editingTask.Description" rows="2"></textarea>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <label class="form-label">Priority</label>
+                    <select class="form-select" @bind="_editingTask.Priority">
+                        <option value="1">High</option>
+                        <option value="2">Normal</option>
+                        <option value="3">Low</option>
+                    </select>
+                </div>
+                <div class="col-6">
+                    <label class="form-label">Estimated (min)</label>
+                    <input type="number" class="form-control" @bind="_editingTask.EstimatedMinutes" min="0" />
+                </div>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <button class="btn btn-secondary" @onclick="CloseEditModal">Cancel</button>
+        <button class="btn btn-primary" @onclick="SaveEditedTask">Save</button>
+    </Footer>
+</Modal>
+
+<ConfirmDialog
+    Title="Delete Task"
+    Message="Are you sure you want to delete this task?"
+    IsVisible="@_showDeleteConfirm"
+    OnConfirm="ConfirmDelete"
+    OnCancel="() => _showDeleteConfirm = false" />
+
 <style>
     .workspace-card {
         transition: transform 0.2s, box-shadow 0.2s;
@@ -338,6 +569,13 @@ else
     private WorkspaceInfo? _selectedWorkspace;
     private List<TodoTask> _tasksWithoutContext = new();
     private List<CalendarEvent> _todayEvents = new();
+    private string _quickAddTitle = string.Empty;
+
+    // Edit modal
+    private bool _showEditModal = false;
+    private TodoTask? _editingTask;
+    private bool _showDeleteConfirm = false;
+    private TodoTask? _deletingTask;
 
     protected override async Task OnInitializedAsync()
     {
@@ -366,7 +604,7 @@ else
         }
         catch (Exception)
         {
-            // Log error but don't crash - data will be stale until next refresh
+            // Log error but don't crash
         }
     }
 
@@ -379,20 +617,37 @@ else
                 .Where(t => t.Status != TodoTaskStatus.Completed && t.Status != TodoTaskStatus.Deleted)
                 .ToList();
 
-            // Group tasks by context (Category field)
-            _workspaces = allTasks
-                .Where(t => !string.IsNullOrEmpty(t.Category))
-                .GroupBy(t => t.Category!.TrimStart('@'))
+            // Group tasks by Contexts (GTD contexts like @home, @work, @phone)
+            var contextGroups = new Dictionary<string, List<TodoTask>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var task in allTasks)
+            {
+                var contexts = task.Contexts ?? new List<string>();
+                if (contexts.Any())
+                {
+                    foreach (var context in contexts)
+                    {
+                        var normalizedContext = context.TrimStart('@');
+                        if (!contextGroups.ContainsKey(normalizedContext))
+                        {
+                            contextGroups[normalizedContext] = new List<TodoTask>();
+                        }
+                        contextGroups[normalizedContext].Add(task);
+                    }
+                }
+            }
+
+            _workspaces = contextGroups
                 .Select(g => new WorkspaceInfo
                 {
                     Name = g.Key,
-                    Tasks = g.ToList()
+                    Tasks = g.Value
                 })
                 .ToList();
 
-            // Get tasks without context
+            // Get tasks without any context (only Next Actions)
             _tasksWithoutContext = allTasks
-                .Where(t => string.IsNullOrEmpty(t.Category) && t.Status == TodoTaskStatus.NextAction)
+                .Where(t => !(t.Contexts ?? new List<string>()).Any() && t.Status == TodoTaskStatus.NextAction)
                 .OrderBy(t => t.Priority)
                 .ToList();
 
@@ -418,6 +673,127 @@ else
     private void NavigateToContext(string context)
     {
         NavigationManager.NavigateTo($"workspaces/{context}");
+    }
+
+    private static string GetContextIcon(string context)
+    {
+        return context.ToLower() switch
+        {
+            "computer" or "laptop" or "pc" => "oi-laptop",
+            "phone" or "mobile" or "cell" => "oi-phone",
+            "home" or "house" => "oi-home",
+            "office" or "work" => "oi-briefcase",
+            "errands" or "out" or "outside" => "oi-map-marker",
+            "email" or "mail" => "oi-envelope-closed",
+            "calls" or "call" => "oi-phone",
+            "waiting" or "pending" => "oi-clock",
+            "anywhere" or "online" => "oi-globe",
+            "read" or "reading" => "oi-book",
+            _ => "oi-tag"
+        };
+    }
+
+    private async Task HandleQuickAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_quickAddTitle))
+        {
+            await QuickAddTask();
+        }
+    }
+
+    private async Task QuickAddTask()
+    {
+        if (string.IsNullOrWhiteSpace(_quickAddTitle) || string.IsNullOrEmpty(Context)) return;
+
+        var task = new TodoTask
+        {
+            Title = _quickAddTitle,
+            Status = TodoTaskStatus.NextAction,
+            Contexts = new List<string> { Context },
+            Priority = 2
+        };
+
+        await TaskService.CreateAsync(task);
+        _quickAddTitle = string.Empty;
+        DataChangeNotification.NotifyDataChanged();
+        await LoadData();
+    }
+
+    private async Task CompleteTask(TodoTask task)
+    {
+        if (task.IsRecurring)
+        {
+            await TaskService.CompleteRecurringTaskAsync(task.Id);
+        }
+        else
+        {
+            await TaskService.CompleteAsync(task.Id);
+        }
+        DataChangeNotification.NotifyDataChanged();
+        await LoadData();
+    }
+
+    private void EditTask(TodoTask task)
+    {
+        _editingTask = new TodoTask
+        {
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            Priority = task.Priority,
+            EstimatedMinutes = task.EstimatedMinutes,
+            Status = task.Status,
+            Contexts = task.Contexts.ToList()
+        };
+        _showEditModal = true;
+    }
+
+    private void CloseEditModal()
+    {
+        _showEditModal = false;
+        _editingTask = null;
+    }
+
+    private async Task SaveEditedTask()
+    {
+        if (_editingTask == null) return;
+
+        var original = await TaskService.GetByIdAsync(_editingTask.Id);
+        if (original != null)
+        {
+            original.Title = _editingTask.Title;
+            original.Description = _editingTask.Description;
+            original.Priority = _editingTask.Priority;
+            original.EstimatedMinutes = _editingTask.EstimatedMinutes;
+            await TaskService.UpdateAsync(original);
+            DataChangeNotification.NotifyDataChanged();
+        }
+
+        CloseEditModal();
+        await LoadData();
+    }
+
+    private void DeleteTask(TodoTask task)
+    {
+        _deletingTask = task;
+        _showDeleteConfirm = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deletingTask != null)
+        {
+            await TaskService.DeleteAsync(_deletingTask.Id);
+            _deletingTask = null;
+            DataChangeNotification.NotifyDataChanged();
+        }
+        _showDeleteConfirm = false;
+        await LoadData();
+    }
+
+    private void FocusOnTask(TodoTask task)
+    {
+        NavigationManager.NavigateTo($"focus/{task.Id}");
     }
 
     public void Dispose()

@@ -1,0 +1,208 @@
+.growth-context-panel {
+    padding: 0.75rem;
+    color: #000;
+    background: #fff;
+}
+
+.context-metrics-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.context-metric-card {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background: #f8f9fa;
+}
+
+.context-metric-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.context-metric-label {
+    font-size: 0.7rem;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.context-section {
+    margin-bottom: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.context-section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 0.5rem;
+}
+
+/* Skills */
+.context-skills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.context-skill-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #000;
+}
+
+.context-skill-name {
+    min-width: 120px;
+    font-weight: 500;
+}
+
+.context-skill-stars {
+    letter-spacing: 1px;
+}
+
+.star-filled {
+    color: #ffc107;
+}
+
+.star-empty {
+    color: #aaa;
+}
+
+.context-delta {
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
+.delta-up {
+    color: #198754;
+}
+
+.delta-down {
+    color: #dc3545;
+}
+
+.delta-same {
+    color: #666;
+}
+
+/* Goals */
+.context-goals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.context-goal-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #000;
+}
+
+.context-goal-header {
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.context-goal-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}
+
+.context-goal-bar {
+    flex: 1;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 60px;
+}
+
+.context-goal-bar-fill {
+    height: 100%;
+    background: #0d6efd;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.context-goal-pct {
+    font-size: 0.75rem;
+    color: #333;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* Activity */
+.context-detail-row {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    color: #000;
+}
+
+.context-detail-label {
+    font-weight: 500;
+    color: #333;
+    margin-right: 0.25rem;
+}
+
+/* Wellbeing */
+.context-wellbeing-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.context-wellbeing-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.context-wellbeing-label {
+    font-size: 0.7rem;
+    color: #333;
+    text-transform: uppercase;
+}
+
+.context-wellbeing-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #000;
+}
+
+/* Notes */
+.context-notes {
+    font-size: 0.85rem;
+    color: #333;
+    font-style: italic;
+    margin: 0;
+}
+
+/* No snapshot */
+.context-no-snapshot {
+    font-size: 0.8rem;
+    color: #555;
+    text-align: center;
+    padding: 0.5rem;
+    border: 1px dashed #dee2e6;
+    border-radius: 0.375rem;
+    margin-top: 0.5rem;
+}

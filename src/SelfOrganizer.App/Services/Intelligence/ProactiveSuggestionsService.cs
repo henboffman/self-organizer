@@ -1,7 +1,6 @@
 using SelfOrganizer.Core.Interfaces;
 using SelfOrganizer.Core.Models;
 using SelfOrganizer.App.Services.Domain;
-using SelfOrganizer.App.Services.GoogleCalendar;
 
 namespace SelfOrganizer.App.Services.Intelligence;
 
@@ -23,7 +22,6 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
     private readonly IMeetingInsightService _meetingInsightService;
     private readonly IProjectService _projectService;
     private readonly IBalanceDimensionService _balanceDimensionService;
-    private readonly IGoogleCalendarSyncService _googleCalendarSyncService;
 
     private List<ProactiveSuggestion> _cachedSuggestions = new();
     private DateTime _lastRefresh = DateTime.MinValue;
@@ -43,8 +41,7 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
         ICalendarService calendarService,
         IMeetingInsightService meetingInsightService,
         IProjectService projectService,
-        IBalanceDimensionService balanceDimensionService,
-        IGoogleCalendarSyncService googleCalendarSyncService)
+        IBalanceDimensionService balanceDimensionService)
     {
         _taskService = taskService;
         _goalService = goalService;
@@ -58,7 +55,6 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
         _meetingInsightService = meetingInsightService;
         _projectService = projectService;
         _balanceDimensionService = balanceDimensionService;
-        _googleCalendarSyncService = googleCalendarSyncService;
     }
 
     /// <summary>
@@ -97,9 +93,8 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
                 AnalyzeCalendarPatternsAsync(),
                 AnalyzeProjectFocusAsync(),
                 DetectSchedulingConflictsAsync(),
-                // Balance and sync suggestions
-                AnalyzeBalanceDimensionsAsync(),
-                AnalyzeGoogleCalendarSyncAsync()
+                // Balance suggestions
+                AnalyzeBalanceDimensionsAsync()
             );
 
             foreach (var analysis in analyses)
@@ -959,47 +954,6 @@ public class ProactiveSuggestionsService : IProactiveSuggestionsService
         catch
         {
             // Ignore errors
-        }
-
-        return suggestions;
-    }
-
-    /// <summary>
-    /// Checks if Google Calendar needs syncing and suggests it.
-    /// </summary>
-    private async Task<List<ProactiveSuggestion>> AnalyzeGoogleCalendarSyncAsync()
-    {
-        var suggestions = new List<ProactiveSuggestion>();
-
-        try
-        {
-            var lastSync = await _googleCalendarSyncService.GetLastSyncTimeAsync();
-
-            if (lastSync.HasValue)
-            {
-                var daysSinceSync = (DateTime.UtcNow - lastSync.Value).TotalDays;
-
-                if (daysSinceSync > 1)
-                {
-                    suggestions.Add(new ProactiveSuggestion
-                    {
-                        Id = Guid.NewGuid(),
-                        Type = SuggestionType.Reminder,
-                        Category = "Calendar",
-                        Title = "Calendar Out of Sync",
-                        Message = $"Google Calendar hasn't synced in {(int)daysSinceSync} days. Sync now to keep your calendar current.",
-                        ActionLabel = "Sync Now",
-                        ActionUrl = "settings/calendar-providers",
-                        Priority = 5,
-                        Icon = "oi-loop-circular",
-                        CreatedAt = DateTime.Now
-                    });
-                }
-            }
-        }
-        catch
-        {
-            // Ignore errors - Google Calendar may not be configured
         }
 
         return suggestions;
