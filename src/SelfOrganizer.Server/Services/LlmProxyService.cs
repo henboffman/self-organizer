@@ -207,15 +207,22 @@ public class LlmProxyService : ILlmProxyService
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(apiKey))
-                return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI API key not configured" };
+            if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(apimSubscriptionKey))
+                return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI API key or APIM subscription key not configured" };
 
-            authHeaderValue = apiKey;
+            authHeaderValue = apiKey ?? string.Empty;
             useApiKeyAuth = true;
-            // Log partial key for debugging (first 4 chars only)
-            var keyPreview = apiKey.Length > 4 ? apiKey.Substring(0, 4) + "..." : "****";
-            _logger.LogInformation("Using API key authentication, key length: {KeyLength}, starts with: {KeyPreview}",
-                apiKey.Length, keyPreview);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                // Log partial key for debugging (first 4 chars only)
+                var keyPreview = apiKey.Length > 4 ? apiKey.Substring(0, 4) + "..." : "****";
+                _logger.LogInformation("Using API key authentication, key length: {KeyLength}, starts with: {KeyPreview}",
+                    apiKey.Length, keyPreview);
+            }
+            else
+            {
+                _logger.LogInformation("No api-key configured, relying on APIM subscription key for authentication");
+            }
         }
 
         var messages = new List<OpenAIChatMessage>();
@@ -236,7 +243,10 @@ public class LlmProxyService : ILlmProxyService
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         if (useApiKeyAuth)
         {
-            httpRequest.Headers.Add("api-key", authHeaderValue);
+            if (!string.IsNullOrWhiteSpace(authHeaderValue))
+            {
+                httpRequest.Headers.Add("api-key", authHeaderValue);
+            }
         }
         else
         {
@@ -358,7 +368,9 @@ public class LlmProxyService : ILlmProxyService
         var hasEndpointAndDeployment = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
                                        !string.IsNullOrWhiteSpace(config.AzureDeploymentName);
 
-        var hasValidAuth = config.UseAzureAD ? config.HasAzureADConfig : config.HasAzureApiKey;
+        var hasValidAuth = config.UseAzureAD
+            ? config.HasAzureADConfig
+            : (config.HasAzureApiKey || config.HasApimSubscriptionKey);
         var isConfigured = hasEndpointAndDeployment && hasValidAuth;
 
         string? errorMessage = null;
@@ -368,8 +380,8 @@ public class LlmProxyService : ILlmProxyService
                 errorMessage = "Azure OpenAI endpoint or deployment not configured";
             else if (config.UseAzureAD && !config.HasAzureADConfig)
                 errorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured";
-            else if (!config.UseAzureAD && !config.HasAzureApiKey)
-                errorMessage = "Azure OpenAI API key not configured";
+            else if (!config.UseAzureAD && !config.HasAzureApiKey && !config.HasApimSubscriptionKey)
+                errorMessage = "Azure OpenAI API key or APIM subscription key not configured";
         }
 
         return new LlmConnectionStatus
