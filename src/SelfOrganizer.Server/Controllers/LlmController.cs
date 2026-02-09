@@ -87,7 +87,7 @@ public class LlmController : ControllerBase
 
         // Build a minimal chat completions request
         var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
-        var body = """{"messages":[{"role":"user","content":"say hello"}],"max_completion_tokens":5}""";
+        var body = """{"messages":[{"role":"user","content":"say hello"}],"max_tokens":5}""";
 
         diag["requestUrl"] = url;
         diag["requestBody"] = body;
