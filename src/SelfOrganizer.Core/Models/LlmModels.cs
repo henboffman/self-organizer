@@ -4,7 +4,7 @@ public class LlmOptions
 {
     public string? Model { get; set; }
     public string? SystemPrompt { get; set; }
-    public double Temperature { get; set; } = 0.7;
+    public double Temperature { get; set; } = 1;
     public int MaxTokens { get; set; } = 2048;
     public int TimeoutSeconds { get; set; } = 60;
 }
@@ -39,7 +39,7 @@ public class LlmSettings
     // Azure OpenAI settings
     public string AzureEndpoint { get; set; } = string.Empty;
     public string AzureDeploymentName { get; set; } = string.Empty;
-    public string AzureApiVersion { get; set; } = "2024-02-01";
+    public string AzureApiVersion { get; set; } = "2024-10-21";
     public string AzureApiKey { get; set; } = string.Empty;
     // For Azure AD authentication (optional)
     public string AzureTenantId { get; set; } = string.Empty;
@@ -116,6 +116,7 @@ public class OpenAIChatRequest
     public List<OpenAIChatMessage> Messages { get; set; } = new();
     public double? Temperature { get; set; }
     public int? MaxTokens { get; set; }
+    public int? MaxCompletionTokens { get; set; }
 }
 
 public class OpenAIChatMessage
@@ -200,7 +201,7 @@ public class LlmSettingsFromConfig
     // Azure OpenAI
     public string AzureEndpoint { get; set; } = string.Empty;
     public string AzureDeploymentName { get; set; } = string.Empty;
-    public string AzureApiVersion { get; set; } = "2024-02-01";
+    public string AzureApiVersion { get; set; } = "2024-10-21";
     public bool HasAzureApiKey { get; set; }
     public bool HasApimSubscriptionKey { get; set; }
     public bool UseAzureAD { get; set; }

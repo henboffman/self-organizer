@@ -83,7 +83,7 @@ public class LlmProxyService : ILlmProxyService
 
             AzureEndpoint = section.GetValue<string>("AzureOpenAI:Endpoint") ?? "",
             AzureDeploymentName = section.GetValue<string>("AzureOpenAI:DeploymentName") ?? "",
-            AzureApiVersion = section.GetValue<string>("AzureOpenAI:ApiVersion") ?? "2024-02-01",
+            AzureApiVersion = section.GetValue<string>("AzureOpenAI:ApiVersion") ?? "2024-10-21",
             HasAzureApiKey = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ApiKey")),
             HasApimSubscriptionKey = !string.IsNullOrWhiteSpace(section.GetValue<string>("AzureOpenAI:ApimSubscriptionKey")),
             UseAzureAD = section.GetValue<bool>("AzureOpenAI:UseAzureAD"),
@@ -164,7 +164,7 @@ public class LlmProxyService : ILlmProxyService
         var section = _configuration.GetSection("LlmSettings:AzureOpenAI");
         var endpoint = section.GetValue<string>("Endpoint");
         var deploymentName = section.GetValue<string>("DeploymentName");
-        var apiVersion = section.GetValue<string>("ApiVersion") ?? "2024-02-01";
+        var apiVersion = section.GetValue<string>("ApiVersion") ?? "2024-10-21";
         var useAzureAD = section.GetValue<bool>("UseAzureAD");
         var apiKey = section.GetValue<string>("ApiKey");
         var apimSubscriptionKey = section.GetValue<string>("ApimSubscriptionKey");
@@ -227,7 +227,8 @@ public class LlmProxyService : ILlmProxyService
         {
             Messages = messages,
             Temperature = request.Temperature,
-            MaxTokens = request.MaxTokens
+            MaxCompletionTokens = request.MaxTokens
+            // MaxTokens left null — deprecated for Azure OpenAI, use max_completion_tokens instead
         };
 
         var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
@@ -243,11 +244,17 @@ public class LlmProxyService : ILlmProxyService
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authHeaderValue);
         }
 
-        // Add APIM subscription key if configured (for Azure API Management gateways)
+        // Add APIM subscription key for Azure API Management gateways.
+        // Use dedicated ApimSubscriptionKey if set, otherwise send ApiKey as subscription key too.
         if (!string.IsNullOrWhiteSpace(apimSubscriptionKey))
         {
             httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", apimSubscriptionKey);
-            _logger.LogInformation("Added APIM subscription key header");
+            _logger.LogInformation("Added APIM subscription key header (dedicated key)");
+        }
+        else if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", apiKey);
+            _logger.LogInformation("Added APIM subscription key header (using api-key value)");
         }
 
         // Add User-Agent to match axios behavior (some gateways require this)

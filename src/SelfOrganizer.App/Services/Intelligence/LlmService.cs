@@ -83,7 +83,7 @@ public class LlmService : ILlmService
             Provider = settings.Provider,
             Prompt = prompt,
             SystemPrompt = options?.SystemPrompt,
-            Temperature = options?.Temperature ?? 0.7,
+            Temperature = options?.Temperature ?? 1,
             MaxTokens = options?.MaxTokens ?? 2048
         };
 
@@ -274,7 +274,7 @@ public class LlmProxyRequest
     public LlmProvider Provider { get; set; }
     public string Prompt { get; set; } = string.Empty;
     public string? SystemPrompt { get; set; }
-    public double Temperature { get; set; } = 0.7;
+    public double Temperature { get; set; } = 1;
     public int MaxTokens { get; set; } = 2048;
 }
 
