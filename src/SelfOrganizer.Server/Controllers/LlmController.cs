@@ -96,8 +96,8 @@ public class LlmController : ControllerBase
         using var handler = new HttpClientHandler { AllowAutoRedirect = false };
         using var client = new HttpClient(handler);
 
-        // Set subscription key on DefaultRequestHeaders
-        client.DefaultRequestHeaders.TryAddWithoutValidation("Ocp-Apim-Subscription-Key", subscriptionKey);
+        // api-key header — the standard Azure OpenAI auth header per MS docs
+        client.DefaultRequestHeaders.TryAddWithoutValidation("api-key", subscriptionKey);
 
         var sentHeaders = new Dictionary<string, string>();
         foreach (var h in client.DefaultRequestHeaders)

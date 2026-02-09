@@ -159,123 +159,65 @@ public class LlmProxyService : ILlmProxyService
         return new LlmProxyResponse { Success = true, Response = result?.Choices.FirstOrDefault()?.Message.Content ?? "" };
     }
 
+    /// <summary>
+    /// Azure OpenAI REST API — matches the official docs exactly:
+    /// POST {endpoint}/openai/deployments/{deployment}/chat/completions?api-version=2024-10-21
+    /// Headers: api-key, Content-Type: application/json
+    /// </summary>
     private async Task<LlmProxyResponse> GenerateWithAzureOpenAIAsync(LlmProxyRequest request)
     {
-        // ── 1. Read config ──────────────────────────────────────────────
         var section = _configuration.GetSection("LlmSettings:AzureOpenAI");
         var endpoint = section.GetValue<string>("Endpoint")?.Trim();
         var deploymentName = section.GetValue<string>("DeploymentName")?.Trim();
         var apiVersion = section.GetValue<string>("ApiVersion")?.Trim() ?? "2024-10-21";
-        var useAzureAD = section.GetValue<bool>("UseAzureAD");
         var apiKey = section.GetValue<string>("ApiKey")?.Trim();
-        var apimSubscriptionKey = section.GetValue<string>("ApimSubscriptionKey")?.Trim();
-
-        // The subscription key for APIM gateway — use dedicated APIM key, fall back to ApiKey
-        var subscriptionKey = !string.IsNullOrEmpty(apimSubscriptionKey) ? apimSubscriptionKey : apiKey;
-
-        _logger.LogInformation(
-            "Azure OpenAI config — Endpoint: {Endpoint}, Deployment: {Deployment}, ApiVersion: {ApiVersion}, " +
-            "UseAzureAD: {UseAzureAD}, HasApiKey: {HasApiKey}, HasApimKey: {HasApimKey}, HasEffectiveKey: {HasEffectiveKey}",
-            endpoint, deploymentName, apiVersion, useAzureAD,
-            !string.IsNullOrEmpty(apiKey), !string.IsNullOrEmpty(apimSubscriptionKey), !string.IsNullOrEmpty(subscriptionKey));
 
         if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(deploymentName))
-            return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI endpoint or deployment not configured" };
+            return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI: Endpoint or DeploymentName not configured" };
+        if (string.IsNullOrEmpty(apiKey))
+            return new LlmProxyResponse { Success = false, ErrorMessage = "Azure OpenAI: ApiKey not configured" };
 
-        if (string.IsNullOrEmpty(subscriptionKey))
-            return new LlmProxyResponse { Success = false, ErrorMessage = "No subscription key configured. Set ApimSubscriptionKey (or ApiKey) under LlmSettings:AzureOpenAI." };
+        // URL — exactly per Azure OpenAI REST API docs
+        var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
 
-        // ── 2. Build request body ───────────────────────────────────────
+        // Request body — only the fields Azure OpenAI expects, no empty "model"
         var messages = new List<OpenAIChatMessage>();
         if (!string.IsNullOrWhiteSpace(request.SystemPrompt))
             messages.Add(new OpenAIChatMessage { Role = "system", Content = request.SystemPrompt });
         messages.Add(new OpenAIChatMessage { Role = "user", Content = request.Prompt });
 
-        var openAiRequest = new OpenAIChatRequest
+        var body = new OpenAIChatRequest
         {
+            Model = null!, // excluded via WhenWritingNull — Azure OpenAI uses deployment in URL
             Messages = messages,
             Temperature = request.Temperature,
-            MaxCompletionTokens = request.MaxTokens
+            MaxTokens = request.MaxTokens // Azure OpenAI 2024-10-21 uses max_tokens
         };
 
-        var jsonBody = JsonSerializer.Serialize(openAiRequest, SnakeCaseOptions);
+        var jsonBody = JsonSerializer.Serialize(body, SnakeCaseOptions);
 
-        // ── 3. Build URL (no credentials in URL) ────────────────────────
-        var url = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version={apiVersion}";
-
-        // ── 4. Build HTTP request with correct headers ──────────────────
-        // For APIM portal endpoints:
-        //   - Client sends Ocp-Apim-Subscription-Key (APIM gateway auth)
-        //   - Client does NOT send api-key (APIM policy adds backend auth)
-        //   - If UseAzureAD: also send Authorization: Bearer <token>
+        // HTTP request — just api-key + Content-Type, exactly like the docs
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+        httpRequest.Headers.TryAddWithoutValidation("api-key", apiKey);
         httpRequest.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
-        // APIM subscription key — this is the primary auth header for APIM gateways.
-        // Use TryAddWithoutValidation to guarantee the header is added without any parsing.
-        httpRequest.Headers.TryAddWithoutValidation("Ocp-Apim-Subscription-Key", subscriptionKey);
+        _logger.LogInformation("Azure OpenAI POST {Url} | api-key: {KeyPreview}({KeyLen} chars) | body: {Body}",
+            url, apiKey.Length > 4 ? apiKey[..4] + "..." : "***", apiKey.Length, jsonBody);
 
-        // Azure AD bearer token (if configured)
-        if (useAzureAD)
-        {
-            var tenantId = section.GetValue<string>("TenantId")?.Trim();
-            var clientId = section.GetValue<string>("ClientId")?.Trim();
-            var clientSecret = section.GetValue<string>("ClientSecret")?.Trim();
-
-            if (string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
-                return new LlmProxyResponse { Success = false, ErrorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured" };
-
-            try
-            {
-                var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
-                var tokenResult = await credential.GetTokenAsync(
-                    new Azure.Core.TokenRequestContext(new[] { "https://cognitiveservices.azure.com/.default" }));
-                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResult.Token);
-                _logger.LogInformation("Azure AD token acquired, expires: {ExpiresOn}", tokenResult.ExpiresOn);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to acquire Azure AD token");
-                return new LlmProxyResponse { Success = false, ErrorMessage = $"Failed to acquire Azure AD token: {ex.Message}" };
-            }
-        }
-
-        // ── 5. Log exactly what we're sending ───────────────────────────
-        var headerLog = string.Join(", ", httpRequest.Headers.Select(h =>
-        {
-            var val = h.Value.FirstOrDefault() ?? "";
-            var preview = val.Length > 8 ? $"{val[..4]}...({val.Length} chars)" : "***";
-            return $"{h.Key}: {preview}";
-        }));
-        _logger.LogInformation("Azure OpenAI POST {Url}", url);
-        _logger.LogInformation("Azure OpenAI headers: [{Headers}]", headerLog);
-        _logger.LogInformation("Azure OpenAI body: {Body}", jsonBody);
-
-        // ── 6. Send request ─────────────────────────────────────────────
         var response = await _httpClient.SendAsync(httpRequest);
 
-        // Check for redirect (AllowAutoRedirect is disabled to preserve headers)
-        if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
+        // Handle redirect explicitly (AllowAutoRedirect is disabled)
+        if ((int)response.StatusCode is >= 300 and < 400)
         {
-            var location = response.Headers.Location?.ToString() ?? "(no Location header)";
-            _logger.LogWarning("Azure OpenAI returned redirect {StatusCode} to {Location}. " +
-                "This may indicate the endpoint URL needs updating.", response.StatusCode, location);
-            return new LlmProxyResponse
-            {
-                Success = false,
-                ErrorMessage = $"Azure OpenAI endpoint returned redirect ({(int)response.StatusCode}) to: {location}. Update the Endpoint config to the correct URL."
-            };
+            var location = response.Headers.Location?.ToString() ?? "(none)";
+            return new LlmProxyResponse { Success = false, ErrorMessage = $"Redirect {(int)response.StatusCode} → {location}. Check Endpoint URL." };
         }
 
         if (!response.IsSuccessStatusCode)
         {
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Azure OpenAI {StatusCode}: {ErrorContent}", response.StatusCode, errorContent);
-            return new LlmProxyResponse
-            {
-                Success = false,
-                ErrorMessage = $"Azure OpenAI returned {(int)response.StatusCode} {response.StatusCode}: {errorContent}"
-            };
+            _logger.LogError("Azure OpenAI {Status}: {Error}", response.StatusCode, errorContent);
+            return new LlmProxyResponse { Success = false, ErrorMessage = $"Azure OpenAI {(int)response.StatusCode}: {errorContent}" };
         }
 
         var result = await response.Content.ReadFromJsonAsync<OpenAIChatResponse>(CamelCaseOptions);
@@ -362,29 +304,16 @@ public class LlmProxyService : ILlmProxyService
 
     private LlmConnectionStatus GetAzureOpenAIStatus(LlmSettingsFromConfig config)
     {
-        var hasEndpointAndDeployment = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
-                                       !string.IsNullOrWhiteSpace(config.AzureDeploymentName);
-
-        // Azure AD mode requires AD credentials, but APIM subscription key is also needed
-        // when going through Azure API Management (which is the typical deployment).
-        var hasSubscriptionKey = config.HasAzureApiKey || config.HasApimSubscriptionKey;
-        var hasValidAuth = config.UseAzureAD
-            ? (config.HasAzureADConfig && hasSubscriptionKey)
-            : hasSubscriptionKey;
-        var isConfigured = hasEndpointAndDeployment && hasValidAuth;
+        var hasEndpoint = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
+                          !string.IsNullOrWhiteSpace(config.AzureDeploymentName);
+        var hasKey = config.HasAzureApiKey;
+        var isConfigured = hasEndpoint && hasKey;
 
         string? errorMessage = null;
-        if (!isConfigured)
-        {
-            if (!hasEndpointAndDeployment)
-                errorMessage = "Azure OpenAI endpoint or deployment not configured";
-            else if (config.UseAzureAD && !config.HasAzureADConfig)
-                errorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured";
-            else if (config.UseAzureAD && !hasSubscriptionKey)
-                errorMessage = "APIM subscription key (or API key) required alongside Azure AD for gateway access";
-            else if (!config.UseAzureAD && !hasSubscriptionKey)
-                errorMessage = "Azure OpenAI API key or APIM subscription key not configured";
-        }
+        if (!hasEndpoint)
+            errorMessage = "Azure OpenAI: Endpoint or DeploymentName not configured";
+        else if (!hasKey)
+            errorMessage = "Azure OpenAI: ApiKey not configured";
 
         return new LlmConnectionStatus
         {
