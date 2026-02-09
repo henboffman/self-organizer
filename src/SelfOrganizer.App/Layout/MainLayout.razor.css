@@ -56,6 +56,15 @@ main {
     color: var(--color-primary);
 }
 
+.user-greeting {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
 .content {
     padding-top: var(--space-lg);
 }

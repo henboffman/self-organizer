@@ -66,8 +66,37 @@ public class HybridRepository<T> : IRepository<T> where T : BaseEntity
         {
             try
             {
-                var results = await _httpRepository.GetAllAsync();
-                // Update local cache
+                var results = (await _httpRepository.GetAllAsync()).ToList();
+
+                // If server returned empty, check IndexedDB for pre-existing local data
+                if (results.Count == 0)
+                {
+                    var localResults = (await _indexedDbRepository.GetAllAsync()).ToList();
+                    if (localResults.Count > 0)
+                    {
+                        // Queue local items for sync to server (dedup against pending queue)
+                        var pending = await _pendingQueue.GetPendingAsync();
+                        var pendingEntityIds = new HashSet<Guid>(pending.Select(p => p.EntityId));
+
+                        foreach (var entity in localResults)
+                        {
+                            if (!pendingEntityIds.Contains(entity.Id))
+                            {
+                                await _pendingQueue.EnqueueAsync(new PendingOperation
+                                {
+                                    EntityType = _entityType,
+                                    EntityId = entity.Id,
+                                    OperationType = OperationType.Create,
+                                    Timestamp = DateTime.UtcNow
+                                });
+                            }
+                        }
+
+                        return localResults;
+                    }
+                }
+
+                // Update local cache with server data
                 foreach (var entity in results)
                 {
                     try

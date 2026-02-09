@@ -15,6 +15,9 @@
 @inject IBalanceDimensionService BalanceDimensionService
 @inject ISettingsExportService SettingsExportService
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject IEntraAuthService AuthService
+@inject IOutlookCalendarSyncService OutlookSyncService
 
 <div class="settings-page">
     <div class="settings-header">
@@ -322,12 +325,12 @@
                                     <span>Local, free, private</span>
                                 </div>
                             </label>
-                            <label class="provider-option @(_llmProvider == LlmProvider.OpenAI ? "selected" : "")">
-                                <input type="radio" name="provider" checked="@(_llmProvider == LlmProvider.OpenAI)"
-                                       @onchange="() => _llmProvider = LlmProvider.OpenAI" />
+                            <label class="provider-option @(_llmProvider == LlmProvider.AzureOpenAI ? "selected" : "")">
+                                <input type="radio" name="provider" checked="@(_llmProvider == LlmProvider.AzureOpenAI)"
+                                       @onchange="() => _llmProvider = LlmProvider.AzureOpenAI" />
                                 <div class="provider-info">
-                                    <strong>OpenAI</strong>
-                                    <span>GPT-4, cloud-based</span>
+                                    <strong>Azure OpenAI</strong>
+                                    <span>GPT-4, enterprise cloud</span>
                                 </div>
                             </label>
                             <label class="provider-option @(_llmProvider == LlmProvider.Anthropic ? "selected" : "")">
@@ -430,6 +433,53 @@
                     <div class="export-result @(_importResult.Success ? "success" : "error")">
                         <span class="oi @(_importResult.Success ? "oi-check" : "oi-warning")"></span>
                         <span>@_importResult.Message</span>
+                    </div>
+                }
+            </div>
+
+            <div class="settings-section">
+                <h3>Outlook Sync</h3>
+                <p class="section-description">Sync calendar events from Microsoft Outlook</p>
+
+                @if (AuthService.State != AuthState.Authenticated)
+                {
+                    <div class="data-actions">
+                        <button class="data-action-btn" @onclick="SignInForOutlook">
+                            <span class="oi oi-account-login"></span>
+                            <div>
+                                <strong>Sign In with Microsoft</strong>
+                                <span>Required to sync Outlook calendar</span>
+                            </div>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="data-actions">
+                        <button class="data-action-btn" @onclick="SyncOutlookCalendar" disabled="@_isSyncingOutlook">
+                            <span class="oi oi-reload"></span>
+                            <div>
+                                <strong>Sync Outlook Calendar</strong>
+                                <span>Pull latest events from Outlook</span>
+                            </div>
+                            @if (_isSyncingOutlook)
+                            {
+                                <span class="spinner-border spinner-border-sm"></span>
+                            }
+                        </button>
+                    </div>
+
+                    @if (_outlookSyncResult != null)
+                    {
+                        <div class="export-result @(_outlookSyncResult.Success ? "success" : "error")">
+                            <span class="oi @(_outlookSyncResult.Success ? "oi-check" : "oi-warning")"></span>
+                            <span>@(_outlookSyncResult.Success ? $"Synced {_outlookSyncResult.EventsSynced} events ({_outlookSyncResult.EventsCreated} new, {_outlookSyncResult.EventsUpdated} updated)" : _outlookSyncResult.Error)</span>
+                        </div>
+                    }
+
+                    <div class="config-note">
+                        <span class="oi oi-info"></span>
+                        <span>For calendar selection and detailed sync settings, go to <a href="settings/calendar-providers">Calendar Providers</a>.</span>
                     </div>
                 }
             </div>
@@ -539,6 +589,10 @@
     // Context management
     private List<Context>? _contexts;
     private string _newContextName = string.Empty;
+
+    // Outlook Sync
+    private bool _isSyncingOutlook = false;
+    private CalendarSyncResultCore? _outlookSyncResult;
 
     // LLM Settings
     private bool _llmEnabled = true;
@@ -861,6 +915,68 @@
         finally
         {
             _isTestingLlm = false;
+        }
+    }
+
+    private void SignInForOutlook()
+    {
+        Navigation.NavigateTo("settings/calendar-providers");
+    }
+
+    private async Task SyncOutlookCalendar()
+    {
+        _isSyncingOutlook = true;
+        _outlookSyncResult = null;
+        StateHasChanged();
+
+        try
+        {
+            // Load sync settings from preferences
+            var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
+            var selectedIds = prefs?.OutlookCalendarSelectedIds ?? new List<string>();
+            var pastDays = prefs?.OutlookCalendarSyncPastDays ?? 7;
+            var futureDays = prefs?.OutlookCalendarSyncFutureDays ?? 30;
+
+            // If no calendars selected, try to get the default one
+            if (!selectedIds.Any())
+            {
+                var calendars = await OutlookSyncService.GetCalendarsAsync();
+                var defaultCal = calendars.FirstOrDefault(c => c.IsDefaultCalendar) ?? calendars.FirstOrDefault();
+                if (defaultCal != null)
+                {
+                    selectedIds = new List<string> { defaultCal.Id };
+                }
+            }
+
+            if (!selectedIds.Any())
+            {
+                _outlookSyncResult = new CalendarSyncResultCore
+                {
+                    Success = false,
+                    Error = "No calendars found. Go to Calendar Providers to set up."
+                };
+                return;
+            }
+
+            _outlookSyncResult = await OutlookSyncService.SyncCalendarsAsync(selectedIds, pastDays, futureDays);
+
+            if (_outlookSyncResult.Success && prefs != null)
+            {
+                prefs.OutlookCalendarLastSyncTime = DateTime.UtcNow;
+                await PreferencesRepository.UpdateAsync(prefs);
+            }
+        }
+        catch (Exception ex)
+        {
+            _outlookSyncResult = new CalendarSyncResultCore
+            {
+                Success = false,
+                Error = $"Sync failed: {ex.Message}"
+            };
+        }
+        finally
+        {
+            _isSyncingOutlook = false;
         }
     }
 }
