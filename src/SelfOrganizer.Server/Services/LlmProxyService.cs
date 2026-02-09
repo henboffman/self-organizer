@@ -242,29 +242,35 @@ public class LlmProxyService : ILlmProxyService
         _logger.LogInformation("Azure OpenAI request URL: {Url}", url);
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+
+        // Determine the APIM subscription key value (dedicated key takes priority, then apiKey)
+        var effectiveSubscriptionKey = !string.IsNullOrWhiteSpace(apimSubscriptionKey) ? apimSubscriptionKey : apiKey;
+        var isApimMode = !string.IsNullOrWhiteSpace(apimSubscriptionKey);
+
         if (useApiKeyAuth)
         {
-            if (!string.IsNullOrWhiteSpace(authHeaderValue))
+            // Only send api-key header when NOT going through APIM.
+            // Behind APIM, the gateway handles backend auth — sending api-key causes 403.
+            if (!isApimMode && !string.IsNullOrWhiteSpace(authHeaderValue))
             {
                 httpRequest.Headers.Add("api-key", authHeaderValue);
+                _logger.LogInformation("Direct mode: added api-key header");
             }
         }
         else
         {
+            // Azure AD: send Bearer token for backend auth
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authHeaderValue);
+            _logger.LogInformation("Azure AD mode: added Bearer token");
         }
 
-        // Add APIM subscription key for Azure API Management gateways.
-        // Use dedicated ApimSubscriptionKey if set, otherwise send ApiKey as subscription key too.
-        if (!string.IsNullOrWhiteSpace(apimSubscriptionKey))
+        // Always send Ocp-Apim-Subscription-Key when any subscription key is available.
+        // Required for APIM gateways regardless of auth mode (api-key or Azure AD).
+        if (!string.IsNullOrWhiteSpace(effectiveSubscriptionKey))
         {
-            httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", apimSubscriptionKey);
-            _logger.LogInformation("Added APIM subscription key header (dedicated key)");
-        }
-        else if (!string.IsNullOrWhiteSpace(apiKey))
-        {
-            httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", apiKey);
-            _logger.LogInformation("Added APIM subscription key header (using api-key value)");
+            httpRequest.Headers.Add("Ocp-Apim-Subscription-Key", effectiveSubscriptionKey);
+            _logger.LogInformation("Added Ocp-Apim-Subscription-Key header ({Source})",
+                isApimMode ? "dedicated APIM key" : "using api-key value");
         }
 
         // Add User-Agent to match axios behavior (some gateways require this)
@@ -375,9 +381,12 @@ public class LlmProxyService : ILlmProxyService
         var hasEndpointAndDeployment = !string.IsNullOrWhiteSpace(config.AzureEndpoint) &&
                                        !string.IsNullOrWhiteSpace(config.AzureDeploymentName);
 
+        // Azure AD mode requires AD credentials, but APIM subscription key is also needed
+        // when going through Azure API Management (which is the typical deployment).
+        var hasSubscriptionKey = config.HasAzureApiKey || config.HasApimSubscriptionKey;
         var hasValidAuth = config.UseAzureAD
-            ? config.HasAzureADConfig
-            : (config.HasAzureApiKey || config.HasApimSubscriptionKey);
+            ? (config.HasAzureADConfig && hasSubscriptionKey)
+            : hasSubscriptionKey;
         var isConfigured = hasEndpointAndDeployment && hasValidAuth;
 
         string? errorMessage = null;
@@ -387,7 +396,9 @@ public class LlmProxyService : ILlmProxyService
                 errorMessage = "Azure OpenAI endpoint or deployment not configured";
             else if (config.UseAzureAD && !config.HasAzureADConfig)
                 errorMessage = "Azure AD credentials (TenantId, ClientId, ClientSecret) not configured";
-            else if (!config.UseAzureAD && !config.HasAzureApiKey && !config.HasApimSubscriptionKey)
+            else if (config.UseAzureAD && !hasSubscriptionKey)
+                errorMessage = "APIM subscription key (or API key) required alongside Azure AD for gateway access";
+            else if (!config.UseAzureAD && !hasSubscriptionKey)
                 errorMessage = "Azure OpenAI API key or APIM subscription key not configured";
         }
 
