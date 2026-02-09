@@ -66,38 +66,36 @@ public class HybridRepository<T> : IRepository<T> where T : BaseEntity
         {
             try
             {
-                var results = (await _httpRepository.GetAllAsync()).ToList();
+                var serverResults = (await _httpRepository.GetAllAsync()).ToList();
+                var localResults = (await _indexedDbRepository.GetAllAsync()).ToList();
 
-                // If server returned empty, check IndexedDB for pre-existing local data
-                if (results.Count == 0)
+                // Find items that exist locally but not on the server
+                var serverIds = new HashSet<Guid>(serverResults.Select(e => e.Id));
+                var localOnlyItems = localResults.Where(e => !serverIds.Contains(e.Id)).ToList();
+
+                // Queue local-only items for sync to server (dedup against pending queue)
+                if (localOnlyItems.Count > 0)
                 {
-                    var localResults = (await _indexedDbRepository.GetAllAsync()).ToList();
-                    if (localResults.Count > 0)
+                    var pending = await _pendingQueue.GetPendingAsync();
+                    var pendingEntityIds = new HashSet<Guid>(pending.Select(p => p.EntityId));
+
+                    foreach (var entity in localOnlyItems)
                     {
-                        // Queue local items for sync to server (dedup against pending queue)
-                        var pending = await _pendingQueue.GetPendingAsync();
-                        var pendingEntityIds = new HashSet<Guid>(pending.Select(p => p.EntityId));
-
-                        foreach (var entity in localResults)
+                        if (!pendingEntityIds.Contains(entity.Id))
                         {
-                            if (!pendingEntityIds.Contains(entity.Id))
+                            await _pendingQueue.EnqueueAsync(new PendingOperation
                             {
-                                await _pendingQueue.EnqueueAsync(new PendingOperation
-                                {
-                                    EntityType = _entityType,
-                                    EntityId = entity.Id,
-                                    OperationType = OperationType.Create,
-                                    Timestamp = DateTime.UtcNow
-                                });
-                            }
+                                EntityType = _entityType,
+                                EntityId = entity.Id,
+                                OperationType = OperationType.Create,
+                                Timestamp = DateTime.UtcNow
+                            });
                         }
-
-                        return localResults;
                     }
                 }
 
-                // Update local cache with server data
-                foreach (var entity in results)
+                // Cache server items locally
+                foreach (var entity in serverResults)
                 {
                     try
                     {
@@ -108,7 +106,9 @@ public class HybridRepository<T> : IRepository<T> where T : BaseEntity
                         await _indexedDbRepository.AddAsync(entity);
                     }
                 }
-                return results;
+
+                // Return merged: server items + local-only items
+                return serverResults.Concat(localOnlyItems);
             }
             catch (Exception ex) when (ex is HttpRequestException or JsonException)
             {

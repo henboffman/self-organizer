@@ -49,6 +49,10 @@ public partial class MainLayout : IDisposable
             _dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("keyboardShortcuts.init", _dotNetRef);
 
+            // Check auth state so the user's name appears in the top bar
+            EntraAuthService.OnAuthStateChanged += HandleAuthStateChanged;
+            await EntraAuthService.CheckSessionAsync();
+
             // Check onboarding status
             if (!_checkedOnboarding)
             {
@@ -56,11 +60,38 @@ public partial class MainLayout : IDisposable
                 var prefs = (await PreferencesRepository.GetAllAsync()).FirstOrDefault();
                 if (prefs == null || !prefs.OnboardingCompleted)
                 {
-                    _showOnboarding = true;
-                    StateHasChanged();
+                    // Before showing the wizard, check if the user already has real data
+                    // in IndexedDB (e.g., migrated from a previous version). If so, skip
+                    // onboarding to avoid overwriting their data with sample tasks.
+                    var existingTaskCount = await DbService.CountAsync("tasks");
+                    var existingProjectCount = await DbService.CountAsync("projects");
+                    if (existingTaskCount == 0 && existingProjectCount == 0)
+                    {
+                        _showOnboarding = true;
+                        StateHasChanged();
+                    }
+                    else
+                    {
+                        // User has data — mark onboarding as completed so we don't check again
+                        if (prefs == null)
+                        {
+                            prefs = new UserPreferences { OnboardingCompleted = true };
+                            await PreferencesRepository.AddAsync(prefs);
+                        }
+                        else
+                        {
+                            prefs.OnboardingCompleted = true;
+                            await PreferencesRepository.UpdateAsync(prefs);
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private void HandleAuthStateChanged(AuthState _)
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
@@ -229,6 +260,7 @@ public partial class MainLayout : IDisposable
 
     public void Dispose()
     {
+        EntraAuthService.OnAuthStateChanged -= HandleAuthStateChanged;
         _dotNetRef?.Dispose();
         try
         {
